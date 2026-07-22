@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -200,6 +200,26 @@ def test_notification_migration_preserves_history_and_protects_system_reasons():
     assert "failed_demo_lesson" in migration
     assert "is_system_generated" in migration
     assert "DELETE FROM msi_v2.teacher_candidates" not in migration
+
+
+def test_browser_reminder_migration_backfills_future_appointments_and_retires_telegram_delivery():
+    migration = (
+        ROOT
+        / "database/alembic/versions/0036_browser_recruitment_reminders.py"
+    ).read_text()
+
+    assert 'revision = "0037_browser_reminders"' in migration
+    assert 'down_revision = "0036_future_stage_anchor"' in migration
+    assert "teacher_recruitment_reminder_config" in migration
+    assert "teacher_recruitment_browser_preferences" in migration
+    assert "browser_delivered_at" in migration
+    assert "appointment_reminder" in migration
+    assert "lead_minutes BETWEEN 5 AND 120" in migration
+    assert "appointment.created_by_account_id" in migration
+    assert "appointment.responsible_account_id" in migration
+    assert "telegram_status = 'cancelled'" in migration
+    assert "DELETE FROM msi_v2.teacher_candidates" not in migration
+    assert "DELETE FROM msi_v2.teacher_candidate_appointments" not in migration
 
 
 def test_notification_dashboard_can_request_unread_rows_only():
@@ -424,6 +444,105 @@ def test_only_assigned_evaluator_can_start_demo(monkeypatch):
     assert exc.value.status_code == 403
     assert starts == []
     assert conn.commits == 0
+
+
+def test_accidental_interview_start_restores_original_schedule(monkeypatch):
+    conn = _Connection()
+    calls = []
+    audits = []
+    reads = [
+        {
+            "id": 92,
+            "candidate_id": 7,
+            "appointment_type": "job_interview",
+            "status": "in_progress",
+            "starts_at": "2026-07-22T09:05:00+00:00",
+            "started_at": "2026-07-22T09:05:00+00:00",
+            "pre_start_starts_at": "2026-07-22T11:00:00+00:00",
+            "pre_start_ends_at": None,
+            "responsible_account_id": 41,
+            "version": 5,
+        },
+        {
+            "id": 92,
+            "candidate_id": 7,
+            "appointment_type": "job_interview",
+            "status": "scheduled",
+            "starts_at": "2026-07-22T11:00:00+00:00",
+            "ends_at": None,
+            "started_at": None,
+            "pre_start_starts_at": None,
+            "pre_start_ends_at": None,
+            "responsible_account_id": 41,
+            "version": 6,
+        },
+    ]
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(
+        repository,
+        "lock_candidate_decision_row",
+        lambda *_args, **_kwargs: {"id": 7, "status": "job_interview"},
+    )
+    monkeypatch.setattr(
+        repository,
+        "get_appointment_row",
+        lambda *_args, **_kwargs: reads.pop(0),
+    )
+    monkeypatch.setattr(
+        repository,
+        "undo_appointment_start",
+        lambda *_args, **kwargs: calls.append(kwargs)
+        or {"id": 92, "version": 6, "status": "scheduled"},
+    )
+    monkeypatch.setattr(repository, "touch_candidate", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        service,
+        "_audit_appointment",
+        lambda *_args, **kwargs: audits.append(
+            (kwargs["event_type"], kwargs["detail"])
+        ),
+    )
+    monkeypatch.setattr(
+        service, "_sync_system_next_actions", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        service, "get_candidate", lambda *_args, **_kwargs: {"id": 7}
+    )
+
+    result = service.undo_appointment_start(
+        _user(),
+        7,
+        92,
+        expected_version=5,
+    )
+
+    assert calls[0]["expected_version"] == 5
+    assert result["appointment"]["status"] == "scheduled"
+    assert result["appointment"]["starts_at"] == "2026-07-22T11:00:00+00:00"
+    assert result["appointment"]["can_start"] is True
+    assert audits == [
+        (
+            "candidate.interview_start_cancelled",
+            {
+                "cancelled_started_at": "2026-07-22T09:05:00+00:00",
+                "restored_starts_at": "2026-07-22T11:00:00+00:00",
+                "restored_schedule": True,
+            },
+        )
+    ]
+    assert conn.commits == 1
+
+
+def test_start_rollback_migration_backfills_active_production_sessions():
+    migration = (
+        ROOT
+        / "database/alembic/versions/0037_recruitment_appointment_start_rollback.py"
+    ).read_text()
+
+    assert 'down_revision = "0037_browser_reminders"' in migration
+    assert "ADD COLUMN IF NOT EXISTS pre_start_starts_at" in migration
+    assert "audit.detail_json->>'scheduled_starts_at'" in migration
+    assert "appointment.status = 'in_progress'" in migration
 
 
 def test_interview_completion_uses_existing_structured_profile_fields(monkeypatch):
@@ -863,7 +982,7 @@ def test_hr_cannot_record_demo_without_an_assigned_appointment(monkeypatch):
 
 def test_hr_demo_notification_links_back_to_hr_recruitment():
     assert notifications._candidate_action_url(7, "hr_manager") == (
-        "/hr-manager/recruitment/candidates/7?tab=evaluations"
+        "/hr-manager/candidates/7?tab=evaluations"
     )
 
 
@@ -1216,7 +1335,7 @@ def test_passed_interview_moves_job_interview_to_test_and_demo(monkeypatch):
     assert conn.commits == 1
 
 
-def test_demo_notifications_have_versioned_dedupe_keys_and_future_reminders():
+def test_demo_notifications_create_one_browser_reminder_for_hr_and_evaluator():
     class NotificationConnection:
         def __init__(self):
             self.calls = []
@@ -1225,12 +1344,17 @@ def test_demo_notifications_have_versioned_dedupe_keys_and_future_reminders():
             self.calls.append((sql, params))
             return self
 
+        def fetchone(self):
+            return {"lead_minutes": 15, "version": 1}
+
     conn = NotificationConnection()
     appointment = {
         "id": 92,
         "candidate_id": 7,
         "appointment_type": "demo_lesson",
         "starts_at": datetime(2099, 7, 16, 5, 0, tzinfo=UTC),
+        "created_by_account_id": 42,
+        "created_by_role": "hr_manager",
         "responsible_account_id": 41,
         "responsible_role": "head_of_department",
         "candidate_name": "Candidate Seven",
@@ -1249,10 +1373,123 @@ def test_demo_notifications_have_versioned_dedupe_keys_and_future_reminders():
     assert len(insert_params) == 3
     assert {params[-1] for params in insert_params} == {
         "appointment:92:demo_assigned:3",
-        "appointment:92:demo_reminder_24h:3",
-        "appointment:92:demo_reminder_1h:3",
+        "appointment:92:appointment_reminder:3:41:lead:15",
+        "appointment:92:appointment_reminder:3:42:lead:15",
     }
-    assert all(params[6].startswith("/head-of-departments/recruitment") for params in insert_params)
+    assert any(params[6].startswith("/hr-manager/candidates") for params in insert_params)
+    assert any(params[6].startswith("/head-of-departments/recruitment") for params in insert_params)
+
+
+def test_short_notice_appointment_does_not_create_a_browser_reminder():
+    class NotificationConnection:
+        def __init__(self):
+            self.calls = []
+
+        def execute(self, sql, params=None):
+            self.calls.append((sql, params))
+            return self
+
+        def fetchone(self):
+            return {"lead_minutes": 15, "version": 1}
+
+    conn = NotificationConnection()
+    notifications.enqueue_appointment_reminders(
+        conn,
+        appointment={
+            "id": 93,
+            "candidate_id": 8,
+            "appointment_type": "job_interview",
+            "starts_at": datetime.now(UTC).replace(microsecond=0)
+            + timedelta(minutes=10),
+            "created_by_account_id": 42,
+            "created_by_role": "hr_manager",
+            "responsible_account_id": 42,
+            "responsible_role": "hr_manager",
+            "candidate_name": "Short Notice",
+        },
+        version_token=1,
+    )
+
+    inserts = [
+        sql
+        for sql, _params in conn.calls
+        if "INSERT INTO msi_v2.teacher_recruitment_notifications" in sql
+    ]
+    assert inserts == []
+
+
+def test_hr_demo_evaluator_receives_only_one_browser_reminder():
+    class NotificationConnection:
+        def __init__(self):
+            self.calls = []
+
+        def execute(self, sql, params=None):
+            self.calls.append((sql, params))
+            return self
+
+        def fetchone(self):
+            return {"lead_minutes": 15, "version": 1}
+
+    conn = NotificationConnection()
+    notifications.enqueue_appointment_reminders(
+        conn,
+        appointment={
+            "id": 94,
+            "candidate_id": 9,
+            "appointment_type": "demo_lesson",
+            "starts_at": datetime(2099, 7, 16, 5, 0, tzinfo=UTC),
+            "created_by_account_id": 42,
+            "created_by_role": "hr_manager",
+            "responsible_account_id": 42,
+            "responsible_role": "hr_manager",
+            "candidate_name": "HR Evaluator",
+        },
+        version_token=2,
+    )
+
+    insert_params = [
+        params
+        for sql, params in conn.calls
+        if "INSERT INTO msi_v2.teacher_recruitment_notifications" in sql
+    ]
+    assert len(insert_params) == 1
+    assert insert_params[0][-1] == (
+        "appointment:94:appointment_reminder:2:42:lead:15"
+    )
+
+
+def test_updating_reminder_lead_time_recalculates_future_appointments(monkeypatch):
+    conn = _Connection()
+    recalculated = []
+    audits = []
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(
+        repository,
+        "update_recruitment_reminder_config",
+        lambda *_args, **kwargs: {
+            "lead_minutes": kwargs["lead_minutes"],
+            "version": kwargs["expected_version"] + 1,
+        },
+    )
+    monkeypatch.setattr(
+        repository,
+        "recalculate_future_appointment_reminders",
+        lambda *_args, **kwargs: recalculated.append(kwargs["lead_minutes"]),
+    )
+    monkeypatch.setattr(
+        repository,
+        "insert_recruitment_setting_audit",
+        lambda *_args, **kwargs: audits.append(kwargs["detail"]),
+    )
+
+    result = service.update_appointment_reminder_config(
+        _user(), lead_minutes=10, expected_version=3
+    )
+
+    assert result == {"lead_minutes": 10, "version": 4}
+    assert recalculated == [10]
+    assert audits == [{"lead_minutes": 10}]
+    assert conn.commits == 1
 
 
 def test_delete_evaluation_is_permanent_and_minimally_audited(monkeypatch):

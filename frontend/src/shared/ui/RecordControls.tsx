@@ -46,7 +46,7 @@ export function PaginationControls({
 
   return (
     <div className="flex items-center justify-between gap-2 border-t border-foreground/5 pt-2">
-      <span className="text-[11px] font-semibold text-muted-foreground">
+      <span className="text-[0.6875rem] font-semibold text-muted-foreground">
         {label || `Page ${page} of ${totalPages}`}
       </span>
       <div className="flex items-center gap-1">
@@ -54,7 +54,7 @@ export function PaginationControls({
           type="button"
           disabled={page <= 1}
           onClick={() => onPageChange(Math.max(1, page - 1))}
-          className="h-7 rounded-md border border-foreground/10 px-2 text-[11px] font-bold text-muted-foreground hover:bg-muted disabled:opacity-40"
+          className="h-7 rounded-md border border-foreground/10 px-2 text-[0.6875rem] font-bold text-muted-foreground hover:bg-muted disabled:opacity-40"
         >
           Prev
         </button>
@@ -62,7 +62,7 @@ export function PaginationControls({
           type="button"
           disabled={page >= totalPages}
           onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-          className="h-7 rounded-md border border-foreground/10 px-2 text-[11px] font-bold text-muted-foreground hover:bg-muted disabled:opacity-40"
+          className="h-7 rounded-md border border-foreground/10 px-2 text-[0.6875rem] font-bold text-muted-foreground hover:bg-muted disabled:opacity-40"
         >
           Next
         </button>

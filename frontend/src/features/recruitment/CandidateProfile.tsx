@@ -1,5 +1,6 @@
 import {
   Activity,
+  AlertTriangle,
   ArrowLeft,
   Ban,
   BriefcaseBusiness,
@@ -238,10 +239,10 @@ function InlineField({
         className="h-16 w-full min-w-0 overflow-hidden rounded-lg bg-muted/45 px-3 py-1.5 text-left transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait"
         aria-label={`Edit ${label}`}
       >
-        <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <span className="block text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
           {label}
         </span>
-        <span className="mt-0.5 block truncate text-[13px] font-semibold text-foreground" title={displayValue || String(value ?? "") || "Not set"}>
+        <span className="mt-0.5 block truncate text-[0.8125rem] font-semibold text-foreground" title={displayValue || String(value ?? "") || "Not set"}>
           {displayValue || String(value ?? "") || "Not set"}
         </span>
       </button>
@@ -256,8 +257,8 @@ function InlineField({
           className={`absolute inset-x-0 top-0 z-20 rounded-lg border border-primary/30 bg-card p-1.5 shadow-card-hover focus-within:ring-2 focus-within:ring-primary/20 ${multiline ? "min-h-40" : "h-16"}`}
         >
           <div className={multiline ? "grid gap-1.5" : "grid h-full grid-cols-[minmax(0,1fr)_2.75rem_2.75rem] items-center gap-1"}>
-            <label className={multiline ? "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground" : "relative min-w-0"}>
-              <span className={multiline ? "block" : "pointer-events-none absolute left-3 top-1 z-10 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"}>{label}</span>
+            <label className={multiline ? "text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground" : "relative min-w-0"}>
+              <span className={multiline ? "block" : "pointer-events-none absolute left-3 top-1 z-10 text-[0.5625rem] font-semibold uppercase tracking-wide text-muted-foreground"}>{label}</span>
               {options.length ? (
                 <select
                   id={`candidate-inline-${fieldId}`}
@@ -390,20 +391,20 @@ function AttemptList({
               </div>
             </div>
             {item.score !== null && item.score !== undefined ? (
-              <p className="mt-2 text-[13px] font-semibold">
+              <p className="mt-2 text-[0.8125rem] font-semibold">
                 Score: {text(item.score)}
                 {item.maximum_score
                   ? ` / ${text(item.maximum_score)} (${text(item.percentage || 0)}%)`
                   : " / 10"}
               </p>
             ) : null}
-            {item.overall_score !== null && item.overall_score !== undefined ? <p className="mt-2 text-[13px] font-semibold">Overall: {text(item.overall_score)} / 10{item.communication_score !== null && item.communication_score !== undefined ? ` · Communication: ${text(item.communication_score)} / 10` : ""}{item.cefr_level ? ` · CEFR ${text(item.cefr_level)}` : ""}</p> : null}
+            {item.overall_score !== null && item.overall_score !== undefined ? <p className="mt-2 text-[0.8125rem] font-semibold">Overall: {text(item.overall_score)} / 10{item.communication_score !== null && item.communication_score !== undefined ? ` · Communication: ${text(item.communication_score)} / 10` : ""}{item.cefr_level ? ` · CEFR ${text(item.cefr_level)}` : ""}</p> : null}
             {item.paper ? <p className="mt-1 text-xs text-muted-foreground">Paper: {text(item.paper)}</p> : null}
-            {Array.isArray(item.topic_scores) && item.topic_scores.length ? <div className="mt-2 flex flex-wrap gap-1">{item.topic_scores.map((entry, index) => { const score = entry as Record<string, unknown>; return <span key={`${text(score.topic)}-${index}`} className="rounded-full bg-muted px-2 py-1 text-[11px]">{text(score.topic)}: {text(score.score)}/{text(score.maximum_score)}</span>; })}</div> : null}
-            {Array.isArray(item.criteria_scores) && item.criteria_scores.length ? <div className="mt-2 flex flex-wrap gap-1">{item.criteria_scores.map((entry, index) => { const score = entry as Record<string, unknown>; return <span key={`${text(score.criterion)}-${index}`} className="rounded-full bg-muted px-2 py-1 text-[11px]">{text(score.criterion)}: {text(score.score)}/{text(score.maximum_score)}</span>; })}</div> : null}
+            {Array.isArray(item.topic_scores) && item.topic_scores.length ? <div className="mt-2 flex flex-wrap gap-1">{item.topic_scores.map((entry, index) => { const score = entry as Record<string, unknown>; return <span key={`${text(score.topic)}-${index}`} className="rounded-full bg-muted px-2 py-1 text-[0.6875rem]">{text(score.topic)}: {text(score.score)}/{text(score.maximum_score)}</span>; })}</div> : null}
+            {Array.isArray(item.criteria_scores) && item.criteria_scores.length ? <div className="mt-2 flex flex-wrap gap-1">{item.criteria_scores.map((entry, index) => { const score = entry as Record<string, unknown>; return <span key={`${text(score.criterion)}-${index}`} className="rounded-full bg-muted px-2 py-1 text-[0.6875rem]">{text(score.criterion)}: {text(score.score)}/{text(score.maximum_score)}</span>; })}</div> : null}
             {visibleDetails.length ? (
               <div className="mt-3 border-t border-border pt-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                   Interview notes
                 </p>
                 <dl className="mt-2 grid gap-2">
@@ -412,10 +413,10 @@ function AttemptList({
                       key={detail.label}
                       className="min-w-0 rounded-md bg-muted/45 px-2.5 py-2"
                     >
-                      <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      <dt className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
                         {detail.label}
                       </dt>
-                      <dd className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-5 text-foreground">
+                      <dd className="mt-0.5 whitespace-pre-wrap break-words text-[0.8125rem] leading-5 text-foreground">
                         {text(detail.value)}
                       </dd>
                     </div>
@@ -424,7 +425,7 @@ function AttemptList({
               </div>
             ) : null}
             {note || !visibleDetails.length ? (
-              <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-5 text-muted-foreground">
+              <p className="mt-1.5 whitespace-pre-wrap break-words text-[0.8125rem] leading-5 text-muted-foreground">
                 {note || "No notes"}
               </p>
             ) : null}
@@ -462,7 +463,7 @@ function SubjectTestList({
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-[13px] font-semibold">{paper}</p>
+                <p className="truncate text-[0.8125rem] font-semibold">{paper}</p>
                 <p className="mt-1 flex items-center gap-2 text-xs font-semibold">
                   <span className="text-muted-foreground">Status:</span>
                   <StatusBadge status={text(item.result)} />
@@ -662,7 +663,7 @@ function AcademyAssessmentDetails({
         <p className="text-xs font-semibold text-foreground">
           Full lesson evaluation
         </p>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[0.6875rem] text-muted-foreground">
           {dateTimeLabel(assessment.assessment_datetime)}
           {assessment.class_label ? ` · ${assessment.class_label}` : ""}
         </p>
@@ -670,7 +671,7 @@ function AcademyAssessmentDetails({
 
       {sections.length ? (
         <section>
-          <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <h4 className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
             Lesson areas
           </h4>
           <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
@@ -681,14 +682,14 @@ function AcademyAssessmentDetails({
               >
                 <div className="flex items-start justify-between gap-2">
                   <strong className="text-xs text-foreground">{item.label}</strong>
-                  <span className="shrink-0 text-[10px] font-semibold text-muted-foreground">
+                  <span className="shrink-0 text-[0.625rem] font-semibold text-muted-foreground">
                     {[item.status ? humanize(item.status) : "", item.timeUsed]
                       .filter(Boolean)
                       .join(" · ")}
                   </span>
                 </div>
                 {item.remarks ? (
-                  <p className="mt-1 whitespace-pre-wrap text-[11px] leading-4 text-muted-foreground">
+                  <p className="mt-1 whitespace-pre-wrap text-[0.6875rem] leading-4 text-muted-foreground">
                     {item.remarks}
                   </p>
                 ) : null}
@@ -700,7 +701,7 @@ function AcademyAssessmentDetails({
 
       {criteria.length ? (
         <section>
-          <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <h4 className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
             Assessment criteria
           </h4>
           <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
@@ -716,7 +717,7 @@ function AcademyAssessmentDetails({
                   </span>
                 </div>
                 {item.remarks ? (
-                  <p className="mt-1 whitespace-pre-wrap text-[11px] leading-4 text-muted-foreground">
+                  <p className="mt-1 whitespace-pre-wrap text-[0.6875rem] leading-4 text-muted-foreground">
                     {item.remarks}
                   </p>
                 ) : null}
@@ -730,10 +731,10 @@ function AcademyAssessmentDetails({
         <dl className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
           {notes.map(([label, value]) => (
             <div key={label} className="rounded-md bg-muted/55 px-2.5 py-1.5">
-              <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <dt className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
                 {label}
               </dt>
-              <dd className="mt-1 whitespace-pre-wrap text-[11px] leading-4 text-foreground">
+              <dd className="mt-1 whitespace-pre-wrap text-[0.6875rem] leading-4 text-foreground">
                 {value}
               </dd>
             </div>
@@ -818,7 +819,7 @@ function TrainingPanel({
             className={`min-w-0 rounded-lg border px-2.5 py-1.5 shadow-sm ${tone}`}
             aria-label={`${label}: ${value}`}
           >
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
               {label}
             </p>
             <p
@@ -841,7 +842,7 @@ function TrainingPanel({
               className="min-w-32 max-w-5xl flex-1"
               aria-label={`${summary.evaluated} of ${summary.assigned} lessons covered, ${lessonsLeft} left`}
             >
-              <div className="mb-0.5 flex items-center justify-between gap-2 text-[10px] font-semibold text-muted-foreground">
+              <div className="mb-0.5 flex items-center justify-between gap-2 text-[0.625rem] font-semibold text-muted-foreground">
                 <span>
                   {summary.isComplete ? "Teacher Academy completed" : `${summary.evaluated}/${summary.assigned} covered`}
                 </span>
@@ -892,7 +893,7 @@ function TrainingPanel({
                 <caption className="sr-only">
                   Teacher Academy lesson delivery and latest evaluation details
                 </caption>
-                <thead className="bg-muted/60 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <thead className="bg-muted/60 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th scope="col" className="w-[31%] px-3 py-1.5">Assigned Topics</th>
                     <th scope="col" className="w-[19%] px-3 py-1.5">Evaluated Date</th>
@@ -933,7 +934,7 @@ function TrainingPanel({
                           }`}
                         >
                           <th scope="row" className="px-3 py-1.5">
-                            <span className="block truncate text-[13px] font-semibold text-foreground" title={title.number}>
+                            <span className="block truncate text-[0.8125rem] font-semibold text-foreground" title={title.number}>
                               {title.number}
                             </span>
                             <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground" title={title.topic}>
@@ -950,7 +951,7 @@ function TrainingPanel({
                           </td>
                           <td className="px-3 py-1.5">
                             {assessment ? (
-                              <span className="text-[13px] font-semibold tabular-nums text-foreground">
+                              <span className="text-[0.8125rem] font-semibold tabular-nums text-foreground">
                                 {trainingScore(assessment.weighted_overall_score)}
                               </span>
                             ) : (
@@ -1355,7 +1356,7 @@ function ActionFields({
       return (
         <div className="grid gap-2">
           <div className="rounded-lg bg-muted/60 px-3 py-1.5">
-            <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span className="block text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
               Subject test
             </span>
             <strong className="mt-0.5 block text-sm">
@@ -1396,6 +1397,23 @@ function ActionFields({
         />
       );
     case "reschedule_appointment":
+      if (action.appointment.status === "in_progress") {
+        return (
+          <div
+            role="alert"
+            className="rounded-xl border border-amber-400/50 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100"
+          >
+            <p className="flex items-center gap-2 font-semibold">
+              <AlertTriangle className="h-4 w-4" />
+              This appointment is currently active
+            </p>
+            <p className="mt-1 text-xs leading-5">
+              Restore its original schedule at {dateTimeLabel(action.appointment.pre_start_starts_at)}.
+              No result will be recorded, and you can then reschedule it normally.
+            </p>
+          </div>
+        );
+      }
       return (
         <AppointmentForm
           appointmentType={action.appointment.appointment_type}
@@ -1597,7 +1615,9 @@ function actionTitle(action: ProfileAction | null) {
         ? "Schedule job interview"
         : "Schedule demo lesson";
     case "reschedule_appointment":
-      return "Reschedule appointment";
+      return action.appointment.status === "in_progress"
+        ? "Undo accidental start"
+        : "Reschedule appointment";
     case "appointment_status":
       return action.status === "cancelled"
         ? "Cancel appointment"
@@ -1630,7 +1650,10 @@ function actionTitle(action: ProfileAction | null) {
 function actionSubmitLabel(action: ProfileAction | null) {
   if (!action) return "Save";
   if (action.kind === "schedule_appointment") return "Schedule appointment";
-  if (action.kind === "reschedule_appointment") return "Save appointment";
+  if (action.kind === "reschedule_appointment")
+    return action.appointment.status === "in_progress"
+      ? "Restore schedule"
+      : "Save appointment";
   if (action.kind === "appointment_status")
     return action.status === "cancelled"
       ? "Cancel appointment"
@@ -1819,7 +1842,7 @@ export function CandidateProfile({
       <ActionMenu
         label="Appointment actions"
         items={[
-          { key: "reschedule", label: "Reschedule", onClick: () => openReschedule(appointment) },
+          { key: "reschedule", label: appointment.status === "in_progress" ? "Undo start & reschedule" : "Reschedule", onClick: () => openReschedule(appointment) },
           { key: "cancel", label: "Cancel appointment", danger: true, onClick: () => setAction({ kind: "appointment_status", appointment, status: "cancelled" }) },
         ]}
       />
@@ -2037,14 +2060,21 @@ export function CandidateProfile({
         appointment_type: action.appointmentType,
       });
     } else if (action.kind === "reschedule_appointment") {
-      submit(
-        `/appointments/${action.appointment.id}`,
-        {
-          ...formValues(form),
-          expected_version: action.appointment.version,
-        },
-        "PATCH",
-      );
+      if (action.appointment.status === "in_progress") {
+        submit(
+          `/appointments/${action.appointment.id}/undo-start`,
+          { expected_version: action.appointment.version },
+        );
+      } else {
+        submit(
+          `/appointments/${action.appointment.id}`,
+          {
+            ...formValues(form),
+            expected_version: action.appointment.version,
+          },
+          "PATCH",
+        );
+      }
     } else if (action.kind === "appointment_status") {
       submit(
         `/appointments/${action.appointment.id}/${action.status === "cancelled" ? "cancel" : "no-show"}`,
@@ -2409,7 +2439,7 @@ export function CandidateProfile({
               aria-controls={`candidate-panel-${item.key}`}
               onClick={() => setProfileTab(item.key)}
               onKeyDown={(event) => handleTabKeyDown(event, item.key)}
-              className={`min-h-9 rounded-lg px-3 text-[13px] font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${tab === item.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+              className={`min-h-9 rounded-lg px-3 text-[0.8125rem] font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${tab === item.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
             >
               {item.label}
             </button>
@@ -2422,7 +2452,7 @@ export function CandidateProfile({
           id="candidate-panel-overview"
           role="tabpanel"
           aria-labelledby="candidate-tab-overview"
-          className="grid gap-2 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]"
+          className="grid gap-2 xl:grid-cols-[minmax(0,2fr)_minmax(16.25rem,1fr)]"
         >
           <Panel
             title="Personal & background"
@@ -2692,7 +2722,7 @@ export function CandidateProfile({
               action={
                 candidate.current_sla ? (
                   <span
-                    className={`max-w-[12rem] rounded-md px-2 py-1 text-right text-[11px] font-semibold leading-tight ${
+                    className={`max-w-[12rem] rounded-md px-2 py-1 text-right text-[0.6875rem] font-semibold leading-tight ${
                       candidate.current_sla.status === "red"
                         ? "bg-red-50 text-red-700"
                         : candidate.current_sla.status === "yellow"
@@ -2753,7 +2783,7 @@ export function CandidateProfile({
               <div className="mb-3 space-y-2">
                 {scheduledAppointments.filter((item) => item.appointment_type === "job_interview").map((appointment) => (
                   <div key={appointment.id} className="flex items-center gap-1.5">
-                    <button type="button" onClick={() => setInterviewSession(appointment)} className={`flex min-h-14 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${appointment.is_overdue ? "border-amber-300 bg-amber-50 text-amber-900" : appointment.status === "in_progress" ? "border-violet-300 bg-violet-50 text-violet-900" : "border-blue-300 bg-blue-50 text-blue-900"}`}><span className="min-w-0"><strong className="block break-words text-[13px]">{appointment.status === "in_progress" ? "Interview in progress" : appointment.is_overdue ? "Interview overdue" : "Scheduled interview"}</strong><span className="mt-0.5 block break-words text-xs">{dateTimeLabel(appointment.starts_at)}</span></span><span className="shrink-0 text-xs font-semibold">{appointment.status === "in_progress" ? "Resume" : "Start"}</span></button>
+                    <button type="button" onClick={() => setInterviewSession(appointment)} className={`flex min-h-14 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${appointment.is_overdue ? "border-amber-300 bg-amber-50 text-amber-900" : appointment.status === "in_progress" ? "border-violet-300 bg-violet-50 text-violet-900" : "border-blue-300 bg-blue-50 text-blue-900"}`}><span className="min-w-0"><strong className="block break-words text-[0.8125rem]">{appointment.status === "in_progress" ? "Interview in progress" : appointment.is_overdue ? "Interview overdue" : "Scheduled interview"}</strong><span className="mt-0.5 block break-words text-xs">{dateTimeLabel(appointment.starts_at)}</span></span><span className="shrink-0 text-xs font-semibold">{appointment.status === "in_progress" ? "Resume" : "Start"}</span></button>
                     {appointmentActionMenu(appointment)}
                   </div>
                 ))}
@@ -2803,7 +2833,7 @@ export function CandidateProfile({
               <div className="mb-3 space-y-2">
                 {scheduledAppointments.filter((item) => item.appointment_type === "demo_lesson").map((appointment) => (
                   <div key={appointment.id} className="flex items-center gap-1.5">
-                    <button type="button" disabled={!permissions?.can_add_academic_evaluation} onClick={() => setDemoSession(appointment)} className={`flex min-h-14 flex-1 items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-default ${appointment.is_overdue ? "border-amber-300 bg-amber-50 text-amber-900" : "border-blue-300 bg-blue-50 text-blue-900"}`}><span className="min-w-0"><strong className="block break-words text-[13px]">{appointment.status === "in_progress" ? "Demo lesson in progress" : appointment.is_overdue ? "Demo lesson overdue" : "Scheduled demo lesson"}</strong><span className="mt-0.5 block break-words text-xs">{dateTimeLabel(appointment.starts_at)}{appointment.responsible_name ? ` · ${appointment.responsible_name}` : ""}</span>{appointment.topic ? <span className="mt-0.5 block break-words text-xs">Topic: {appointment.topic}</span> : null}</span>{permissions?.can_add_academic_evaluation ? <span className="text-xs font-semibold">{appointment.status === "in_progress" ? "Resume" : "Start"}</span> : null}</button>
+                    <button type="button" disabled={!permissions?.can_add_academic_evaluation} onClick={() => setDemoSession(appointment)} className={`flex min-h-14 flex-1 items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-default ${appointment.is_overdue ? "border-amber-300 bg-amber-50 text-amber-900" : "border-blue-300 bg-blue-50 text-blue-900"}`}><span className="min-w-0"><strong className="block break-words text-[0.8125rem]">{appointment.status === "in_progress" ? "Demo lesson in progress" : appointment.is_overdue ? "Demo lesson overdue" : "Scheduled demo lesson"}</strong><span className="mt-0.5 block break-words text-xs">{dateTimeLabel(appointment.starts_at)}{appointment.responsible_name ? ` · ${appointment.responsible_name}` : ""}</span>{appointment.topic ? <span className="mt-0.5 block break-words text-xs">Topic: {appointment.topic}</span> : null}</span>{permissions?.can_add_academic_evaluation ? <span className="text-xs font-semibold">{appointment.status === "in_progress" ? "Resume" : "Start"}</span> : null}</button>
                     {appointmentActionMenu(appointment)}
                   </div>
                 ))}
@@ -2895,7 +2925,7 @@ export function CandidateProfile({
                     >
                       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                       <span className="min-w-0">
-                        <span className="block truncate text-[13px] font-semibold text-foreground">{fileName}</span>
+                        <span className="block truncate text-[0.8125rem] font-semibold text-foreground">{fileName}</span>
                         <span className="block text-xs text-muted-foreground">{humanize(document.document_type)} · v{text(document.version)}</span>
                       </span>
                     </a>
@@ -2948,7 +2978,7 @@ export function CandidateProfile({
                     key={Number(item.id)}
                     className="rounded-lg border border-border p-3"
                   >
-                    <p className="text-[13px] font-semibold">
+                    <p className="text-[0.8125rem] font-semibold">
                       {text(item.assignee_name)}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
@@ -3015,7 +3045,7 @@ export function CandidateProfile({
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div>
-                          <p className="text-[13px] font-semibold">
+                          <p className="text-[0.8125rem] font-semibold">
                             {stageLabels[text(item.requested_outcome)]}
                           </p>
                           <p className="mt-1 text-xs text-muted-foreground">
@@ -3059,7 +3089,7 @@ export function CandidateProfile({
                     className={`rounded-lg border border-border p-3 ${item.voided_at ? "opacity-60" : ""}`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-[13px] font-semibold">
+                      <span className="text-[0.8125rem] font-semibold">
                         {stageLabels[text(item.decision)]}{item.voided_at ? " · Voided" : ""}
                       </span>
                       <span className="text-xs text-muted-foreground">
@@ -3143,7 +3173,7 @@ export function CandidateProfile({
                   className="flex min-h-14 items-center justify-between gap-2 rounded-lg border border-border p-3"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-[13px] font-semibold">
+                    <p className="truncate text-[0.8125rem] font-semibold">
                       {task.title}
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -3165,7 +3195,7 @@ export function CandidateProfile({
                   key={Number(note.id)}
                   className="rounded-lg border border-border p-3"
                 >
-                  <p className="whitespace-pre-wrap text-[13px] leading-5">
+                  <p className="whitespace-pre-wrap text-[0.8125rem] leading-5">
                     {text(note.body)}
                   </p>
                   <p className="mt-2 text-xs text-muted-foreground">
@@ -3186,7 +3216,7 @@ export function CandidateProfile({
                   key={Number(item.id)}
                   className="border-l-2 border-primary/30 pl-3"
                 >
-                  <p className="text-[13px] font-semibold">
+                  <p className="text-[0.8125rem] font-semibold">
                     {humanize(item.event_type)}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
@@ -3375,14 +3405,14 @@ export function CandidateProfile({
       >
         <ol className="space-y-2">
           {(candidate.stage_history || []).map((item) => (
-            <li key={`stage-${item.id}`} className="border-l-2 border-emerald-400 pl-3"><p className="text-[13px] font-semibold">Entered {item.stage_label || recruitmentStageLabel(item.stage, options.data?.stage_labels)}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.responsible_name || "System"} · {dateLabel(item.entered_at)} · {humanize(item.transition_source)}</p>{item.comment ? <p className="mt-1 text-xs text-muted-foreground">{item.comment}</p> : null}</li>
+            <li key={`stage-${item.id}`} className="border-l-2 border-emerald-400 pl-3"><p className="text-[0.8125rem] font-semibold">Entered {item.stage_label || recruitmentStageLabel(item.stage, options.data?.stage_labels)}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.responsible_name || "System"} · {dateLabel(item.entered_at)} · {humanize(item.transition_source)}</p>{item.comment ? <p className="mt-1 text-xs text-muted-foreground">{item.comment}</p> : null}</li>
           ))}
           {(candidate.activity || []).map((item) => (
             <li
               key={Number(item.id)}
               className="border-l-2 border-primary/30 pl-3"
             >
-              <p className="text-[13px] font-semibold">
+              <p className="text-[0.8125rem] font-semibold">
                 {humanize(item.event_type)}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">

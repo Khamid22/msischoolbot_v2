@@ -53,7 +53,11 @@ export function RoleSidebar<Key extends string = string>({
 }: RoleSidebarProps<Key>) {
   const login = authLogin || roleLabel;
   const compact = collapsible && collapsed;
-  const widthClass = collapsible ? (compact ? "w-[4.5rem]" : "w-56") : "w-64";
+  const widthClass = collapsible
+    ? compact
+      ? "w-[var(--workspace-sidebar-compact-width)]"
+      : "w-[var(--workspace-sidebar-collapsible-width)]"
+    : "w-[var(--workspace-sidebar-width)]";
   const navItemClass = compact ? "justify-center px-0" : "gap-2 px-2.5 pl-3";
   const activeGroupKey = navItems.find((item) => item.key === active && item.children?.length)?.key ?? null;
   const [openGroupKey, setOpenGroupKey] = useState<Key | null>(activeGroupKey);
@@ -106,7 +110,7 @@ export function RoleSidebar<Key extends string = string>({
             href={workspaceBackLink.href}
             title={compact ? workspaceBackLink.label : undefined}
             aria-label={compact ? workspaceBackLink.label : undefined}
-            className={`mb-3 flex min-h-11 w-full items-center rounded-lg text-[13px] font-semibold text-slate-300 transition-colors hover:bg-sidebar-accent hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${navItemClass}`}
+            className={`mb-3 flex min-h-11 w-full items-center rounded-lg text-[0.8125rem] font-semibold text-slate-300 transition-colors hover:bg-sidebar-accent hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${navItemClass}`}
           >
             <ArrowLeft className="h-4 w-4 shrink-0" />
             {!compact ? <span className="min-w-0 truncate">{workspaceBackLink.label}</span> : null}
@@ -115,7 +119,7 @@ export function RoleSidebar<Key extends string = string>({
         <nav aria-label={navLabel}>
           <div className="space-y-1">
             {!compact ? (
-              <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <p className="px-2 pb-1 text-[0.625rem] font-bold uppercase tracking-wider text-slate-400">
                 {sectionLabel}
               </p>
             ) : null}
@@ -126,7 +130,7 @@ export function RoleSidebar<Key extends string = string>({
               const hasChildren = Boolean(item.children?.length);
               const groupIsOpen = hasChildren && openGroupKey === item.key && !compact;
               const childGroupId = `role-nav-${String(item.key)}-children`;
-              const itemClasses = `relative flex min-h-11 w-full items-center rounded-lg text-left text-[13px] font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none ${navItemClass} ${
+              const itemClasses = `relative flex min-h-11 w-full items-center rounded-lg text-left text-[0.8125rem] font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none ${navItemClass} ${
                 isActive || groupIsOpen
                   ? childIsActive
                     ? "bg-sidebar-accent text-sidebar-accent-foreground"
@@ -146,7 +150,7 @@ export function RoleSidebar<Key extends string = string>({
                       {isActive ? <span aria-hidden="true" className="absolute left-1 top-1/2 h-4 w-1 -translate-y-1/2 rounded-full bg-white/80" /> : null}
                       <Icon className="h-4 w-4 shrink-0" />
                       <span className="min-w-0 truncate">{item.label}</span>
-                      {item.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-slate-950" aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
+                      {item.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[0.625rem] font-bold text-slate-950" aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
                       <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 transition-transform duration-200 motion-reduce:transition-none ${groupIsOpen ? "rotate-180" : ""}`} />
                     </button>
                   ) : (
@@ -161,7 +165,7 @@ export function RoleSidebar<Key extends string = string>({
                       {isActive ? <span aria-hidden="true" className={`absolute top-1/2 h-4 w-1 -translate-y-1/2 rounded-full bg-white/80 ${compact ? "left-0" : "left-1"}`} /> : null}
                       <Icon className="h-4 w-4 shrink-0" />
                       {!compact ? <span className="min-w-0 truncate">{item.label}</span> : null}
-                      {item.badge ? <span className={`${compact ? "absolute right-0.5 top-0.5" : "ml-auto"} flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-slate-950`} aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
+                      {item.badge ? <span className={`${compact ? "absolute right-0.5 top-0.5" : "ml-auto"} flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[0.625rem] font-bold text-slate-950`} aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
                     </a>
                   )}
                   {!compact && item.children?.length ? (
@@ -184,7 +188,7 @@ export function RoleSidebar<Key extends string = string>({
                               >
                                 {ChildIcon ? <ChildIcon className="h-3.5 w-3.5 shrink-0" /> : null}
                                 <span className="min-w-0 truncate">{child.label}</span>
-                                {child.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-slate-950" aria-label={`${child.badge} unread`}>{child.badge > 99 ? "99+" : child.badge}</span> : null}
+                                {child.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[0.625rem] font-bold text-slate-950" aria-label={`${child.badge} unread`}>{child.badge > 99 ? "99+" : child.badge}</span> : null}
                               </a>
                             );
                           })}

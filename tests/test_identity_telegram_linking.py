@@ -106,8 +106,6 @@ def test_link_refresh_and_unlink_preserve_one_active_identity(monkeypatch):
     monkeypatch.setattr(telegram_linking, "connect_auth_db", _connection_factory(conn))
     monkeypatch.setattr(telegram_linking, "telegram_user_from_init_data", lambda _value: {"id": 9001, "username": "demo_hod"})
     monkeypatch.setattr(telegram_linking.repository, "insert_account_audit_event", lambda *_args, **kwargs: audits.append(kwargs["event_type"]))
-    monkeypatch.setattr(telegram_linking, "enqueue_linked_account_summary", lambda *_args, **_kwargs: None)
-
     linked = telegram_linking.link_connection(_user("head_of_department"), "verified")
     refreshed = telegram_linking.link_connection(_user("head_of_department"), "verified-again")
     unlinked = telegram_linking.unlink_connection(_user("head_of_department"))

@@ -133,17 +133,17 @@ export default function ARPage(props: ArPageProps) {
                     className="rounded-lg border border-foreground/5 p-3"
                   >
                     <div className="mb-2 flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-medium text-muted-foreground">
+                      <span className="text-[0.625rem] font-medium text-muted-foreground">
                         {formatLessonDateDisplay(row.lesson_date_display)}
                       </span>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[0.625rem] font-bold">
                         Lesson {formatLessonNumber(row.lesson_number)}
                       </span>
                     </div>
                     <div className="flex items-start justify-between gap-3">
                       <p className="flex-1 text-xs font-bold leading-snug">{row.lesson_topic}</p>
                       <span
-                        className={`inline-flex min-h-7 shrink-0 items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${getStatusClasses(
+                        className={`inline-flex min-h-7 shrink-0 items-center rounded-full border px-2.5 py-1 text-[0.625rem] font-bold uppercase tracking-wide ${getStatusClasses(
                           row.attendance_status,
                         )}`}
                       >
@@ -155,13 +155,13 @@ export default function ARPage(props: ArPageProps) {
               </div>
 
               <div className="miniapp-table-scroll hidden max-h-[70dvh] sm:block">
-                <table className="w-full min-w-[720px] text-left">
-                  <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+                <table className="w-full min-w-[45rem] text-left">
+                  <thead className="sticky top-0 z-20 bg-surface shadow-[0_0.0625rem_0_hsl(var(--foreground)/0.08)]">
                     <tr className="border-b border-foreground/5">
-                      <th className="w-[16%] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
-                      <th className="w-[12%] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Lesson</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Topic</th>
-                      <th className="w-[16%] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</th>
+                      <th className="w-[16%] px-3 py-2 text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
+                      <th className="w-[12%] px-3 py-2 text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground">Lesson</th>
+                      <th className="px-3 py-2 text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground">Topic</th>
+                      <th className="w-[16%] px-3 py-2 text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -177,7 +177,7 @@ export default function ARPage(props: ArPageProps) {
                         <td className="px-3 py-3 text-xs font-medium">{row.lesson_topic}</td>
                         <td className="px-3 py-3">
                           <span
-                            className={`inline-flex min-h-7 items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${getStatusClasses(
+                            className={`inline-flex min-h-7 items-center rounded-full border px-2.5 py-1 text-[0.625rem] font-bold uppercase tracking-wide ${getStatusClasses(
                               row.attendance_status,
                             )}`}
                           >

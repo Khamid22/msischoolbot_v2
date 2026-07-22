@@ -17,7 +17,7 @@ import { routes } from "@/shared/lib/routes";
 import { RoleWorkspaceShell } from "@/shared/ui/RoleWorkspaceShell";
 import type { RoleNavItem } from "@/shared/ui/roleNav";
 import { useRecruitmentUnreadCount } from "@/features/recruitment/RecruitmentNotifications";
-import { TelegramConnectionCard } from "@/features/recruitment/TelegramConnectionCard";
+import { BrowserReminderPreferencesCard } from "@/features/recruitment/BrowserRecruitmentReminders";
 import {
   academicDirectorMobileNavConfig,
   academicDirectorNavConfig,
@@ -294,7 +294,7 @@ function RoleProfileSection({
         </form>
       </div>
     </section>
-    <TelegramConnectionCard />
+    <BrowserReminderPreferencesCard />
     </div>
   );
 }

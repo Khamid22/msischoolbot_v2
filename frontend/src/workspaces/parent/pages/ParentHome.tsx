@@ -83,7 +83,7 @@ function workspaceCardIcon(label: string) {
 function WorkspaceSummaryCard({ card }: { card: WorkspaceCard }) {
   return (
     <div className="rounded-lg border border-foreground/8 bg-surface p-3 shadow-card">
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+      <div className="flex items-center gap-2 text-[0.6875rem] font-bold uppercase tracking-wide text-muted-foreground">
         {workspaceCardIcon(card.label)}
         <span className="min-w-0 break-words">{card.label}</span>
       </div>
@@ -123,7 +123,7 @@ function ChildStatsCard({ child }: { child: Record<string, unknown> }) {
             {subjects.length ? (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {subjects.slice(0, 3).map((subject) => (
-                  <span key={subject} className="rounded-md bg-muted px-2 py-1 text-[11px] font-bold text-muted-foreground">
+                  <span key={subject} className="rounded-md bg-muted px-2 py-1 text-[0.6875rem] font-bold text-muted-foreground">
                     {subject}
                   </span>
                 ))}
@@ -178,7 +178,7 @@ function ChildStatsCard({ child }: { child: Record<string, unknown> }) {
 function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="rounded-lg border border-foreground/8 bg-background p-3">
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+      <div className="flex items-center gap-2 text-[0.6875rem] font-bold uppercase tracking-wide text-muted-foreground">
         {icon}
         {label}
       </div>

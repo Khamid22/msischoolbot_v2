@@ -48,7 +48,7 @@ export function PeriodFilter({
 }) {
   return (
     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground sm:justify-end">
+      <span className="inline-flex items-center gap-1.5 text-[0.6875rem] font-bold uppercase tracking-wide text-muted-foreground sm:justify-end">
         <Filter className="h-3.5 w-3.5" />
         Filter
       </span>
@@ -93,7 +93,7 @@ export function ExamTypeFilter({
 }) {
   return (
     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground sm:justify-end">
+      <span className="inline-flex items-center gap-1.5 text-[0.6875rem] font-bold uppercase tracking-wide text-muted-foreground sm:justify-end">
         <Filter className="h-3.5 w-3.5" />
         Show
       </span>
@@ -133,7 +133,7 @@ export function ExamViewSwitcher({
             type="button"
             aria-pressed={active}
             onClick={() => onChange(option.key)}
-            className={`inline-flex min-h-10 items-center gap-1.5 rounded-md px-2 text-[11px] font-bold transition-[transform,background-color,color,box-shadow] duration-200 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:min-h-8 motion-reduce:transition-none motion-reduce:active:scale-100 ${
+            className={`inline-flex min-h-10 items-center gap-1.5 rounded-md px-2 text-[0.6875rem] font-bold transition-[transform,background-color,color,box-shadow] duration-200 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:min-h-8 motion-reduce:transition-none motion-reduce:active:scale-100 ${
               active ? "bg-surface text-foreground shadow-card" : "text-muted-foreground hover:bg-surface/70 hover:text-foreground"
             }`}
           >
@@ -184,7 +184,7 @@ export function CompactMetric({
   value: string | number;
 }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+    <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-[0.6875rem] font-semibold text-muted-foreground">
       {icon}
       <span className="font-bold text-foreground">{value}</span>
       {label}

@@ -78,11 +78,11 @@ export function RecruitmentNotificationsPanel({ basePath }: { basePath: string }
       <div className="flex items-center justify-between border-b border-border px-3 py-3">
         <div className="flex items-center gap-2">
           <Bell className="h-4 w-4 text-primary" />
-          <h2 id="recruitment-notifications-title" className="text-sm font-bold">Assigned demo lessons</h2>
+          <h2 id="recruitment-notifications-title" className="text-sm font-bold">Recruitment notifications</h2>
         </div>
         <a href={`${basePath}/recruitment/schedule`} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-primary hover:bg-primary/5">Open schedule<ExternalLink className="h-3.5 w-3.5" /></a>
       </div>
-      {notifications.isLoading ? <div className="p-3 text-sm text-muted-foreground">Loading assignments…</div> : null}
+      {notifications.isLoading ? <div className="p-3 text-sm text-muted-foreground">Loading notifications…</div> : null}
       {notifications.error ? <div role="alert" className="p-3 text-sm text-destructive">{queryError(notifications.error)}</div> : null}
       {markRead.error ? <div role="alert" className="border-b border-destructive/20 bg-destructive/10 px-3 py-1.5 text-xs text-destructive">{queryError(markRead.error)} The notification was restored.</div> : null}
       {notifications.data ? <div className="divide-y divide-border">
@@ -91,12 +91,12 @@ export function RecruitmentNotificationsPanel({ basePath }: { basePath: string }
             <a href={item.action_url || "#"} onClick={(event) => openNotification(event, item)} className="min-w-0 flex-1 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
               <p className="text-sm font-semibold text-foreground">{item.title}</p>
               <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{item.body}</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">{dateLabel(item.created_at)}</p>
+              <p className="mt-1 text-[0.6875rem] text-muted-foreground">{dateLabel(item.created_at)}</p>
             </a>
             {!item.read_at ? <button type="button" disabled={markRead.isPending} onClick={() => markRead.mutate(item.id)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-wait disabled:opacity-50" aria-label={`Mark ${item.title} as read`} title="Mark as read"><Check className="h-4 w-4" /></button> : null}
           </div>
         ))}
-        {!notifications.data.items.length ? <div className="p-3"><EmptyLine>No assigned demo notifications.</EmptyLine></div> : null}
+        {!notifications.data.items.length ? <div className="p-3"><EmptyLine>No unread recruitment notifications.</EmptyLine></div> : null}
       </div> : null}
     </section>
   );

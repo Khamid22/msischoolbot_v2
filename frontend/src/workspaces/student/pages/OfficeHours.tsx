@@ -247,7 +247,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Filters</h3>
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="block">
-            <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Subject</span>
+            <span className="mb-1 block text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground">Subject</span>
             <select
               value={subjectFilter}
               onChange={(e) => setSubjectFilter(e.target.value)}
@@ -261,7 +261,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Teacher</span>
+            <span className="mb-1 block text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground">Teacher</span>
             <select
               value={teacherFilter}
               onChange={(e) => setTeacherFilter(e.target.value)}
@@ -275,7 +275,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">From Date</span>
+            <span className="mb-1 block text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground">From Date</span>
             <input
               type="date"
               value={dateFilter}
@@ -294,7 +294,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
       >
         <div className="miniapp-table-scroll rounded-lg border border-foreground/10">
           <table className="w-full text-left text-xs">
-            <thead className="bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+            <thead className="bg-surface shadow-[0_0.0625rem_0_hsl(var(--foreground)/0.08)]">
               <tr className="border-b border-foreground/5">
                 <th className="px-4 py-2.5 font-bold uppercase text-muted-foreground">Teacher</th>
                 <th className="px-4 py-2.5 font-bold uppercase text-muted-foreground">Subject</th>
@@ -369,7 +369,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
       >
         <div className="miniapp-table-scroll rounded-lg border border-foreground/10">
           <table className="w-full text-left text-xs">
-            <thead className="bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+            <thead className="bg-surface shadow-[0_0.0625rem_0_hsl(var(--foreground)/0.08)]">
               <tr className="border-b border-foreground/5">
                 <th className="px-4 py-2.5 font-bold uppercase text-muted-foreground">Teacher</th>
                 <th className="px-4 py-2.5 font-bold uppercase text-muted-foreground">Subject</th>
@@ -398,7 +398,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">{booking.room || "—"}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                      <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[0.625rem] font-bold uppercase ${
                         booking.status === "booked"
                           ? "bg-blue-50 text-blue-700 border border-blue-200"
                           : booking.status === "completed"
@@ -415,7 +415,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
                         <button
                           type="button"
                           onClick={() => handleCancelBooking(booking.id)}
-                          className="inline-flex h-7 items-center rounded-lg border border-destructive/20 bg-destructive/5 px-2 text-[10px] font-bold text-destructive hover:bg-destructive/15"
+                          className="inline-flex h-7 items-center rounded-lg border border-destructive/20 bg-destructive/5 px-2 text-[0.625rem] font-bold text-destructive hover:bg-destructive/15"
                         >
                           Cancel Booking
                         </button>

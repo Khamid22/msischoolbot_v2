@@ -92,7 +92,7 @@ export function DecisionQueueView({ basePath }: { basePath: string }) {
                   {approval ? (
                     <>
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="flex items-center gap-1.5 text-[13px] font-semibold">
+                        <span className="flex items-center gap-1.5 text-[0.8125rem] font-semibold">
                           <ClipboardCheck className="h-4 w-4 text-primary" />
                           {stageLabels[approval.requested_outcome] || humanize(approval.requested_outcome)}
                         </span>
@@ -101,10 +101,10 @@ export function DecisionQueueView({ basePath }: { basePath: string }) {
                       <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-muted-foreground">
                         {approval.request_note || "No request note provided."}
                       </p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">Requested {dateLabel(approval.created_at)}</p>
+                      <p className="mt-1 text-[0.6875rem] text-muted-foreground">Requested {dateLabel(approval.created_at)}</p>
                     </>
                   ) : (
-                    <div className="flex items-center gap-2 text-[13px] font-semibold">
+                    <div className="flex items-center gap-2 text-[0.8125rem] font-semibold">
                       <UserRound className="h-4 w-4 text-primary" /> Evaluation assigned
                     </div>
                   )}
@@ -113,7 +113,7 @@ export function DecisionQueueView({ basePath }: { basePath: string }) {
                 <a
                   href={openCandidate(candidate.id)}
                   onClick={() => rememberRecruitmentReturn("decisions")}
-                  className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 text-[13px] font-semibold text-primary-foreground transition-colors hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 motion-reduce:transition-none"
+                  className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 text-[0.8125rem] font-semibold text-primary-foreground transition-colors hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 motion-reduce:transition-none"
                 >
                   Review candidate <ArrowRight className="h-4 w-4" />
                 </a>

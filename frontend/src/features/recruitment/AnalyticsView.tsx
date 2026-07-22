@@ -186,15 +186,15 @@ function KpiCard({
   accent?: boolean;
 }) {
   return (
-    <article className={`min-h-[98px] rounded-xl border p-2.5 shadow-sm transition-[border-color,box-shadow] duration-200 motion-reduce:transition-none ${accent ? "border-lime-300 bg-lime-200/80 text-slate-950" : "border-border bg-card"}`}>
+    <article className={`min-h-[6.125rem] rounded-xl border p-2.5 shadow-sm transition-[border-color,box-shadow] duration-200 motion-reduce:transition-none ${accent ? "border-lime-300 bg-lime-200/80 text-slate-950" : "border-border bg-card"}`}>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className={`text-[10px] font-semibold uppercase leading-tight tracking-[0.08em] ${accent ? "text-slate-700" : "text-muted-foreground"}`}>{label}</p>
+          <p className={`text-[0.625rem] font-semibold uppercase leading-tight tracking-[0.08em] ${accent ? "text-slate-700" : "text-muted-foreground"}`}>{label}</p>
           <p className="mt-1 text-2xl font-bold tracking-tight tabular-nums">{numberValue(metric.value)}</p>
         </div>
         <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${accent ? "bg-white/65 text-slate-900" : "bg-primary/8 text-primary"}`}>{icon}</span>
       </div>
-      <div className={`mt-1.5 flex items-center justify-between gap-2 text-[10px] font-semibold ${accent ? "text-slate-700" : "text-muted-foreground"}`}>
+      <div className={`mt-1.5 flex items-center justify-between gap-2 text-[0.625rem] font-semibold ${accent ? "text-slate-700" : "text-muted-foreground"}`}>
         <span>{period}</span>
         <span>Total {numberValue(metric.total)}</span>
       </div>
@@ -219,13 +219,13 @@ function EvaluationKpi({
     <article className="rounded-xl border border-border bg-card p-3 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
           <p className="mt-1 text-2xl font-bold tabular-nums">
             {numberValue(metric.unique_candidates)}
           </p>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-[0.625rem] text-muted-foreground">
             Unique candidates · best valid attempt
           </p>
         </div>
@@ -241,7 +241,7 @@ function EvaluationKpi({
           Failed {numberValue(metric.failed)}
         </span>
       </div>
-      <p className="mt-2 text-[10px] font-semibold text-muted-foreground">
+      <p className="mt-2 text-[0.625rem] font-semibold text-muted-foreground">
         Total attempts {numberValue(metric.total)}
       </p>
     </article>
@@ -268,13 +268,13 @@ function SecondaryMetric({
     danger: "bg-destructive/8 text-destructive",
   }[tone];
   return (
-    <article className="flex min-h-[64px] items-center gap-2 rounded-xl border border-border bg-card p-2">
+    <article className="flex min-h-[4rem] items-center gap-2 rounded-xl border border-border bg-card p-2">
       <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${toneClass}`}>{icon}</span>
       <div className="min-w-0">
-        <p className="line-clamp-2 text-[10px] font-semibold uppercase leading-tight tracking-wide text-muted-foreground">{label}</p>
+        <p className="line-clamp-2 text-[0.625rem] font-semibold uppercase leading-tight tracking-wide text-muted-foreground">{label}</p>
         <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0">
           <p className="text-lg font-bold tabular-nums">{value}</p>
-          {total !== undefined ? <span className="text-[10px] font-semibold text-muted-foreground">Total {numberValue(total)}</span> : null}
+          {total !== undefined ? <span className="text-[0.625rem] font-semibold text-muted-foreground">Total {numberValue(total)}</span> : null}
         </div>
       </div>
     </article>
@@ -298,8 +298,8 @@ function Panel({
     <section className={`min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm ${className}`}>
       <header className="flex min-h-12 items-start justify-between gap-2 border-b border-border/70 px-3 py-1.5">
         <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-[13px] font-semibold leading-tight">{icon}{title}</h2>
-          {description ? <p className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-muted-foreground">{description}</p> : null}
+          <h2 className="flex items-center gap-2 text-[0.8125rem] font-semibold leading-tight">{icon}{title}</h2>
+          {description ? <p className="mt-0.5 line-clamp-2 text-[0.625rem] leading-tight text-muted-foreground">{description}</p> : null}
         </div>
       </header>
       {children}
@@ -316,7 +316,7 @@ function AnalyticsSkeleton() {
     <div className="space-y-2" aria-label="Loading HR analytics">
       <div className="h-16 animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none" />
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }, (_, index) => <div key={index} className="h-[98px] animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none" />)}
+        {Array.from({ length: 4 }, (_, index) => <div key={index} className="h-[6.125rem] animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none" />)}
       </div>
       <div className="grid gap-2 xl:grid-cols-12">
         <div className="h-72 animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none xl:col-span-8" />
@@ -396,7 +396,7 @@ function FilterDrawer({
             <option value="">All responsible people</option>
             {options?.responsible_people.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
-          <span className="mt-1 block text-[11px] font-normal text-muted-foreground">Includes anyone responsible during at least one recruitment stage.</span>
+          <span className="mt-1 block text-[0.6875rem] font-normal text-muted-foreground">Includes anyone responsible during at least one recruitment stage.</span>
         </label>
       </div>
     </Drawer>
@@ -544,7 +544,7 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
           </div>
           <button type="button" className={`${secondaryButtonClass} relative !min-h-10 !px-3 !text-xs before:absolute before:-inset-y-0.5 before:inset-x-0`} onClick={() => setFiltersOpen(true)}>
             <Filter className="h-4 w-4" />Filters
-            {activeFilterCount ? <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground">{activeFilterCount}</span> : null}
+            {activeFilterCount ? <span className="rounded-full bg-primary px-1.5 py-0.5 text-[0.625rem] text-primary-foreground">{activeFilterCount}</span> : null}
           </button>
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 border-t border-border/70 pt-1.5">
@@ -554,11 +554,11 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
               ...filters,
               [key]: "",
               ...(key === "source" ? { subsource: "" } : {}),
-            })} className="inline-flex min-h-9 items-center rounded-full border border-border bg-muted/50 px-2.5 text-[11px] font-semibold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
+            })} className="inline-flex min-h-9 items-center rounded-full border border-border bg-muted/50 px-2.5 text-[0.6875rem] font-semibold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
               {label}: {optionLabel(key, filters[key])}<XCircle className="ml-1.5 h-3.5 w-3.5" />
             </button>
           ))}
-          {activeFilterCount ? <button type="button" onClick={clearFilters} className="min-h-9 px-2 text-[11px] font-semibold text-primary hover:underline">Clear all</button> : null}
+          {activeFilterCount ? <button type="button" onClick={clearFilters} className="min-h-9 px-2 text-[0.6875rem] font-semibold text-primary hover:underline">Clear all</button> : null}
         </div>
       </section>
 
@@ -580,7 +580,7 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
         <EvaluationKpi label="Subject Tests" metric={data.evaluation_kpis.subject_test} />
       </section>
 
-      <div className="grid gap-2 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+      <div className="grid gap-2 xl:grid-cols-[minmax(0,2fr)_minmax(17.5rem,1fr)]">
         <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="Additional selected cohort metrics">
           <SecondaryMetric label="Teacher Academy added" value={numberValue(data.secondary_kpis.academy_accepted)} total={data.secondary_kpis.academy_total} icon={<ShieldCheck className="h-4 w-4" />} tone="warning" />
           <SecondaryMetric label="Withdrawn" value={numberValue(data.secondary_kpis.withdrawn)} total={data.secondary_kpis.withdrawn_total} icon={<UserMinus className="h-4 w-4" />} />
@@ -589,8 +589,8 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
         </section>
         <section className="rounded-xl border border-border bg-card p-2" aria-label="Live recruitment snapshot">
           <div className="mb-2 flex items-center justify-between gap-2 px-1">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Live snapshot</h2>
-            <span className="text-[10px] text-muted-foreground">As of {dateLabel(data.as_of)}</span>
+            <h2 className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">Live snapshot</h2>
+            <span className="text-[0.625rem] text-muted-foreground">As of {dateLabel(data.as_of)}</span>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <SecondaryMetric label="Current active pipeline" value={numberValue(data.secondary_kpis.active_candidates)} icon={<UsersRound className="h-4 w-4" />} />
@@ -602,7 +602,7 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
       <div className="grid gap-2 xl:grid-cols-12">
         <Panel title={`Recruitment activity · ${selectedPeriod}`} description="Applications and actual stage events" icon={<Activity className="h-4 w-4 text-primary" />} className="xl:col-span-8">
           {hasTrend ? (
-            <div className="h-[260px] min-w-0 px-1 pb-1 pt-2 sm:px-2">
+            <div className="h-[16.25rem] min-w-0 px-1 pb-1 pt-2 sm:px-2">
               <p className="sr-only">Recruitment activity chart. Applications, shortlisted candidates, active hires and rejections over the selected period.</p>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data.activity_trend} margin={{ top: 14, right: 12, left: -20, bottom: 0 }}>
@@ -636,7 +636,7 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
 
         <Panel title={`Applicant sources · ${selectedPeriod}`} description={`Application cohort · ${data.summary_cards.applications.value} applications`} icon={<CircleDot className="h-4 w-4 text-primary" />} className="xl:col-span-4">
           {topSources.length ? (
-            <div className="grid min-h-[260px] grid-cols-1 items-center gap-1 p-2 sm:grid-cols-[minmax(0,1fr)_minmax(150px,0.8fr)] xl:grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_minmax(150px,0.8fr)]">
+            <div className="grid min-h-[16.25rem] grid-cols-1 items-center gap-1 p-2 sm:grid-cols-[minmax(0,1fr)_minmax(9.375rem,0.8fr)] xl:grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_minmax(9.375rem,0.8fr)]">
               <div className="h-44 min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -647,7 +647,7 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <ul className="grid gap-2 text-[11px]" aria-label="Applicant source counts">
+              <ul className="grid gap-2 text-[0.6875rem]" aria-label="Applicant source counts">
                 {topSources.map((item, index) => (
                   <li key={item.source} className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-2"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: sourcePalette[index % sourcePalette.length] }} /><span className="truncate">{item.source}</span></span>
@@ -663,7 +663,7 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
           <div className="space-y-2 p-3">
             {data.journey.map((item) => (
               <div key={item.stage}>
-                <div className="mb-1 flex items-center justify-between gap-2 text-[11px]">
+                <div className="mb-1 flex items-center justify-between gap-2 text-[0.6875rem]">
                   <span className="font-semibold">{item.stage_label || recruitmentStageLabel(item.stage, recruitmentOptions?.stage_labels)}</span>
                   <span className="flex items-center gap-2 tabular-nums text-muted-foreground">
                     {item.conversion_percentage !== null && item.conversion_percentage !== undefined ? `${item.conversion_percentage}% from prior` : "Entry stage"}
@@ -677,7 +677,7 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
             ))}
             <div className="grid gap-1.5 border-t border-border pt-2 sm:grid-cols-2">
               {data.outcomes.map((item) => (
-                <div key={item.outcome} className="flex min-h-9 items-center justify-between rounded-lg bg-muted/45 px-2.5 text-[11px]">
+                <div key={item.outcome} className="flex min-h-9 items-center justify-between rounded-lg bg-muted/45 px-2.5 text-[0.6875rem]">
                   <span className="font-semibold">{recruitmentStageLabel(item.outcome, recruitmentOptions?.stage_labels)}</span>
                   <strong className="tabular-nums">{item.candidates}</strong>
                 </div>
@@ -688,7 +688,7 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
 
         <Panel title={`Applications by position · ${selectedPeriod}`} description="Application cohort · standardized positions" icon={<UsersRound className="h-4 w-4 text-primary" />} className="xl:col-span-5">
           {data.position_distribution.length ? (
-            <div className="h-[280px] min-w-0 p-2">
+            <div className="h-[17.5rem] min-w-0 p-2">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.position_distribution.slice(0, 8)} layout="vertical" margin={{ top: 0, right: 32, left: 16, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
@@ -710,16 +710,16 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
               const target = Number(item.sla_target_days || 0);
               const ratio = target ? Math.min(100, Number(item.average_days || 0) / target * 100) : 0;
               return (
-                <div key={item.stage} className="grid gap-2 px-3 py-1.5 sm:grid-cols-[minmax(120px,1fr)_minmax(120px,1.2fr)_auto] sm:items-center">
+                <div key={item.stage} className="grid gap-2 px-3 py-1.5 sm:grid-cols-[minmax(7.5rem,1fr)_minmax(7.5rem,1.2fr)_auto] sm:items-center">
                   <div>
                     <p className="text-xs font-semibold">{item.stage_label || recruitmentStageLabel(item.stage, recruitmentOptions?.stage_labels)}</p>
-                    <p className="text-[11px] text-muted-foreground">{item.entries} stage entries</p>
+                    <p className="text-[0.6875rem] text-muted-foreground">{item.entries} stage entries</p>
                   </div>
                   <div>
-                    <div className="mb-1 flex justify-between text-[10px] text-muted-foreground"><span>{item.average_days ?? 0}d average</span><span>{target ? `${target}d target` : "No SLA"}</span></div>
+                    <div className="mb-1 flex justify-between text-[0.625rem] text-muted-foreground"><span>{item.average_days ?? 0}d average</span><span>{target ? `${target}d target` : "No SLA"}</span></div>
                     <div className="h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${ratio > 100 ? "bg-destructive" : ratio >= 75 ? "bg-amber-500" : "bg-success"}`} style={{ width: `${target ? Math.max(4, ratio) : 0}%` }} /></div>
                   </div>
-                  <span className={`inline-flex min-h-8 items-center justify-center rounded-full px-2 text-[10px] font-semibold ${item.sla_breaches ? "bg-destructive/8 text-destructive" : "bg-success/10 text-success"}`}>{item.sla_breaches ? `${item.sla_breaches} late` : "On track"}</span>
+                  <span className={`inline-flex min-h-8 items-center justify-center rounded-full px-2 text-[0.625rem] font-semibold ${item.sla_breaches ? "bg-destructive/8 text-destructive" : "bg-success/10 text-success"}`}>{item.sla_breaches ? `${item.sla_breaches} late` : "On track"}</span>
                 </div>
               );
             }) : <EmptyChart>No stage-time data in this cohort.</EmptyChart>}
@@ -728,10 +728,10 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
 
         <Panel title="Source quality" description="Subsource-level shortlisting and Active Teacher conversion." icon={<TrendingUp className="h-4 w-4 text-primary" />} className="xl:col-span-6">
           <div className="hidden overflow-x-auto sm:block">
-            <table className="w-full min-w-[540px] text-left text-xs">
-              <thead className="bg-muted/45 text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-1.5">Source</th><th className="px-3 py-1.5">Applicants</th><th className="px-3 py-1.5">Shortlisted</th><th className="px-3 py-1.5">Active Teachers</th><th className="px-3 py-1.5">Conversion</th></tr></thead>
+            <table className="w-full min-w-[33.75rem] text-left text-xs">
+              <thead className="bg-muted/45 text-[0.625rem] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-1.5">Source</th><th className="px-3 py-1.5">Applicants</th><th className="px-3 py-1.5">Shortlisted</th><th className="px-3 py-1.5">Active Teachers</th><th className="px-3 py-1.5">Conversion</th></tr></thead>
               <tbody className="divide-y divide-border/70">
-                {data.source_quality.slice(0, 10).map((item) => <tr key={`${item.source}:${item.subsource}`} className="hover:bg-muted/25"><td className="px-3 py-1.5"><strong className="block">{item.source}</strong><span className="text-[10px] text-muted-foreground">{item.subsource}</span></td><td className="px-3 py-1.5 tabular-nums">{item.candidates}</td><td className="px-3 py-1.5 tabular-nums">{item.shortlisted}</td><td className="px-3 py-1.5 tabular-nums">{item.hired}</td><td className="px-3 py-1.5 font-semibold tabular-nums">{item.conversion_percentage ?? 0}%</td></tr>)}
+                {data.source_quality.slice(0, 10).map((item) => <tr key={`${item.source}:${item.subsource}`} className="hover:bg-muted/25"><td className="px-3 py-1.5"><strong className="block">{item.source}</strong><span className="text-[0.625rem] text-muted-foreground">{item.subsource}</span></td><td className="px-3 py-1.5 tabular-nums">{item.candidates}</td><td className="px-3 py-1.5 tabular-nums">{item.shortlisted}</td><td className="px-3 py-1.5 tabular-nums">{item.hired}</td><td className="px-3 py-1.5 font-semibold tabular-nums">{item.conversion_percentage ?? 0}%</td></tr>)}
               </tbody>
             </table>
           </div>
@@ -742,22 +742,22 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
         </Panel>
 
         <Panel title={roleIsHr ? "Operational attention" : "Executive attention"} description={roleIsHr ? "Live work across the current pipeline; the cohort date does not limit this panel." : "Read-only live overview across the current pipeline."} icon={<CalendarClock className="h-4 w-4 text-primary" />} className="h-full xl:col-span-5">
-          <div className="grid gap-2 p-2 sm:grid-cols-2 xl:h-[272px] xl:grid-cols-1 xl:overflow-y-auto 2xl:grid-cols-2">
+          <div className="grid gap-2 p-2 sm:grid-cols-2 xl:h-[17rem] xl:grid-cols-1 xl:overflow-y-auto 2xl:grid-cols-2">
             <div>
-              <p className="sticky top-0 z-10 mb-2 flex items-center justify-between bg-card py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><span>Overdue actions</span><span className="rounded-full bg-destructive/8 px-2 py-1 text-destructive">{data.overdue_actions.length}</span></p>
+              <p className="sticky top-0 z-10 mb-2 flex items-center justify-between bg-card py-1 text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground"><span>Overdue actions</span><span className="rounded-full bg-destructive/8 px-2 py-1 text-destructive">{data.overdue_actions.length}</span></p>
               <div className="space-y-1">
                 {data.overdue_actions.slice(0, 5).map((item) => {
-                  const content = <><span className="min-w-0"><strong className="block truncate">{item.candidate_name}</strong><span className="block truncate text-[11px] text-muted-foreground">{item.title} · {dateLabel(item.due_at)}</span></span>{roleIsHr ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" /> : null}</>;
+                  const content = <><span className="min-w-0"><strong className="block truncate">{item.candidate_name}</strong><span className="block truncate text-[0.6875rem] text-muted-foreground">{item.title} · {dateLabel(item.due_at)}</span></span>{roleIsHr ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" /> : null}</>;
                   return roleIsHr ? <a key={item.id} href={`${basePath}/candidates/${item.candidate_id}`} className="flex min-h-12 items-center justify-between gap-2 rounded-lg px-2 text-xs hover:bg-muted/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{content}</a> : <div key={item.id} className="flex min-h-12 items-center gap-2 rounded-lg px-2 text-xs">{content}</div>;
                 })}
                 {!data.overdue_actions.length ? <p className="rounded-lg border border-dashed border-border px-3 py-3 text-xs text-muted-foreground">No overdue actions.</p> : null}
               </div>
             </div>
             <div>
-              <p className="sticky top-0 z-10 mb-2 flex items-center justify-between bg-card py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><span>Upcoming</span><span className="rounded-full bg-primary/8 px-2 py-1 text-primary">{data.upcoming_appointments.length}</span></p>
+              <p className="sticky top-0 z-10 mb-2 flex items-center justify-between bg-card py-1 text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground"><span>Upcoming</span><span className="rounded-full bg-primary/8 px-2 py-1 text-primary">{data.upcoming_appointments.length}</span></p>
               <div className="space-y-1">
                 {data.upcoming_appointments.slice(0, 5).map((item) => {
-                  const content = <><span className="min-w-0"><strong className="block truncate">{item.candidate_name}</strong><span className="block truncate text-[11px] text-muted-foreground">{humanize(item.appointment_type)} · {dateLabel(item.starts_at)}</span></span>{roleIsHr ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" /> : null}</>;
+                  const content = <><span className="min-w-0"><strong className="block truncate">{item.candidate_name}</strong><span className="block truncate text-[0.6875rem] text-muted-foreground">{humanize(item.appointment_type)} · {dateLabel(item.starts_at)}</span></span>{roleIsHr ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" /> : null}</>;
                   return roleIsHr ? <a key={item.id} href={`${basePath}/candidates/${item.candidate_id}?tab=evaluations`} className="flex min-h-12 items-center justify-between gap-2 rounded-lg px-2 text-xs hover:bg-muted/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{content}</a> : <div key={item.id} className="flex min-h-12 items-center gap-2 rounded-lg px-2 text-xs">{content}</div>;
                 })}
                 {!data.upcoming_appointments.length ? <p className="rounded-lg border border-dashed border-border px-3 py-3 text-xs text-muted-foreground">No upcoming appointments.</p> : null}
@@ -767,7 +767,7 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
         </Panel>
 
         <Panel title={`Recent candidates · ${selectedPeriod}`} description="Latest application-cohort candidates" icon={<UsersRound className="h-4 w-4 text-primary" />} className="h-full xl:col-span-7">
-          <div className="no-scrollbar hidden h-[272px] overflow-x-hidden overflow-y-auto md:block">
+          <div className="no-scrollbar hidden h-[17rem] overflow-x-hidden overflow-y-auto md:block">
             <table className="w-full table-fixed text-left text-xs">
               <colgroup>
                 <col className="w-[19%]" />
@@ -777,14 +777,14 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
                 <col className="w-[18%]" />
                 <col className="w-[23%]" />
               </colgroup>
-              <thead className="sticky top-0 z-10 bg-muted text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-2 py-1.5">Candidate</th><th className="px-2 py-1.5">Position</th><th className="px-2 py-1.5">Source</th><th className="px-2 py-1.5">Applied</th><th className="px-2 py-1.5">Stage</th><th className="px-2 py-1.5">Next action</th></tr></thead>
+              <thead className="sticky top-0 z-10 bg-muted text-[0.625rem] uppercase tracking-wide text-muted-foreground"><tr><th className="px-2 py-1.5">Candidate</th><th className="px-2 py-1.5">Position</th><th className="px-2 py-1.5">Source</th><th className="px-2 py-1.5">Applied</th><th className="px-2 py-1.5">Stage</th><th className="px-2 py-1.5">Next action</th></tr></thead>
               <tbody className="divide-y divide-border/70">
-                {data.recent_candidates.map((item) => <tr key={item.id} className="h-12 hover:bg-muted/25"><td className="px-2 py-1"><a href={`${basePath}/candidates/${item.id}`} className="inline-flex min-h-10 max-w-full items-center break-words font-semibold leading-tight hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{item.full_name}</a></td><td className="truncate px-2 py-1">{item.position}</td><td className="px-2 py-1 leading-tight"><span className="block truncate">{item.source}</span>{item.subsource ? <span className="block truncate text-[10px] text-muted-foreground">{item.subsource}</span> : null}</td><td className="truncate px-2 py-1">{dateLabel(item.application_date)}</td><td className="truncate px-2 py-1">{item.status_label || recruitmentStageLabel(item.status, recruitmentOptions?.stage_labels)}</td><td className="truncate px-2 py-1">{item.next_action || "—"}</td></tr>)}
+                {data.recent_candidates.map((item) => <tr key={item.id} className="h-12 hover:bg-muted/25"><td className="px-2 py-1"><a href={`${basePath}/candidates/${item.id}`} className="inline-flex min-h-10 max-w-full items-center break-words font-semibold leading-tight hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{item.full_name}</a></td><td className="truncate px-2 py-1">{item.position}</td><td className="px-2 py-1 leading-tight"><span className="block truncate">{item.source}</span>{item.subsource ? <span className="block truncate text-[0.625rem] text-muted-foreground">{item.subsource}</span> : null}</td><td className="truncate px-2 py-1">{dateLabel(item.application_date)}</td><td className="truncate px-2 py-1">{item.status_label || recruitmentStageLabel(item.status, recruitmentOptions?.stage_labels)}</td><td className="truncate px-2 py-1">{item.next_action || "—"}</td></tr>)}
               </tbody>
             </table>
           </div>
-          <div className="no-scrollbar max-h-[300px] divide-y divide-border/70 overflow-y-auto md:hidden">
-            {data.recent_candidates.map((item) => <a key={item.id} href={`${basePath}/candidates/${item.id}`} className="block min-h-[60px] px-3 py-1.5 hover:bg-muted/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"><div className="flex items-start justify-between gap-2"><strong className="truncate text-xs">{item.full_name}</strong><span className="shrink-0 text-[10px] font-semibold text-primary">{item.status_label || recruitmentStageLabel(item.status, recruitmentOptions?.stage_labels)}</span></div><p className="mt-0.5 truncate text-[11px] text-muted-foreground">{item.position} · {item.source}{item.subsource ? ` / ${item.subsource}` : ""}</p><p className="mt-0.5 truncate text-[10px] text-muted-foreground">{dateLabel(item.application_date)} · {item.next_action || "No next action"}</p></a>)}
+          <div className="no-scrollbar max-h-[18.75rem] divide-y divide-border/70 overflow-y-auto md:hidden">
+            {data.recent_candidates.map((item) => <a key={item.id} href={`${basePath}/candidates/${item.id}`} className="block min-h-[3.75rem] px-3 py-1.5 hover:bg-muted/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"><div className="flex items-start justify-between gap-2"><strong className="truncate text-xs">{item.full_name}</strong><span className="shrink-0 text-[0.625rem] font-semibold text-primary">{item.status_label || recruitmentStageLabel(item.status, recruitmentOptions?.stage_labels)}</span></div><p className="mt-0.5 truncate text-[0.6875rem] text-muted-foreground">{item.position} · {item.source}{item.subsource ? ` / ${item.subsource}` : ""}</p><p className="mt-0.5 truncate text-[0.625rem] text-muted-foreground">{dateLabel(item.application_date)} · {item.next_action || "No next action"}</p></a>)}
           </div>
           {!data.recent_candidates.length ? <EmptyChart>No recent candidates in this cohort.</EmptyChart> : null}
         </Panel>
@@ -792,12 +792,12 @@ export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOption
         <Panel title="Recent activity" description="Actor-attributed events that occurred within the selected dates." icon={<Activity className="h-4 w-4 text-primary" />} className="xl:col-span-12">
           <ol className="grid gap-px bg-border/70 sm:grid-cols-2 xl:grid-cols-3">
             {data.recent_activity.map((item) => (
-              <li key={item.id} className="flex min-h-[68px] gap-2 bg-card px-3 py-1.5">
+              <li key={item.id} className="flex min-h-[4.25rem] gap-2 bg-card px-3 py-1.5">
                 <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary"><Activity className="h-4 w-4" /></span>
                 <div className="min-w-0">
                   <p className="text-xs font-semibold">{activityLabel(item.event_type)}</p>
                   <a href={`${basePath}/candidates/${item.candidate_id}`} className="mt-0.5 block truncate text-xs text-primary hover:underline">{item.candidate_name}</a>
-                  <p className="mt-1 text-[10px] text-muted-foreground">{item.actor} · {dateLabel(item.created_at)}</p>
+                  <p className="mt-1 text-[0.625rem] text-muted-foreground">{item.actor} · {dateLabel(item.created_at)}</p>
                 </div>
               </li>
             ))}

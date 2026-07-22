@@ -1,4 +1,4 @@
-import { AlertTriangle, Archive, Ban, CalendarPlus, Check, CheckCircle2, Clock3, ListFilter, Loader2, Plus, Save, Search, Settings2, Trash2, UserMinus, X } from "lucide-react";
+import { AlertTriangle, Archive, Ban, CalendarPlus, Check, CheckCircle2, Clock3, ListFilter, Loader2, Plus, RotateCcw, Save, Search, Settings2, Trash2, UserMinus, X } from "lucide-react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   memo,
@@ -54,7 +54,7 @@ type PipelineData = {
   total: number;
 };
 
-type MutationPayload = { message: string; candidate?: RecruitmentCandidate };
+type MutationPayload = { message: string; candidate?: RecruitmentCandidate; appointment?: RecruitmentAppointment | null };
 type PipelineFilters = {
   search: string;
   position: string;
@@ -185,7 +185,7 @@ function PipelineSummary({ counts, stages, action }: { counts: Record<string, nu
         </div>
         {action}
       </div>
-      <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] leading-4 text-muted-foreground sm:text-[11px]">
+      <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[0.625rem] leading-4 text-muted-foreground sm:text-[0.6875rem]">
         {values.map((item) => (
           <li key={item.stage} className="inline-flex items-center gap-1.5 whitespace-nowrap">
             <span className={`h-2.5 w-2.5 rounded-sm ${item.legend}`} aria-hidden="true" />
@@ -278,10 +278,10 @@ function PipelineStageEditor({
             <span className={`mt-1 h-3 w-3 shrink-0 rounded-full ${stageColorStyles[stage.color_token].swatch}`} aria-hidden="true" />
             <div className="min-w-0">
               <p className="break-words text-sm font-semibold">{stage.label}</p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">{custom ? "Custom manual stage" : "Protected system stage"}</p>
+              <p className="mt-0.5 text-[0.6875rem] text-muted-foreground">{custom ? "Custom manual stage" : "Protected system stage"}</p>
             </div>
           </div>
-          <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-[10px] font-semibold">SLA {stage.sla_target_days || "—"}d</span>
+          <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-[0.625rem] font-semibold">SLA {stage.sla_target_days || "—"}d</span>
         </div>
       </article>
     );
@@ -299,21 +299,21 @@ function PipelineStageEditor({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{custom ? "Custom workflow stage" : "System workflow stage"}</p>
-          <p className="mt-0.5 break-all text-[10px] text-muted-foreground">{stage.stage_key}</p>
+          <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">{custom ? "Custom workflow stage" : "System workflow stage"}</p>
+          <p className="mt-0.5 break-all text-[0.625rem] text-muted-foreground">{stage.stage_key}</p>
         </div>
-        <span className="rounded-full bg-muted px-2 py-1 text-[10px] font-semibold">SLA {stage.sla_target_days || "—"}d</span>
+        <span className="rounded-full bg-muted px-2 py-1 text-[0.625rem] font-semibold">SLA {stage.sla_target_days || "—"}d</span>
       </div>
       <label className="mt-3 block text-xs font-semibold">Column name<input required maxLength={80} className={`${fieldClass} mt-1`} value={label} onChange={(event) => setLabel(event.target.value)} /></label>
       {custom ? (
         <div className="mt-3 grid gap-3">
           <StageColorPicker value={color} onChange={setColor} />
           <div className="grid gap-2 sm:grid-cols-2">
-            <label className="text-xs font-semibold">SLA after application<input required type="number" min={1} max={90} className={`${fieldClass} mt-1`} value={slaDays} onChange={(event) => setSlaDays(event.target.value)} /><span className="mt-1 block text-[10px] font-normal text-muted-foreground">Calendar days in Asia/Tashkent.</span></label>
+            <label className="text-xs font-semibold">SLA after application<input required type="number" min={1} max={90} className={`${fieldClass} mt-1`} value={slaDays} onChange={(event) => setSlaDays(event.target.value)} /><span className="mt-1 block text-[0.625rem] font-normal text-muted-foreground">Calendar days in Asia/Tashkent.</span></label>
             <label className="text-xs font-semibold">Move after<select className={`${fieldClass} mt-1`} value={afterStage} onChange={(event) => setAfterStage(event.target.value)}><option value="">Keep current position</option>{stages.filter((item) => item.stage_key !== stage.stage_key).map((item) => <option key={item.stage_key} value={item.stage_key}>{item.label}</option>)}</select></label>
           </div>
         </div>
-      ) : <p className="mt-2 text-[11px] text-muted-foreground">Renaming changes this stage label everywhere. Its workflow behavior and position stay protected.</p>}
+      ) : <p className="mt-2 text-[0.6875rem] text-muted-foreground">Renaming changes this stage label everywhere. Its workflow behavior and position stay protected.</p>}
       <div className="mt-3 flex flex-wrap justify-end gap-2">
         {custom ? <button type="button" className={`${secondaryButtonClass} text-destructive hover:text-destructive`} disabled={pending} onClick={() => onArchive(stage)}><Archive className="h-4 w-4" />Remove</button> : null}
         <button type="submit" className={buttonClass} disabled={pending || !label.trim()}>{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save</button>
@@ -382,19 +382,19 @@ function PipelineStagesDrawer({
       {stagesQuery.isLoading ? <PageState>Loading pipeline columns…</PageState> : stagesQuery.error ? <PageState tone="error">{queryError(stagesQuery.error)}</PageState> : (
         <div className="space-y-4">
           {!readOnly ? <form className="rounded-xl border border-primary/20 bg-primary/5 p-3" onSubmit={(event) => { event.preventDefault(); createStage.mutate({ label: createLabel, color_token: createColor, after_stage_key: createAfter, sla_target_days: Number(createSla) }); }}>
-            <div className="flex items-center gap-2"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Plus className="h-4 w-4" /></div><div><h3 className="text-sm font-semibold">Add workflow stage</h3><p className="text-[11px] text-muted-foreground">Candidates enter this stage only when HR or CEO drags them here.</p></div></div>
+            <div className="flex items-center gap-2"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Plus className="h-4 w-4" /></div><div><h3 className="text-sm font-semibold">Add workflow stage</h3><p className="text-[0.6875rem] text-muted-foreground">Candidates enter this stage only when HR or CEO drags them here.</p></div></div>
             <div className="mt-3 grid gap-3">
               <label className="text-xs font-semibold">Column name<input autoFocus required maxLength={80} className={`${fieldClass} mt-1`} value={createLabel} onChange={(event) => setCreateLabel(event.target.value)} placeholder="For example: Reference Check" /></label>
               <StageColorPicker value={createColor} onChange={setCreateColor} />
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className="text-xs font-semibold">Insert after<select required className={`${fieldClass} mt-1`} value={createAfter} onChange={(event) => setCreateAfter(event.target.value)}>{stages.map((stage) => <option key={stage.stage_key} value={stage.stage_key}>{stage.label}</option>)}</select></label>
-                <label className="text-xs font-semibold">SLA after application<input required type="number" min={1} max={90} className={`${fieldClass} mt-1`} value={createSla} onChange={(event) => setCreateSla(event.target.value)} /><span className="mt-1 block text-[10px] font-normal text-muted-foreground">Deadline = application date + calendar days.</span></label>
+                <label className="text-xs font-semibold">SLA after application<input required type="number" min={1} max={90} className={`${fieldClass} mt-1`} value={createSla} onChange={(event) => setCreateSla(event.target.value)} /><span className="mt-1 block text-[0.625rem] font-normal text-muted-foreground">Deadline = application date + calendar days.</span></label>
               </div>
             </div>
             <div className="mt-3 flex justify-end"><button type="submit" className={buttonClass} disabled={anyPending || !createLabel.trim() || !createAfter}>{createStage.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Add column</button></div>
           </form> : <div className="rounded-xl border border-border bg-muted/30 p-3 text-xs text-muted-foreground">You can review the live column order, labels, colors, and SLAs. Only the HR Manager can change pipeline columns.</div>}
 
-          <section aria-labelledby="existing-pipeline-columns"><div className="mb-2 flex items-center justify-between gap-2"><div><h3 id="existing-pipeline-columns" className="text-sm font-semibold">Existing columns</h3><p className="text-[11px] text-muted-foreground">Shown in the same order as the board.</p></div><span className="rounded-full bg-muted px-2 py-1 text-xs font-semibold tabular-nums">{stages.length}</span></div><div className="grid gap-3">{stages.map((stage) => <PipelineStageEditor key={`${stage.stage_key}:${stage.version}`} stage={stage} stages={stages} pending={anyPending} readOnly={readOnly} onSave={(selected, values) => updateStage.mutate({ stage: selected, values })} onArchive={(selected) => { setArchiveStage(selected); setArchiveDestination(stages.find((item) => item.stage_key !== selected.stage_key)?.stage_key || ""); }} />)}</div></section>
+          <section aria-labelledby="existing-pipeline-columns"><div className="mb-2 flex items-center justify-between gap-2"><div><h3 id="existing-pipeline-columns" className="text-sm font-semibold">Existing columns</h3><p className="text-[0.6875rem] text-muted-foreground">Shown in the same order as the board.</p></div><span className="rounded-full bg-muted px-2 py-1 text-xs font-semibold tabular-nums">{stages.length}</span></div><div className="grid gap-3">{stages.map((stage) => <PipelineStageEditor key={`${stage.stage_key}:${stage.version}`} stage={stage} stages={stages} pending={anyPending} readOnly={readOnly} onSave={(selected, values) => updateStage.mutate({ stage: selected, values })} onArchive={(selected) => { setArchiveStage(selected); setArchiveDestination(stages.find((item) => item.stage_key !== selected.stage_key)?.stage_key || ""); }} />)}</div></section>
 
           {archiveStage ? (
             <section role="alertdialog" aria-labelledby="archive-stage-title" className="sticky bottom-0 rounded-xl border border-destructive/30 bg-card p-3 shadow-card-hover">
@@ -492,7 +492,7 @@ const CandidateCard = memo(function CandidateCard({
     candidate.status === "test_and_demo" &&
     demoPassed &&
     evaluationStates?.subject_test !== "passed";
-  const chipBase = compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-1 text-[10px]";
+  const chipBase = compact ? "px-1.5 py-0.5 text-[0.5625rem]" : "px-2 py-1 text-[0.625rem]";
   const emeraldChip = "bg-emerald-100 font-semibold text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-100";
   const redChip = "bg-red-100 font-semibold text-red-700 dark:bg-red-400/15 dark:text-red-200";
 
@@ -511,37 +511,37 @@ const CandidateCard = memo(function CandidateCard({
     >
       <a href={`${basePath}/candidates/${candidate.id}?tab=overview&origin=pipeline`} onClick={() => rememberRecruitmentReturn("pipeline")} className={`relative block focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 ${compact ? "rounded-t-md px-2.5 pb-1.5 pt-2" : "rounded-t-lg px-3 pb-2 pt-3"}`} title={candidate.full_name}>
         <div className="flex min-w-0 items-start justify-between gap-1.5">
-          <p className={`min-w-0 break-words font-semibold text-foreground ${compact ? "text-[13px] leading-4" : "text-sm"}`}>{candidate.full_name}</p>
-          {sla ? <span className={`shrink-0 rounded-full text-right font-semibold leading-tight ${slaClass} ${compact ? "max-w-20 px-1.5 py-0.5 text-[9px]" : "max-w-24 px-2 py-1 text-[10px]"}`} title={`SLA due ${dateLabel(sla.due_at)}`}>{slaLabel}</span> : null}
+          <p className={`min-w-0 break-words font-semibold text-foreground ${compact ? "text-[0.8125rem] leading-4" : "text-sm"}`}>{candidate.full_name}</p>
+          {sla ? <span className={`shrink-0 rounded-full text-right font-semibold leading-tight ${slaClass} ${compact ? "max-w-20 px-1.5 py-0.5 text-[0.5625rem]" : "max-w-24 px-2 py-1 text-[0.625rem]"}`} title={`SLA due ${dateLabel(sla.due_at)}`}>{slaLabel}</span> : null}
         </div>
-        <p className={`break-words text-muted-foreground ${compact ? "mt-0.5 text-[11px] leading-4" : "mt-1 text-xs"}`}>{candidate.applied_position || candidate.subject || "Position not set"}</p>
-        {detailLabel ? <div className={`rounded-md bg-background/65 ${compact ? "mt-1.5 px-1.5 py-1 text-[11px] leading-4" : "mt-2 px-2 py-1.5 text-xs"}`}><span className="flex items-center gap-1.5 truncate font-semibold text-foreground"><StatusIcon className={`${compact ? "h-3 w-3" : "h-3.5 w-3.5"} shrink-0`} />{detailLabel}</span><span className={`block truncate text-muted-foreground ${compact ? "" : "mt-0.5"}`}>{detailValue}</span>{candidate.status === "test_and_demo" && appointment ? <span className={`${compact ? "mt-0.5" : "mt-1"} block text-muted-foreground`}><span className="block truncate">Evaluator: {appointment.responsible_name || "Not assigned"}</span>{appointment.topic ? <span className="block truncate">Topic: {appointment.topic}</span> : null}<span className={`block font-semibold ${overdue ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-200"}`}>{overdue ? "Overdue" : "Scheduled"}</span></span> : null}</div> : null}
+        <p className={`break-words text-muted-foreground ${compact ? "mt-0.5 text-[0.6875rem] leading-4" : "mt-1 text-xs"}`}>{candidate.applied_position || candidate.subject || "Position not set"}</p>
+        {detailLabel ? <div className={`rounded-md bg-background/65 ${compact ? "mt-1.5 px-1.5 py-1 text-[0.6875rem] leading-4" : "mt-2 px-2 py-1.5 text-xs"}`}><span className="flex items-center gap-1.5 truncate font-semibold text-foreground"><StatusIcon className={`${compact ? "h-3 w-3" : "h-3.5 w-3.5"} shrink-0`} />{detailLabel}</span><span className={`block truncate text-muted-foreground ${compact ? "" : "mt-0.5"}`}>{detailValue}</span>{candidate.status === "test_and_demo" && appointment ? <span className={`${compact ? "mt-0.5" : "mt-1"} block text-muted-foreground`}><span className="block truncate">Evaluator: {appointment.responsible_name || "Not assigned"}</span>{appointment.topic ? <span className="block truncate">Topic: {appointment.topic}</span> : null}<span className={`block font-semibold ${overdue ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-200"}`}>{overdue ? "Overdue" : "Scheduled"}</span></span> : null}</div> : null}
         {candidate.status === "test_and_demo" ? (
           <div className={`flex flex-wrap gap-1 ${compact ? "mt-1" : "mt-2"}`}>
             {evaluationStates?.interview === "passed" ? <span className={`inline-flex rounded-full ${emeraldChip} ${chipBase}`}>Interview passed</span> : interviewMissing ? <span className={`inline-flex rounded-full ${redChip} ${chipBase}`}>No interview recorded</span> : null}
             {demoResult ? <span className={`inline-flex rounded-full ${demoPassed ? emeraldChip : redChip} ${chipBase}`}>{demoPassed ? "Demo passed" : "Demo not passed"}</span> : null}
           </div>
         ) : null}
-        {candidate.status === "test_and_demo" && demoResult && candidate.latest_demo_note ? <p className={`mt-1 truncate italic text-muted-foreground ${compact ? "text-[10px] leading-4" : "text-[11px]"}`} title={candidate.latest_demo_note}>“{candidate.latest_demo_note}”</p> : null}
+        {candidate.status === "test_and_demo" && demoResult && candidate.latest_demo_note ? <p className={`mt-1 truncate italic text-muted-foreground ${compact ? "text-[0.625rem] leading-4" : "text-[0.6875rem]"}`} title={candidate.latest_demo_note}>“{candidate.latest_demo_note}”</p> : null}
         {candidate.status === "under_review" ? <div className={`flex flex-wrap gap-1 ${compact ? "mt-1" : "mt-2"}`}><span className={`inline-flex rounded-full ${demoMissing ? redChip : emeraldChip} ${chipBase}`}>{demoMissing ? "No demo recorded" : "Demo passed"}</span><span className={`inline-flex rounded-full ${subjectKnowledgeWarning ? redChip : emeraldChip} ${chipBase}`}>{subjectKnowledgeWarning ? "Subject test missing/not passed" : "Subject test passed"}</span></div> : null}
       </a>
       {unscheduledType ? (
-        <button type="button" draggable={false} onClick={(event) => { event.stopPropagation(); onSchedule(candidate, unscheduledType); }} className={`${compact ? "mx-1.5 mb-1.5 w-[calc(100%-0.75rem)] text-[11px]" : "mx-2 mb-2 w-[calc(100%-1rem)] text-xs"} flex min-h-9 items-center gap-2 rounded-md border border-amber-400/50 bg-amber-100 px-2 text-left font-semibold text-amber-900 transition-colors hover:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 dark:bg-amber-400/15 dark:text-amber-100`}>
+        <button type="button" draggable={false} onClick={(event) => { event.stopPropagation(); onSchedule(candidate, unscheduledType); }} className={`${compact ? "mx-1.5 mb-1.5 w-[calc(100%-0.75rem)] text-[0.6875rem]" : "mx-2 mb-2 w-[calc(100%-1rem)] text-xs"} flex min-h-9 items-center gap-2 rounded-md border border-amber-400/50 bg-amber-100 px-2 text-left font-semibold text-amber-900 transition-colors hover:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 dark:bg-amber-400/15 dark:text-amber-100`}>
           <CalendarPlus className="h-4 w-4 shrink-0" />{unscheduledType === "job_interview" ? "Interview not scheduled" : "Demo lesson not scheduled"}
         </button>
       ) : null}
       {appointment ? (
         <div draggable={false} onClick={(event) => event.stopPropagation()} className={`flex items-center gap-1.5 ${compact ? "mx-1.5 mb-1.5" : "mx-2 mb-2"}`}>
           {appointment.appointment_type === "job_interview" ? (
-            <button type="button" draggable={false} onClick={(event) => { event.stopPropagation(); onInterview(candidate, appointment); }} className={`flex min-h-9 flex-1 items-center justify-center gap-2 rounded-md bg-primary px-2 font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${compact ? "text-[11px]" : "text-xs"}`}><Clock3 className="h-4 w-4" />{appointment.status === "in_progress" ? "Resume interview" : "Start interview"}</button>
+            <button type="button" draggable={false} onClick={(event) => { event.stopPropagation(); onInterview(candidate, appointment); }} className={`flex min-h-9 flex-1 items-center justify-center gap-2 rounded-md bg-primary px-2 font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${compact ? "text-[0.6875rem]" : "text-xs"}`}><Clock3 className="h-4 w-4" />{appointment.status === "in_progress" ? "Resume interview" : "Start interview"}</button>
           ) : (
-            <span className={`flex min-h-9 flex-1 items-center gap-2 truncate rounded-md border border-amber-400/50 bg-amber-50 px-2 font-semibold text-amber-900 dark:bg-amber-400/10 dark:text-amber-100 ${compact ? "text-[11px]" : "text-xs"}`}><CalendarPlus className="h-4 w-4 shrink-0" /><span className="truncate">Demo scheduled</span></span>
+            <span className={`flex min-h-9 flex-1 items-center gap-2 truncate rounded-md border border-amber-400/50 bg-amber-50 px-2 font-semibold text-amber-900 dark:bg-amber-400/10 dark:text-amber-100 ${compact ? "text-[0.6875rem]" : "text-xs"}`}><CalendarPlus className="h-4 w-4 shrink-0" /><span className="truncate">Demo scheduled</span></span>
           )}
           {canManageAppointments ? (
             <ActionMenu
               label="Appointment actions"
               items={[
-                { key: "reschedule", label: "Reschedule", onClick: () => onReschedule(candidate, appointment) },
+                { key: "reschedule", label: appointment.status === "in_progress" ? "Undo start & reschedule" : "Reschedule", onClick: () => onReschedule(candidate, appointment) },
                 { key: "cancel", label: "Cancel appointment", danger: true, onClick: () => onCancelAppointment(candidate, appointment) },
               ]}
             />
@@ -552,7 +552,7 @@ const CandidateCard = memo(function CandidateCard({
         <a
           href={`${basePath}/candidates/${candidate.id}?tab=evaluations&origin=pipeline`}
           onClick={() => rememberRecruitmentReturn("pipeline")}
-          className={`${compact ? "mx-1.5 mb-1.5 w-[calc(100%-0.75rem)] text-[11px]" : "mx-2 mb-2 w-[calc(100%-1rem)] text-xs"} flex min-h-9 items-center justify-center gap-2 rounded-md bg-primary px-2 font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40`}
+          className={`${compact ? "mx-1.5 mb-1.5 w-[calc(100%-0.75rem)] text-[0.6875rem]" : "mx-2 mb-2 w-[calc(100%-1rem)] text-xs"} flex min-h-9 items-center justify-center gap-2 rounded-md bg-primary px-2 font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40`}
         >
           <CheckCircle2 className="h-4 w-4" />
           Record subject test
@@ -702,6 +702,20 @@ export function PipelineView({
   const reschedule = useMutation({
     mutationFn: ({ candidate, appointment, values }: { candidate: RecruitmentCandidate; appointment: RecruitmentAppointment; values: Record<string, unknown> }) => recruitmentRequest<MutationPayload>(`${RECRUITMENT_API}/candidates/${candidate.id}/appointments/${appointment.id}`, { method: "PATCH", body: jsonBody({ ...values, expected_version: appointment.version }) }),
     onSuccess: (result) => { setRescheduleSelection(null); onAnnouncement(result.message || "Appointment rescheduled."); },
+    onError: (error) => onAnnouncement(queryError(error), "error"),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ["recruitment"] }),
+  });
+  const undoStart = useMutation({
+    mutationFn: ({ candidate, appointment }: { candidate: RecruitmentCandidate; appointment: RecruitmentAppointment }) => recruitmentRequest<MutationPayload>(`${RECRUITMENT_API}/candidates/${candidate.id}/appointments/${appointment.id}/undo-start`, { method: "POST", body: jsonBody({ expected_version: appointment.version }) }),
+    onSuccess: (result) => {
+      if (result.appointment) {
+        setRescheduleSelection((current) => current ? { ...current, appointment: result.appointment as RecruitmentAppointment } : null);
+        onAnnouncement("Original schedule restored. Choose a new date and time.");
+      } else {
+        setRescheduleSelection(null);
+        onAnnouncement(result.message || "Original schedule restored.");
+      }
+    },
     onError: (error) => onAnnouncement(queryError(error), "error"),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ["recruitment"] }),
   });
@@ -861,7 +875,7 @@ export function PipelineView({
           const items = data.stages[stage.stage_key] || [];
           return (
             <section key={stage.stage_key} aria-label={`${stage.label} candidates`} onDragEnter={(event) => { if (acceptsDrop && draggedCandidateRef.current) { event.preventDefault(); setDragOverStage(stage.stage_key); } }} onDragOver={(event) => { if (acceptsDrop && draggedCandidateRef.current) event.preventDefault(); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverStage(null); }} onDrop={(event) => { event.preventDefault(); setDragOverStage(null); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate || candidate.status === stage.stage_key || !acceptsDrop) return; moveMutate({ candidate, stage: stage.stage_key }); }} className={`flex min-w-0 h-[calc(100dvh-9.75rem)] min-h-[32rem] flex-col overflow-hidden rounded-t-xl border-x border-t transition-colors motion-reduce:transition-none ${highlighted ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-muted/25"}`}>
-              <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/95 px-2"><div className="flex min-w-0 items-center gap-1.5">{stage.stage_key === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}{stage.stage_kind === "custom" ? <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${stageColorStyles[stage.color_token].swatch}`} aria-hidden="true" /> : null}<h2 className="break-words text-[11px] font-semibold uppercase leading-4 tracking-wide text-foreground">{stage.label}</h2></div><span className="rounded-full bg-card px-2 py-1 text-[11px] font-semibold text-muted-foreground tabular-nums">{items.length}</span></div>
+              <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/95 px-2"><div className="flex min-w-0 items-center gap-1.5">{stage.stage_key === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}{stage.stage_kind === "custom" ? <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${stageColorStyles[stage.color_token].swatch}`} aria-hidden="true" /> : null}<h2 className="break-words text-[0.6875rem] font-semibold uppercase leading-4 tracking-wide text-foreground">{stage.label}</h2></div><span className="rounded-full bg-card px-2 py-1 text-[0.6875rem] font-semibold text-muted-foreground tabular-nums">{items.length}</span></div>
               <div data-pipeline-column-scroll className="miniapp-scroll flex-1 overflow-y-auto overscroll-y-contain p-1.5">{cards(items, true, stage)}</div>
             </section>
           );
@@ -895,7 +909,7 @@ export function PipelineView({
               title="Search and filters"
             >
               <Search className="h-4 w-4" />
-              {activeFilterCount ? <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">{activeFilterCount}</span> : null}
+              {activeFilterCount ? <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[0.5625rem] font-bold text-primary-foreground">{activeFilterCount}</span> : null}
             </button>
             {searchOpen ? (
               <div id="pipeline-search-popover" role="group" aria-label="Search candidates and filters" className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-3 shadow-card-hover">
@@ -967,8 +981,8 @@ export function PipelineView({
       <Modal open={Boolean(scheduleSelection)} onClose={() => { if (!schedule.isPending) setScheduleSelection(null); }} title={scheduleSelection?.appointmentType === "job_interview" ? "Schedule job interview" : "Schedule demo lesson"} subtitle={scheduleSelection?.candidate.full_name} size="md">
         {scheduleSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); schedule.mutate({ candidate: scheduleSelection.candidate, appointmentType: scheduleSelection.appointmentType, values: formValues(event.currentTarget) }); }}><ModalBody><AppointmentForm appointmentType={scheduleSelection.appointmentType} options={options} /></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setScheduleSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={schedule.isPending}>{schedule.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Schedule</button></div></ModalFooter></form> : null}
       </Modal>
-      <Modal open={Boolean(rescheduleSelection)} onClose={() => { if (!reschedule.isPending) setRescheduleSelection(null); }} title={rescheduleSelection?.appointment.appointment_type === "job_interview" ? "Reschedule job interview" : "Reschedule demo lesson"} subtitle={rescheduleSelection?.candidate.full_name} size="md">
-        {rescheduleSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); reschedule.mutate({ candidate: rescheduleSelection.candidate, appointment: rescheduleSelection.appointment, values: formValues(event.currentTarget) }); }}><ModalBody><AppointmentForm appointmentType={rescheduleSelection.appointment.appointment_type} appointment={rescheduleSelection.appointment} options={options} /></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setRescheduleSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={reschedule.isPending}>{reschedule.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Save appointment</button></div></ModalFooter></form> : null}
+      <Modal open={Boolean(rescheduleSelection)} onClose={() => { if (!reschedule.isPending && !undoStart.isPending) setRescheduleSelection(null); }} title={rescheduleSelection?.appointment.appointment_type === "job_interview" ? "Reschedule job interview" : "Reschedule demo lesson"} subtitle={rescheduleSelection?.candidate.full_name} size="md">
+        {rescheduleSelection ? rescheduleSelection.appointment.status === "in_progress" ? <><ModalBody><div role="alert" className="rounded-xl border border-amber-400/50 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100"><p className="flex items-center gap-2 font-semibold"><RotateCcw className="h-4 w-4" />This appointment is currently active</p><p className="mt-1 text-xs leading-5">Cancel the accidental start first. The appointment will return to its original schedule at {dateTimeLabel(rescheduleSelection.appointment.pre_start_starts_at)}, then this form will let you select a new date and time. No result will be recorded.</p></div></ModalBody><ModalFooter><div className="flex flex-wrap justify-end gap-2"><button type="button" className={secondaryButtonClass} disabled={undoStart.isPending} onClick={() => setRescheduleSelection(null)}>Keep active</button><button type="button" className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-amber-500 bg-amber-50 px-3 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-amber-950/20 dark:text-amber-100" disabled={undoStart.isPending || !rescheduleSelection.appointment.can_undo_start} title={rescheduleSelection.appointment.can_undo_start ? undefined : "The original schedule is unavailable."} onClick={() => undoStart.mutate(rescheduleSelection)}>{undoStart.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}Restore schedule</button></div></ModalFooter></> : <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); reschedule.mutate({ candidate: rescheduleSelection.candidate, appointment: rescheduleSelection.appointment, values: formValues(event.currentTarget) }); }}><ModalBody><AppointmentForm appointmentType={rescheduleSelection.appointment.appointment_type} appointment={rescheduleSelection.appointment} options={options} /></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setRescheduleSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={reschedule.isPending}>{reschedule.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Save appointment</button></div></ModalFooter></form> : null}
       </Modal>
 
       <Modal open={Boolean(cancelSelection)} onClose={() => { if (!cancelAppointment.isPending) setCancelSelection(null); }} title={cancelSelection?.appointment.appointment_type === "job_interview" ? "Cancel job interview" : "Cancel demo lesson"} subtitle={cancelSelection?.candidate.full_name} size="sm">

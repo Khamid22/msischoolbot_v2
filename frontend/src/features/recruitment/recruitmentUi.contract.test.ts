@@ -161,13 +161,15 @@ describe("compact recruitment pipeline", () => {
   });
 });
 
-describe("recruitment scheduling and assigned-demo notifications", () => {
+describe("recruitment scheduling and browser appointment reminders", () => {
   const appointmentForm = source("AppointmentForm.tsx");
   const model = source("model.ts");
   const pipeline = source("PipelineView.tsx");
   const profile = source("CandidateProfile.tsx");
   const notifications = source("RecruitmentNotifications.tsx");
-  const telegram = source("TelegramConnectionCard.tsx");
+  const browserReminders = source("BrowserRecruitmentReminders.tsx");
+  const workspace = source("RecruitmentWorkspace.tsx");
+  const app = projectSource("app/App.tsx");
 
   test("uses compact date/time controls, auto-assigns HR interviews, and omits scheduling notes", () => {
     assert.match(appointmentForm, /type="date"/);
@@ -199,9 +201,9 @@ describe("recruitment scheduling and assigned-demo notifications", () => {
     assert.match(profile, /Subject test missing\/not passed/);
   });
 
-  test("shows recipient-scoped demo notifications and unread recruitment badges", () => {
+  test("shows generic recruitment notifications and unread recruitment badges", () => {
     assert.match(notifications, /notifications\/unread-count/);
-    assert.match(notifications, /Assigned demo lessons/);
+    assert.match(notifications, /Recruitment notifications/);
     assert.match(notifications, /notifications\/\$\{id\}\/read/);
     assert.match(notifications, /unread_only=true/);
     assert.match(notifications, /onMutate/);
@@ -209,14 +211,41 @@ describe("recruitment scheduling and assigned-demo notifications", () => {
     assert.match(notifications, /event\.preventDefault\(\)/);
     assert.match(notifications, /window\.location\.assign/);
     assert.match(notifications, /refetchInterval: 30_000/);
+    assert.match(workspace, /badge: notificationUnread/);
   });
 
-  test("links Telegram only with Mini App initData and supports unlinking", () => {
-    assert.match(telegram, /Telegram\?\.WebApp\?\.initData/);
-    assert.match(telegram, /init_data: telegramInitData\(\)/);
-    assert.match(telegram, /method: "DELETE"/);
-    assert.match(telegram, /Open Telegram Mini App/);
-    assert.doesNotMatch(telegram, /telegram_user_id|raw Telegram/i);
+  test("uses profile-enabled browser alerts, a top-right toast, and a fixed two-tone preview", () => {
+    assert.ok(!existsSync(new URL("./TelegramConnectionCard.tsx", import.meta.url)));
+    assert.match(browserReminders, /notifications\/browser-preference/);
+    assert.match(browserReminders, /notifications\/browser-alerts\?limit=10/);
+    assert.match(browserReminders, /refetchIntervalInBackground: true/);
+    assert.match(browserReminders, /notifications\/browser-test/);
+    assert.match(browserReminders, /Notification\.requestPermission\(\)/);
+    assert.match(browserReminders, /new Notification\(alert\.title/);
+    assert.match(browserReminders, /659\.25/);
+    assert.match(browserReminders, /880/);
+    assert.match(browserReminders, /lg:top-\[4\.5rem\]/);
+    assert.match(browserReminders, /Open candidate/);
+    assert.match(browserReminders, /At least one MSI portal tab must remain open/);
+    assert.match(workspace, /BrowserReminderPreferencesCard/);
+    assert.match(app, /<BrowserRecruitmentReminders/);
+  });
+
+  test("can undo an accidental appointment start before rescheduling", () => {
+    const interviewSession = source("InterviewSessionModal.tsx");
+    const demoSession = source("DemoSessionModal.tsx");
+    for (const session of [interviewSession, demoSession]) {
+      assert.match(session, /\/undo-start/);
+      assert.match(session, /Cancel start/);
+      assert.match(session, /Restore schedule/);
+      assert.match(session, /Keep active/);
+      assert.match(session, /pre_start_starts_at/);
+    }
+    assert.match(pipeline, /Undo start & reschedule/);
+    assert.match(pipeline, /Original schedule restored\. Choose a new date and time/);
+    assert.match(profile, /Undo accidental start/);
+    assert.match(profile, /\/undo-start/);
+    assert.match(model, /can_undo_start\?: boolean/);
   });
 });
 
@@ -407,6 +436,9 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(settings, /RECRUITMENT_API}\/settings/);
     assert.match(settings, /Stage SLA targets/);
     assert.match(settings, /sla-rules/);
+    assert.match(settings, /Appointment reminder timing/);
+    assert.match(settings, /settings\/appointment-reminders/);
+    assert.match(settings, /Short-notice appointments/);
     assert.match(workspace, /name="position_option_id"/);
     assert.match(profile, /position_option_id/);
     assert.match(pipeline, /option_categories\.position/);

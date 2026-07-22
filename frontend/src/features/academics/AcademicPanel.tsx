@@ -487,7 +487,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
                           <div>
                             <p className="text-xs font-bold text-foreground">{asString(item.lesson_number)}</p>
                             <span
-                              className={`mt-1 inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                              className={`mt-1 inline-flex rounded-md px-2 py-0.5 text-[0.625rem] font-bold ${
                                 isExam
                                   ? "bg-amber-100 text-amber-800"
                                   : "bg-muted text-muted-foreground"
@@ -720,7 +720,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
                                 </span>
                                 <div className="min-w-0">
                                   <p className="truncate text-sm font-bold">{asString(school.name)}</p>
-                                  <p className="truncate text-[11px] text-muted-foreground">{code}</p>
+                                  <p className="truncate text-[0.6875rem] text-muted-foreground">{code}</p>
                                 </div>
                               </div>
                               <div className="flex shrink-0 gap-1.5">
@@ -769,7 +769,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
                     <Filter className="h-3.5 w-3.5" />
                     Filters
                     {activeGroupFilterCount > 0 ? (
-                      <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] text-primary">
+                      <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[0.625rem] text-primary">
                         {activeGroupFilterCount}
                       </span>
                     ) : null}
@@ -826,7 +826,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
                   </label>
                   <div className="mt-3 space-y-2">
                     <div>
-                      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">School</p>
+                      <p className="mb-1.5 text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">School</p>
                       <div className="flex flex-wrap gap-1.5">
                         <button
                           type="button"
@@ -834,14 +834,14 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
                             setGroupSchool("all");
                             setGroupSubject("all");
                           }}
-                          className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-bold transition-colors ${
+                          className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[0.6875rem] font-bold transition-colors ${
                             groupSchool === "all"
                               ? "border-primary/50 bg-primary/10 text-primary"
                               : "border-foreground/10 bg-background text-foreground hover:bg-muted"
                           }`}
                         >
                           All Schools
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">{groups.length}</span>
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[0.625rem]">{groups.length}</span>
                         </button>
                         {schools.map((school: Record<string, unknown>) => {
                           const code = asString(school.code);
@@ -855,40 +855,40 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
                                 setGroupSchool(code);
                                 setGroupSubject("all");
                               }}
-                              className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-bold transition-colors ${
+                              className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[0.6875rem] font-bold transition-colors ${
                                 active
                                   ? "border-primary/50 bg-primary/10 text-primary"
                                   : "border-foreground/10 bg-background text-foreground hover:bg-muted"
                               }`}
                             >
                               {asString(school.name)}
-                              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">{stats?.groups ?? 0}</span>
+                              <span className="rounded bg-muted px-1.5 py-0.5 text-[0.625rem]">{stats?.groups ?? 0}</span>
                             </button>
                           );
                         })}
                       </div>
                     </div>
                     <div>
-                      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Program</p>
+                      <p className="mb-1.5 text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">Program</p>
                       <div className="flex flex-wrap gap-1.5">
                         <button
                           type="button"
                           onClick={() => setGroupSubject("all")}
-                          className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-bold transition-colors ${
+                          className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[0.6875rem] font-bold transition-colors ${
                             groupSubject === "all"
                               ? "border-primary/50 bg-primary/10 text-primary"
                               : "border-foreground/10 bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
                           }`}
                         >
                           All programs
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">{contextSummary.groups}</span>
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[0.625rem]">{contextSummary.groups}</span>
                         </button>
                         {subjectFilterOptions.map((subject) => (
                           <button
                             key={subject.name}
                             type="button"
                             onClick={() => setGroupSubject(subject.name)}
-                            className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-bold transition-colors ${
+                            className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[0.6875rem] font-bold transition-colors ${
                               groupSubject === subject.name
                                 ? "border-primary/50 bg-primary/10 text-primary"
                                 : "border-foreground/10 bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -896,7 +896,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
                           >
                             <span className={`h-2 w-2 rounded-full ${programColor(subject.name)}`} />
                             {subject.name}
-                            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">{subject.groups}</span>
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-[0.625rem]">{subject.groups}</span>
                           </button>
                         ))}
                       </div>
@@ -933,10 +933,10 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
                         <section key={normalizeSubjectKey(section.name)} className="space-y-2">
                           <div className="flex items-center gap-2">
                             <span className={`h-2 w-2 shrink-0 rounded-full ${sectionSwatch}`} aria-hidden="true" />
-                            <p className="truncate text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                            <p className="truncate text-[0.6875rem] font-bold uppercase tracking-wide text-muted-foreground">
                               {section.name}
                             </p>
-                            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[0.625rem] font-bold text-muted-foreground">
                               {section.groups.length} {section.groups.length === 1 ? "group" : "groups"}
                             </span>
                             <span className="h-px min-w-6 flex-1 bg-foreground/10" aria-hidden="true" />
@@ -973,7 +973,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
                                     </span>
                                     <div className="min-w-0 flex-1 pr-8">
                                       <p className="truncate text-sm font-bold leading-tight">{name}</p>
-                                      <p className="truncate text-[11px] text-muted-foreground">
+                                      <p className="truncate text-[0.6875rem] text-muted-foreground">
                                         {groupSchool === "all" ? schoolName : asString(group.code) || schoolCode}
                                       </p>
                                     </div>
@@ -983,11 +983,11 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
                                   <div className="mt-3 flex items-center gap-1.5">
                                     <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${swatch}`} aria-hidden="true" />
                                     <span className="truncate text-xs font-semibold">{subjectName || "No program"}</span>
-                                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                                    <span className="rounded bg-muted px-1.5 py-0.5 text-[0.625rem] font-bold text-muted-foreground">
                                       {asString(group.set_name) || "Set 1"}
                                     </span>
                                     {isNewGroup ? (
-                                      <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">
+                                      <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[0.625rem] font-bold text-sky-700">
                                         New Group
                                       </span>
                                     ) : null}
@@ -996,15 +996,15 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
                                   <div className="mt-3 flex items-center justify-between border-t border-foreground/8 pt-3">
                                     <div className="flex items-baseline gap-1.5">
                                       <span className="text-lg font-bold leading-none">{studentsCount}</span>
-                                      <span className="text-[11px] text-muted-foreground">active</span>
+                                      <span className="text-[0.6875rem] text-muted-foreground">active</span>
                                       {disqualifiedCount > 0 ? (
-                                        <span className="ml-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                                        <span className="ml-1 rounded bg-amber-50 px-1.5 py-0.5 text-[0.625rem] font-bold text-amber-700">
                                           {disqualifiedCount} disq.
                                         </span>
                                       ) : null}
                                     </div>
                                     <span
-                                      className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                      className={`inline-flex items-center rounded-md px-2 py-0.5 text-[0.625rem] font-bold uppercase ${
                                         isActive ? "bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"
                                       }`}
                                     >

@@ -13,7 +13,8 @@ import { SettingsView } from "@/features/recruitment/SettingsView";
 import { TasksView } from "@/features/recruitment/TasksView";
 import { TrashBinView } from "@/features/recruitment/TrashBinView";
 import { TeachersView } from "@/features/recruitment/TeachersView";
-import { TelegramConnectionCard } from "@/features/recruitment/TelegramConnectionCard";
+import { BrowserReminderPreferencesCard } from "@/features/recruitment/BrowserRecruitmentReminders";
+import { useRecruitmentUnreadCount } from "@/features/recruitment/RecruitmentNotifications";
 import { formValues, jsonBody, recruitmentRequest } from "@/features/recruitment/api";
 import { type RecruitmentCandidate, type RecruitmentOptions, type RecruitmentRole, type RecruitmentView } from "@/features/recruitment/model";
 import {
@@ -115,7 +116,7 @@ function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolea
           <label className="text-xs font-semibold">Application date<input name="application_date" type="date" defaultValue={new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date())} className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Source<select name="source_option_id" value={sourceId} onChange={(event) => { setSourceId(event.target.value); setSubsourceId(""); }} className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.sources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}</select></label>
           <label className="text-xs font-semibold">Subsource<select name="subsource_option_id" value={subsourceId} onChange={(event) => setSubsourceId(event.target.value)} disabled={!sourceId} required={Boolean(sourceId && options?.subsources.some((item) => String(item.parent_id || "") === sourceId))} className={`${fieldClass} mt-1 disabled:cursor-not-allowed disabled:opacity-60`}><option value="">{sourceId ? "Select subsource" : "Select a source first"}</option>{options?.subsources.filter((item) => String(item.parent_id || "") === sourceId).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-          <label className="text-xs font-semibold">CV <span className="font-normal text-muted-foreground">(optional)</span><input name="candidate_cv" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" disabled={!options?.document_upload_enabled} className={`${fieldClass} mt-1 cursor-pointer px-2 py-1.5 text-xs file:mr-2 file:rounded-md file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:font-semibold file:text-primary disabled:cursor-not-allowed disabled:opacity-60`} /><span className="mt-1 block text-[10px] font-normal text-muted-foreground">{options?.document_upload_enabled ? "PDF, DOC, DOCX, JPG or PNG · max 20 MB" : "Document storage is unavailable. Add the CV later."}</span></label>
+          <label className="text-xs font-semibold">CV <span className="font-normal text-muted-foreground">(optional)</span><input name="candidate_cv" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" disabled={!options?.document_upload_enabled} className={`${fieldClass} mt-1 cursor-pointer px-2 py-1.5 text-xs file:mr-2 file:rounded-md file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:font-semibold file:text-primary disabled:cursor-not-allowed disabled:opacity-60`} /><span className="mt-1 block text-[0.625rem] font-normal text-muted-foreground">{options?.document_upload_enabled ? "PDF, DOC, DOCX, JPG or PNG · max 20 MB" : "Document storage is unavailable. Add the CV later."}</span></label>
         </ModalBody>
         <ModalFooter><div className="flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={create.isPending} onClick={close}>Cancel</button><button className={buttonClass} disabled={create.isPending} type="submit">{create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Create candidate</button></div></ModalFooter>
       </form>
@@ -128,22 +129,23 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
   const { toast, showToast, clearToast } = useFloatingToast();
   const options = useQuery({ queryKey: ["recruitment", "options"], queryFn: () => recruitmentRequest<RecruitmentOptions>(`${RECRUITMENT_API}/options`) });
   const effectiveRole = role || (authRole as RecruitmentRole);
+  const notificationUnread = useRecruitmentUnreadCount();
   const active = view === "candidate" ? (effectiveRole === "hr_manager" ? "pipeline" : "candidates") : view === "profile" ? "profile" : view;
   const navItems = useMemo(() => {
     if (effectiveRole === "academic_director") return [
         { key: "decisions", label: "Decisions", href: `${basePath}/decisions`, icon: ShieldCheck },
         { key: "candidates", label: "Candidates", href: `${basePath}/candidates`, icon: UsersRound },
-        { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays },
+        { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays, badge: notificationUnread },
       ];
     if (effectiveRole === "head_of_department") return [
       { key: "candidates", label: "Assigned Candidates", href: `${basePath}/candidates`, icon: UsersRound },
-      { key: "schedule", label: "Assigned Schedule", href: `${basePath}/schedule`, icon: CalendarDays },
+      { key: "schedule", label: "Assigned Schedule", href: `${basePath}/schedule`, icon: CalendarDays, badge: notificationUnread },
     ];
     if (effectiveRole === "hr_manager") return [
       { key: "pipeline", label: "Pipeline", href: `${basePath}/pipeline`, icon: KanbanSquare },
       { key: "teachers", label: "Teachers", href: `${basePath}/teachers`, icon: UsersRound },
       { key: "analytics", label: "Analytics", href: `${basePath}/analytics`, icon: BarChart3 },
-      { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays },
+      { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays, badge: notificationUnread },
       { key: "rejected", label: "Rejected", href: `${basePath}/rejected`, icon: Ban },
       { key: "trash", label: "Trash Bin", href: `${basePath}/trash`, icon: Trash2 },
       { key: "settings", label: "Settings", href: `${basePath}/settings`, icon: Settings2 },
@@ -152,12 +154,12 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       { key: "pipeline", label: "Pipeline", href: `${basePath}/pipeline`, icon: KanbanSquare },
       ...(effectiveRole === "ceo" ? [{ key: "analytics", label: "Analytics", href: `${basePath}/analytics`, icon: BarChart3 }] : []),
       { key: "candidates", label: "Candidates", href: `${basePath}/candidates`, icon: UsersRound },
-      { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays },
+      { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays, badge: notificationUnread },
       { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
       ...(effectiveRole === "ceo" ? [{ key: "settings", label: "SLA Settings", href: `${basePath}/settings`, icon: Settings2 }] : []),
     ];
     return items;
-  }, [basePath, effectiveRole]);
+  }, [basePath, effectiveRole, notificationUnread]);
   const title = { pipeline: "Recruitment Pipeline", teachers: "Teachers", analytics: "Recruitment Analytics", decisions: "Hiring Decisions", candidates: "Candidates", schedule: "Interview & Demo Schedule", tasks: "Recruitment Tasks", rejected: "Closed Candidates", settings: "Recruitment Settings", trash: "Trash Bin", candidate: "Candidate Profile", profile: "Profile" }[view];
   const home = workspaceHome(effectiveRole);
   const workspaceBackLink = effectiveRole === "hr_manager" ? undefined : { href: home, label: `Back to ${roleLabel(effectiveRole)} workspace` };
@@ -171,11 +173,11 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       {view !== "candidate" ? (
         <header className={`flex flex-wrap items-center justify-between ${view === "pipeline" ? "gap-2" : "gap-2"}`}>
           <div className="min-w-0">
-            <p className={`${view === "pipeline" ? "text-[10px] leading-3" : "text-[11px]"} font-semibold uppercase tracking-[0.14em] text-primary`}>Teacher Recruitment</p>
+            <p className={`${view === "pipeline" ? "text-[0.625rem] leading-3" : "text-[0.6875rem]"} font-semibold uppercase tracking-[0.14em] text-primary`}>Teacher Recruitment</p>
             <h1 className={`${view === "pipeline" ? "mt-0 text-lg leading-6 sm:text-xl" : "mt-0.5 text-lg sm:text-xl"} font-bold tracking-tight`}>{title}</h1>
-            {view === "decisions" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Review assigned evaluations and pending hiring requests.</p> : null}
-            {view === "schedule" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Manage upcoming sessions and review evaluation history in Asia/Tashkent time.</p> : null}
-            {view === "trash" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Deleted candidates only. Open a profile to restore one.</p> : null}
+            {view === "decisions" ? <p className="mt-0.5 hidden max-w-2xl text-[0.8125rem] text-muted-foreground sm:block">Review assigned evaluations and pending hiring requests.</p> : null}
+            {view === "schedule" ? <p className="mt-0.5 hidden max-w-2xl text-[0.8125rem] text-muted-foreground sm:block">Manage upcoming sessions and review evaluation history in Asia/Tashkent time.</p> : null}
+            {view === "trash" ? <p className="mt-0.5 hidden max-w-2xl text-[0.8125rem] text-muted-foreground sm:block">Deleted candidates only. Open a profile to restore one.</p> : null}
           </div>
         </header>
       ) : null}
@@ -193,7 +195,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       {view === "settings" && ["hr_manager", "ceo"].includes(effectiveRole) ? <SettingsView onAnnouncement={showToast} /> : null}
       {view === "trash" && effectiveRole === "hr_manager" ? <TrashBinView basePath={basePath} options={options.data} onAnnouncement={showToast} /> : null}
       {view === "candidate" && Number(candidateId) > 0 ? <CandidateProfile candidateId={Number(candidateId)} basePath={basePath} role={effectiveRole} onAnnouncement={showToast} /> : null}
-      {view === "profile" ? <div className="space-y-2"><section className="rounded-xl border border-border bg-card p-3"><div className="flex items-center gap-2"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div><div><h2 className="text-sm font-semibold">{authLogin || roleLabel(effectiveRole)}</h2><p className="text-xs text-muted-foreground">{roleLabel(effectiveRole)} recruitment access</p></div></div><div className="mt-4 flex flex-wrap gap-2">{effectiveRole !== "hr_manager" ? <a className={secondaryButtonClass} href={home}>Back to main workspace</a> : null}<a className={secondaryButtonClass} href="/account/security">Account security</a></div></section>{["hr_manager", "academic_director", "head_of_department"].includes(effectiveRole) ? <TelegramConnectionCard /> : null}</div> : null}
+      {view === "profile" ? <div className="space-y-2"><section className="rounded-xl border border-border bg-card p-3"><div className="flex items-center gap-2"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div><div><h2 className="text-sm font-semibold">{authLogin || roleLabel(effectiveRole)}</h2><p className="text-xs text-muted-foreground">{roleLabel(effectiveRole)} recruitment access</p></div></div><div className="mt-4 flex flex-wrap gap-2">{effectiveRole !== "hr_manager" ? <a className={secondaryButtonClass} href={home}>Back to main workspace</a> : null}<a className={secondaryButtonClass} href="/account/security">Account security</a></div></section>{["hr_manager", "academic_director", "head_of_department"].includes(effectiveRole) ? <BrowserReminderPreferencesCard /> : null}</div> : null}
 
       <NewCandidateModal open={newCandidateOpen} onClose={() => setNewCandidateOpen(false)} onCreated={showToast} options={options.data} />
     </>
@@ -206,7 +208,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
         csrfToken={csrfToken}
         active="recruitment"
         recruitmentView={academicRecruitmentView}
-        maxWidthClass="max-w-[1600px]"
+        maxWidthClass="max-w-[100rem]"
         sectionClassName={view === "pipeline" ? "gap-2" : "gap-2"}
       >
         {content}
@@ -221,7 +223,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
         csrfToken={csrfToken}
         active="recruitment"
         recruitmentView={academicRecruitmentView}
-        maxWidthClass="max-w-[1600px]"
+        maxWidthClass="max-w-[100rem]"
         sectionClassName={view === "pipeline" ? "gap-2" : "gap-2"}
       >
         {content}
@@ -245,7 +247,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       desktopSidebarStorageKey="msi:recruitment:sidebar:v1"
       workspaceBackLink={workspaceBackLink}
       profileHref={`${basePath}/profile`}
-      maxWidthClass="max-w-[1600px]"
+      maxWidthClass="max-w-[100rem]"
       sectionClassName={view === "pipeline" ? "gap-2" : "gap-2"}
     >
       {content}

@@ -15,6 +15,7 @@ from backend.modules.hr.recruitment.appointments.repository import (
     list_appointment_rows,
     set_appointment_status,
     start_appointment_session,
+    undo_appointment_start,
     update_appointment,
 )
 from backend.modules.hr.recruitment.candidates.read_repository import (
@@ -104,18 +105,17 @@ from backend.modules.hr.recruitment.handoffs.repository import (
     sync_academy_subject_from_candidate,
 )
 from backend.modules.hr.recruitment.notification_repository import (
+    browser_preference_row,
     cancel_recruitment_notification_reminders,
-    claimable_recruitment_notification_rows,
+    claim_due_browser_alert_rows,
     insert_recruitment_notification,
-    list_future_demo_appointments_for_recipient,
     list_recruitment_notification_rows,
-    mark_recruitment_notification_failed,
     mark_recruitment_notification_read,
-    mark_recruitment_notification_sending,
-    mark_recruitment_notification_sent,
-    mark_recruitment_notification_waiting_link,
-    recover_stale_recruitment_notification_deliveries,
+    recalculate_future_appointment_reminders,
     recruitment_notification_unread_count,
+    recruitment_reminder_config_row,
+    update_browser_preference,
+    update_recruitment_reminder_config,
 )
 from backend.modules.hr.recruitment.pipeline_stages_repository import (
     active_pipeline_stage_by_key,

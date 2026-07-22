@@ -101,12 +101,15 @@ export type RecruitmentAppointment = {
   cancelled_at?: string;
   no_show_at?: string;
   started_at?: string;
+  pre_start_starts_at?: string | null;
+  pre_start_ends_at?: string | null;
   started_by_account_id?: number | null;
   started_by_name?: string;
   start_available_at?: string | null;
   overdue_at?: string | null;
   can_start?: boolean;
   can_resume?: boolean;
+  can_undo_start?: boolean;
   created_at?: string;
   updated_at?: string;
   subject_id?: number | null;
@@ -460,6 +463,12 @@ export type RecruitmentSettingsData = {
   expected_salarys: RecruitmentSetting[];
   teaching_experiences: RecruitmentSetting[];
   sla_rules: Array<{ stage: string; stage_label?: string; target_days: number; updated_at?: string; updated_by_name?: string }>;
+  appointment_reminders: {
+    lead_minutes: number;
+    version: number;
+    updated_at?: string;
+    updated_by_account_id?: number | null;
+  };
   read_only: boolean;
 };
 

@@ -53,7 +53,7 @@ export default function RatingPage(props: RatingPageProps) {
           <button
             type="button"
             onClick={() => setFormulaOpen((current) => !current)}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-[11px] font-bold transition-colors ${
+            className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-[0.6875rem] font-bold transition-colors ${
               formulaOpen
                 ? "border-foreground/20 bg-foreground text-background"
                 : "border-foreground/10 bg-surface text-foreground hover:bg-muted"
@@ -69,7 +69,7 @@ export default function RatingPage(props: RatingPageProps) {
                 <a
                   key={option.code}
                   href={option.url}
-                  className={`rounded-md px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                  className={`rounded-md px-3 py-1.5 text-[0.6875rem] font-semibold transition-colors ${
                     option.is_current ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground"
                   }`}
                 >
@@ -109,7 +109,7 @@ export default function RatingPage(props: RatingPageProps) {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                  <p className="text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">
                     {row.isProvisional ? "Provisional" : `Rank #${row.rank || index + 1}`}
                   </p>
                   <p className="mt-0.5 break-words text-sm font-bold leading-snug">{row.displayName}</p>
@@ -117,26 +117,26 @@ export default function RatingPage(props: RatingPageProps) {
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="font-display text-xl font-bold leading-none">{row.averageCompositeDisplay}</p>
-                  <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">AVG</p>
+                  <p className="mt-1 text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">AVG</p>
                 </div>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-lg bg-muted px-2 py-2">
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground">EP</p>
+                  <p className="text-[0.625rem] font-bold uppercase text-muted-foreground">EP</p>
                   <p className="mt-0.5 text-xs font-bold">{row.examPerformanceDisplay || row.examPerformance}/9</p>
                 </div>
                 <div className="rounded-lg bg-muted px-2 py-2">
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground">AAP</p>
+                  <p className="text-[0.625rem] font-bold uppercase text-muted-foreground">AAP</p>
                   <p className="mt-0.5 text-xs font-bold">{row.aapDisplay || row.aap}/9</p>
                 </div>
                 <div className="rounded-lg bg-muted px-2 py-2">
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground">AR</p>
+                  <p className="text-[0.625rem] font-bold uppercase text-muted-foreground">AR</p>
                   <p className="mt-0.5 text-xs font-bold">{row.attendanceRate}%</p>
                 </div>
               </div>
               <div className="mt-3">
                 <span
-                  className={`inline-flex rounded-md px-2 py-1 text-[10px] font-bold ${
+                  className={`inline-flex rounded-md px-2 py-1 text-[0.625rem] font-bold ${
                     row.isProvisional
                       ? "bg-warning/20 text-foreground"
                       : "bg-success/10 text-success"
@@ -150,13 +150,13 @@ export default function RatingPage(props: RatingPageProps) {
         </div>
 
         <div className="miniapp-table-scroll hidden max-h-[70dvh] sm:block">
-          <table className="w-full min-w-[820px] text-left">
-            <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+          <table className="w-full min-w-[51.25rem] text-left">
+            <thead className="sticky top-0 z-20 bg-surface shadow-[0_0.0625rem_0_hsl(var(--foreground)/0.08)]">
               <tr className="border-b border-foreground/5">
                 {["#", "Student", "Grp", "Status", "AVG", "EP", "AAP", "AR%"].map((heading) => (
                   <th
                     key={heading}
-                    className="bg-surface px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                    className="bg-surface px-3 py-2 text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground"
                   >
                     {heading}
                   </th>
@@ -178,7 +178,7 @@ export default function RatingPage(props: RatingPageProps) {
                   </td>
                   <td className="px-3 py-3">
                     <span
-                      className={`inline-flex rounded-md px-2 py-1 text-[10px] font-bold ${
+                      className={`inline-flex rounded-md px-2 py-1 text-[0.625rem] font-bold ${
                         row.isProvisional
                           ? "bg-warning/20 text-foreground"
                           : "bg-success/10 text-success"

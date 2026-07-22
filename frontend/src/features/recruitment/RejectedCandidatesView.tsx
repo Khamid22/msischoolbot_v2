@@ -121,7 +121,7 @@ export function RejectedCandidatesView({ basePath, options, onAnnouncement }: Pr
           </select>
           <button type="button" className={`${secondaryButtonClass} relative`} onClick={() => { setDraftFilters(filters); setFilterOpen(true); }}>
             <Filter className="h-4 w-4" />Filter
-            {filterCount ? <span className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">{filterCount}</span> : null}
+            {filterCount ? <span className="rounded-full bg-primary px-1.5 text-[0.625rem] text-primary-foreground">{filterCount}</span> : null}
           </button>
         </div>
       </section>
@@ -132,8 +132,8 @@ export function RejectedCandidatesView({ basePath, options, onAnnouncement }: Pr
         {candidates.data ? (
           <section className="overflow-hidden rounded-xl border border-border bg-card">
             <div className="hidden lg:block">
-              <table className="w-full table-fixed text-left text-[13px]">
-                <thead className="bg-muted/60 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <table className="w-full table-fixed text-left text-[0.8125rem]">
+                <thead className="bg-muted/60 text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="w-[20%] px-3 py-1.5">Candidate</th>
                     <th className="w-[13%] px-3 py-1.5">Failed / left at</th>
@@ -145,10 +145,10 @@ export function RejectedCandidatesView({ basePath, options, onAnnouncement }: Pr
                 </thead>
                 <tbody className="divide-y divide-border">
                   {candidates.data.items.map((candidate) => (
-                    <tr key={candidate.id} className="h-[62px] hover:bg-muted/30">
-                      <td className="px-3 py-1"><a href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("rejected")} className="block truncate font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{candidate.full_name}</a><p className="truncate text-[11px] text-muted-foreground">{candidate.applied_position || candidate.subject || "Position not set"}</p></td>
+                    <tr key={candidate.id} className="h-[3.875rem] hover:bg-muted/30">
+                      <td className="px-3 py-1"><a href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("rejected")} className="block truncate font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{candidate.full_name}</a><p className="truncate text-[0.6875rem] text-muted-foreground">{candidate.applied_position || candidate.subject || "Position not set"}</p></td>
                       <td className="px-3 py-1"><StatusBadge status={candidate.decision_origin_stage || "new_candidate"}>{candidate.decision_origin_stage_label || recruitmentStageLabel(candidate.decision_origin_stage || "Unknown", options?.stage_labels)}</StatusBadge></td>
-                      <td className="px-3 py-1"><p className="truncate">{candidate.rejection_reason ? humanize(candidate.rejection_reason) : candidate.decision_reason_detail || "No reason recorded"}</p>{candidate.rejection_reason && candidate.decision_reason_detail ? <p className="truncate text-[11px] text-muted-foreground">{candidate.decision_reason_detail}</p> : null}</td>
+                      <td className="px-3 py-1"><p className="truncate">{candidate.rejection_reason ? humanize(candidate.rejection_reason) : candidate.decision_reason_detail || "No reason recorded"}</p>{candidate.rejection_reason && candidate.decision_reason_detail ? <p className="truncate text-[0.6875rem] text-muted-foreground">{candidate.decision_reason_detail}</p> : null}</td>
                       <td className="truncate px-3 py-1">{candidate.final_decision_actor || "System"}</td>
                       <td className="px-3 py-1 text-muted-foreground">{dateLabel(candidate.final_decision_at || candidate.stage_changed_at)}</td>
                       <td className="px-3 py-1"><ClosedCandidateActions candidate={candidate} onAnnouncement={onAnnouncement} /></td>
@@ -163,7 +163,7 @@ export function RejectedCandidatesView({ basePath, options, onAnnouncement }: Pr
                   <a href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("rejected")} className="block rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
                     <div className="flex items-start justify-between gap-2"><span className="text-sm font-semibold">{candidate.full_name}</span><StatusBadge status={tab}>{tab === "rejected" ? "Rejected" : "Withdrawn"}</StatusBadge></div>
                     <p className="mt-1 text-xs text-muted-foreground">From {candidate.decision_origin_stage_label || recruitmentStageLabel(candidate.decision_origin_stage || "Unknown stage", options?.stage_labels)}</p>
-                    <p className="mt-1 line-clamp-2 text-[13px]">{candidate.rejection_reason ? humanize(candidate.rejection_reason) : candidate.decision_reason_detail || "No reason recorded"}</p>
+                    <p className="mt-1 line-clamp-2 text-[0.8125rem]">{candidate.rejection_reason ? humanize(candidate.rejection_reason) : candidate.decision_reason_detail || "No reason recorded"}</p>
                     <p className="mt-1 text-xs text-muted-foreground">By {candidate.final_decision_actor || "System"} · {dateLabel(candidate.final_decision_at || candidate.stage_changed_at)}</p>
                   </a>
                   <ClosedCandidateActions candidate={candidate} onAnnouncement={onAnnouncement} />

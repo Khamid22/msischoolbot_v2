@@ -106,7 +106,7 @@ function CommentsSection({ resourceId }: { resourceId: number }) {
     <div className="px-4 pb-4 pt-3 sm:px-5">
       <div className="mb-3 flex items-center gap-1.5">
         <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+        <span className="text-[0.6875rem] font-bold uppercase tracking-wider text-muted-foreground">
           Comments{comments.length > 0 ? ` · ${comments.length}` : ""}
         </span>
       </div>
@@ -122,13 +122,13 @@ function CommentsSection({ resourceId }: { resourceId: number }) {
         <div className="mb-3 space-y-3">
           {comments.map((c) => (
             <div key={c.id} className="flex gap-2.5">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-bold uppercase text-muted-foreground">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[0.625rem] font-bold uppercase text-muted-foreground">
                 {c.authorName.charAt(0)}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-[11px] font-bold leading-tight">{c.authorName}</span>
-                  <span className="text-[10px] text-muted-foreground">{c.createdAt}</span>
+                  <span className="text-[0.6875rem] font-bold leading-tight">{c.authorName}</span>
+                  <span className="text-[0.625rem] text-muted-foreground">{c.createdAt}</span>
                 </div>
                 <p className="mt-0.5 text-xs leading-relaxed">{c.body}</p>
               </div>
@@ -159,7 +159,7 @@ function CommentsSection({ resourceId }: { resourceId: number }) {
           {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
         </button>
       </form>
-      {submitError ? <p className="mt-1.5 text-[10px] text-destructive">{submitError}</p> : null}
+      {submitError ? <p className="mt-1.5 text-[0.625rem] text-destructive">{submitError}</p> : null}
     </div>
   );
 }
@@ -198,7 +198,7 @@ function ResourceCard({
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1 p-2.5">
         <p className="line-clamp-2 text-xs font-bold leading-snug">{item.title}</p>
-        <p className="mt-auto text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">{badge}</p>
+        <p className="mt-auto text-[0.5625rem] font-bold uppercase tracking-wider text-muted-foreground/60">{badge}</p>
       </div>
     </button>
   );
@@ -250,12 +250,12 @@ function ResourceTableGroup({
       </div>
       {group.resources.length > 0 ? (
         <div className="max-h-[70dvh] overflow-auto px-0 pb-3">
-          <table className="w-full min-w-[380px] text-left">
-            <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+          <table className="w-full min-w-[23.75rem] text-left">
+            <thead className="sticky top-0 z-20 bg-surface shadow-[0_0.0625rem_0_hsl(var(--foreground)/0.08)]">
               <tr className="border-b border-foreground/5">
-                <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:px-5">Title</th>
-                <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:px-5">Type</th>
-                <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:px-5"></th>
+                <th className="px-4 py-2 text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground sm:px-5">Title</th>
+                <th className="px-4 py-2 text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground sm:px-5">Type</th>
+                <th className="px-4 py-2 text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground sm:px-5"></th>
               </tr>
             </thead>
             <tbody>
@@ -286,7 +286,7 @@ function ResourceTableGroup({
                       </div>
                     </td>
                     <td className="px-4 py-2.5 sm:px-5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{badge}</span>
+                      <span className="text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground">{badge}</span>
                     </td>
                     <td className="px-4 py-2.5 text-right sm:px-5">
                       <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" />
@@ -332,7 +332,7 @@ export default function ResourcesPage(props: ResourcesPageProps) {
         {groupedResources.length > 1 ? (
           <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-surface shadow-card">
             <div className="px-4 pb-3 pt-3 sm:px-5 sm:pt-4">
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Filter by type</p>
+              <p className="mb-2 text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground">Filter by type</p>
               <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-0.5">
                 <button
                   type="button"
@@ -416,17 +416,17 @@ export default function ResourcesPage(props: ResourcesPageProps) {
             <div className="min-h-0 flex-1 overflow-y-auto">
               {(modal.fileUrl || modal.linkUrl) ? (
                 <div className="border-b border-foreground/5 px-4 py-3 sm:px-5">
-                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Open</p>
+                  <p className="mb-2 text-[0.6875rem] font-bold uppercase tracking-wider text-muted-foreground">Open</p>
                   <div className="flex flex-wrap gap-2">
                     {modal.fileUrl && !modal.videoSrc ? (
                       <a href={modal.fileUrl} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-foreground px-3 text-[10px] font-bold text-background">
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-foreground px-3 text-[0.625rem] font-bold text-background">
                         <FileText className="h-3 w-3" /> Open File
                       </a>
                     ) : null}
                     {modal.linkUrl ? (
                       <a href={modal.linkUrl} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-foreground/15 px-3 text-[10px] font-bold">
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-foreground/15 px-3 text-[0.625rem] font-bold">
                         <ExternalLink className="h-3 w-3" /> Open Link
                       </a>
                     ) : null}
@@ -435,7 +435,7 @@ export default function ResourcesPage(props: ResourcesPageProps) {
               ) : null}
               {modal.description ? (
                 <div className="border-b border-foreground/5 px-4 py-3 sm:px-5">
-                  <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Description</p>
+                  <p className="mb-1 text-[0.6875rem] font-bold uppercase tracking-wider text-muted-foreground">Description</p>
                   <p className="text-xs leading-relaxed">{modal.description}</p>
                 </div>
               ) : null}
@@ -459,7 +459,7 @@ export default function ResourcesPage(props: ResourcesPageProps) {
             props.currentStudent?.fullName ? (
               <div className="hidden text-right sm:block">
                 <p className="text-xs font-bold leading-tight">{props.currentStudent.fullName}</p>
-                <p className="text-[10px] text-muted-foreground">{props.currentStudent.group}</p>
+                <p className="text-[0.625rem] text-muted-foreground">{props.currentStudent.group}</p>
               </div>
             ) : null
           }

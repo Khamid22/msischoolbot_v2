@@ -156,13 +156,13 @@ function TimetableEventCard({ item, className = "" }: { item: TimetableItem; cla
     <article className={`rounded-lg border border-border bg-surface p-3 shadow-sm ${className}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-black uppercase tracking-wide text-primary">Academy lesson</p>
+          <p className="text-[0.6875rem] font-black uppercase tracking-wide text-primary">Academy lesson</p>
           <h2 className="mt-1 line-clamp-2 text-sm font-black text-foreground">{timetableTitle(item)}</h2>
-          <p className="mt-1 truncate text-[11px] font-bold text-muted-foreground">
+          <p className="mt-1 truncate text-[0.6875rem] font-bold text-muted-foreground">
             {asText(row.teacher_name) || "Teacher not assigned"}
           </p>
         </div>
-        <StatusBadge tone={statusTone(status)} className="shrink-0 text-[10px]">
+        <StatusBadge tone={statusTone(status)} className="shrink-0 text-[0.625rem]">
           {status}
         </StatusBadge>
       </div>
@@ -203,7 +203,7 @@ function FilterSelect({
 }) {
   return (
     <label className="min-w-0 flex-1">
-      <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="mb-1 block text-[0.625rem] font-black uppercase tracking-wide text-muted-foreground">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -304,7 +304,7 @@ function TimetableContent({
             >
               Filters
               {activeFilterCount ? (
-                <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground">{activeFilterCount}</span>
+                <span className="rounded-full bg-primary px-1.5 py-0.5 text-[0.625rem] text-primary-foreground">{activeFilterCount}</span>
               ) : null}
             </button>
           </div>
@@ -352,7 +352,7 @@ function TimetableContent({
               <p className="truncate text-xs font-black uppercase tracking-wide text-muted-foreground">
                 Upcoming first
               </p>
-              <p className="shrink-0 text-[11px] font-bold text-muted-foreground">{filteredItems.length} events</p>
+              <p className="shrink-0 text-[0.6875rem] font-bold text-muted-foreground">{filteredItems.length} events</p>
             </div>
             <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]">
               {filteredItems.map((item) => (
@@ -366,7 +366,7 @@ function TimetableContent({
           </div>
 
           <ResponsiveTable showAt="md" className="rounded-xl border border-border bg-surface shadow-card">
-            <table className="w-full min-w-[860px] divide-y divide-border text-left text-sm">
+            <table className="w-full min-w-[53.75rem] divide-y divide-border text-left text-sm">
               <thead className="bg-muted/60 text-xs font-black uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3">Date</th>
@@ -401,7 +401,7 @@ function TimetableContent({
                         <p className="truncate font-semibold text-muted-foreground">{timetableLocation(row)}</p>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <StatusBadge tone={statusTone(status)} className="text-[10px]">
+                        <StatusBadge tone={statusTone(status)} className="text-[0.625rem]">
                           {status}
                         </StatusBadge>
                       </td>
@@ -483,11 +483,11 @@ function AnnouncementsContent({ announcements }: { announcements: Row[] }) {
                   : "border-border bg-card text-card-foreground hover:bg-muted"
               }`}
             >
-              <span className={`block truncate text-[9px] font-black uppercase leading-3 tracking-wide ${selected ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+              <span className={`block truncate text-[0.5625rem] font-black uppercase leading-3 tracking-wide ${selected ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
                 {tab.label}
               </span>
               <span className="mt-0.5 block truncate text-lg font-black leading-none tabular-nums sm:text-xl">{tab.count}</span>
-              <span className={`mt-0.5 block truncate text-[10px] font-semibold leading-3 ${selected ? "text-primary-foreground/75" : "text-muted-foreground"}`}>
+              <span className={`mt-0.5 block truncate text-[0.625rem] font-semibold leading-3 ${selected ? "text-primary-foreground/75" : "text-muted-foreground"}`}>
                 {tab.detail}
               </span>
             </button>
@@ -508,15 +508,15 @@ function AnnouncementsContent({ announcements }: { announcements: Row[] }) {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="break-words text-base font-black text-foreground">{title}</h2>
-                      <StatusBadge tone={statusTone(status)} className="text-[10px]">{status}</StatusBadge>
-                      <StatusBadge tone={priorityTone(priority)} className="text-[10px]">Priority: {priority}</StatusBadge>
-                      {item.pinned ? <StatusBadge tone="info" className="text-[10px]">Pinned</StatusBadge> : null}
+                      <StatusBadge tone={statusTone(status)} className="text-[0.625rem]">{status}</StatusBadge>
+                      <StatusBadge tone={priorityTone(priority)} className="text-[0.625rem]">Priority: {priority}</StatusBadge>
+                      {item.pinned ? <StatusBadge tone="info" className="text-[0.625rem]">Pinned</StatusBadge> : null}
                     </div>
                     <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
                       {asText(item.body) || "No message body."}
                     </p>
                   </div>
-                  <div className="flex shrink-0 flex-wrap gap-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                  <div className="flex shrink-0 flex-wrap gap-2 text-[0.6875rem] font-bold uppercase tracking-wide text-muted-foreground">
                     <span className="rounded-full border border-border bg-muted px-2 py-1">Audience: {audience}</span>
                     <span className="rounded-full border border-border bg-muted px-2 py-1">Status: {status}</span>
                   </div>
@@ -567,7 +567,7 @@ export default function AcademicDepartmentWorkspace({
         title={title}
         subtitle={description}
         badge={
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-primary">
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[0.6875rem] font-black uppercase tracking-wide text-primary">
             {roleLabel}
           </span>
         }

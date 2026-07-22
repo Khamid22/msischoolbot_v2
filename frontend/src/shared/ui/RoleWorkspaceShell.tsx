@@ -59,7 +59,7 @@ function initialSidebarCollapsed(initialState: DesktopSidebarInitialState, stora
   if (stored !== null) return stored;
   if (initialState === "collapsed") return true;
   if (initialState === "expanded") return false;
-  return typeof window !== "undefined" ? window.innerWidth < 1600 : false;
+  return typeof window !== "undefined" ? window.innerWidth < 1280 : false;
 }
 
 /**
@@ -138,7 +138,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
 
   useEffect(() => {
     if (!desktopSidebarCollapsible || desktopSidebarInitialState !== "adaptive" || desktopSidebarPreferenceSet) return;
-    const applyAdaptiveState = () => setDesktopSidebarCollapsed(window.innerWidth < 1600);
+    const applyAdaptiveState = () => setDesktopSidebarCollapsed(window.innerWidth < 1280);
     applyAdaptiveState();
     window.addEventListener("resize", applyAdaptiveState);
     return () => window.removeEventListener("resize", applyAdaptiveState);
@@ -161,9 +161,9 @@ export function RoleWorkspaceShell<Key extends string = string>({
 
   const desktopMarginClass = desktopSidebarCollapsible
     ? desktopSidebarCollapsed
-      ? "lg:ml-[4.5rem]"
-      : "lg:ml-56"
-    : "lg:ml-64";
+      ? "lg:ml-[var(--workspace-sidebar-compact-width)]"
+      : "lg:ml-[var(--workspace-sidebar-collapsible-width)]"
+    : "lg:ml-[var(--workspace-sidebar-width)]";
 
   return (
     <div className="min-h-[var(--tg-viewport-height)] bg-background text-foreground">
@@ -187,7 +187,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
       />
 
       <main
-        className={`min-h-[var(--tg-viewport-height)] px-3 pt-[calc(var(--app-top-inset)+0.5rem)] transition-[margin] duration-200 sm:px-5 lg:px-8 lg:pb-6 lg:pt-4 motion-reduce:transition-none ${desktopMarginClass} ${
+        className={`min-h-[var(--tg-viewport-height)] px-3 pt-[calc(var(--app-top-inset)+0.5rem)] transition-[margin] duration-200 sm:px-5 lg:px-[var(--workspace-gutter-desktop)] lg:pb-6 lg:pt-4 motion-reduce:transition-none ${desktopMarginClass} ${
           shouldUseBottomNav
             ? "pb-[calc(var(--app-bottom-inset)+6.25rem)]"
             : "pb-[calc(var(--app-bottom-inset)+1.25rem)]"
@@ -280,7 +280,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
                     <span>{workspaceBackLink.label}</span>
                   </a>
                 ) : null}
-                <p className="px-2 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <p className="px-2 pb-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-slate-400">
                   {sectionLabel}
                 </p>
                 {navItems.map((item) => {
@@ -310,7 +310,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
                           {isActive ? <span aria-hidden="true" className="absolute left-1.5 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-white/80" /> : null}
                           <Icon className="h-4 w-4 shrink-0" />
                           <span className="min-w-0 truncate">{item.label}</span>
-                          {item.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-slate-950" aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
+                          {item.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[0.625rem] font-bold text-slate-950" aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
                           <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 transition-transform duration-200 motion-reduce:transition-none ${groupIsOpen ? "rotate-180" : ""}`} />
                         </button>
                       ) : (
@@ -323,7 +323,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
                           {isActive ? <span aria-hidden="true" className="absolute left-1.5 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-white/80" /> : null}
                           <Icon className="h-4 w-4 shrink-0" />
                           <span className="min-w-0 truncate">{item.label}</span>
-                          {item.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-slate-950" aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
+                          {item.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[0.625rem] font-bold text-slate-950" aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
                         </a>
                       )}
                       {item.children?.length ? (
@@ -347,7 +347,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
                                   >
                                     {ChildIcon ? <ChildIcon className="h-3.5 w-3.5 shrink-0" /> : null}
                                     <span className="min-w-0 truncate">{child.label}</span>
-                                    {child.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-slate-950" aria-label={`${child.badge} unread`}>{child.badge > 99 ? "99+" : child.badge}</span> : null}
+                                    {child.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[0.625rem] font-bold text-slate-950" aria-label={`${child.badge} unread`}>{child.badge > 99 ? "99+" : child.badge}</span> : null}
                                   </a>
                                 );
                               })}

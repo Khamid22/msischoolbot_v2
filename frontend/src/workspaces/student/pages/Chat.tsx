@@ -49,12 +49,12 @@ function MessageBubble({
 }) {
   return (
     <div className={`flex w-full gap-2 ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center self-end rounded-full bg-muted text-[10px] font-bold uppercase text-muted-foreground">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center self-end rounded-full bg-muted text-[0.625rem] font-bold uppercase text-muted-foreground">
         {msg.authorName.charAt(0)}
       </div>
       <div className={`group relative max-w-[75%] ${isOwn ? "items-end" : "items-start"} flex flex-col`}>
         {!isOwn && (
-          <span className="mb-0.5 text-[10px] font-semibold text-muted-foreground">{msg.authorName}</span>
+          <span className="mb-0.5 text-[0.625rem] font-semibold text-muted-foreground">{msg.authorName}</span>
         )}
         <div
           className={`relative rounded-2xl px-3 py-2 text-xs leading-relaxed ${
@@ -65,10 +65,10 @@ function MessageBubble({
         >
           {msg.body}
           {msg.editedAt && (
-            <span className="ml-1.5 text-[9px] opacity-50">(edited)</span>
+            <span className="ml-1.5 text-[0.5625rem] opacity-50">(edited)</span>
           )}
         </div>
-        <span className="mt-0.5 text-[9px] text-muted-foreground">{msg.createdAt}</span>
+        <span className="mt-0.5 text-[0.5625rem] text-muted-foreground">{msg.createdAt}</span>
         {isOwn && (
           <div className="absolute -top-1 right-0 hidden items-center gap-2 group-hover:flex group-focus-within:flex">
             <button
@@ -291,7 +291,7 @@ export default function ChatPage(props: ChatPageProps) {
               <button
                 type="button"
                 onClick={loadMore}
-                className="rounded-full bg-muted px-4 py-1.5 text-[10px] font-semibold text-muted-foreground hover:bg-foreground/10"
+                className="rounded-full bg-muted px-4 py-1.5 text-[0.625rem] font-semibold text-muted-foreground hover:bg-foreground/10"
               >
                 Load earlier messages
               </button>
@@ -351,7 +351,7 @@ export default function ChatPage(props: ChatPageProps) {
               {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
             </button>
           </form>
-          {sendError && <p className="px-3 pb-2 text-[10px] text-destructive">{sendError}</p>}
+          {sendError && <p className="px-3 pb-2 text-[0.625rem] text-destructive">{sendError}</p>}
         </div>
       </div>
       {editTarget && (

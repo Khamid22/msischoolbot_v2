@@ -42,7 +42,7 @@ export function ProgressBar({
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       {track}
-      <span className="shrink-0 text-[11px] font-bold tabular-nums text-muted-foreground">
+      <span className="shrink-0 text-[0.6875rem] font-bold tabular-nums text-muted-foreground">
         {clamped}/{safeMax}
       </span>
     </div>

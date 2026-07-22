@@ -1,6 +1,7 @@
 import { Component, Suspense, lazy, useEffect, useState, type ComponentType } from "react";
 import { parseBootstrapDocument, readBootstrap, type ReactBootstrap } from "@/shared/lib/bootstrap";
 import { getTelegramStartParam, initTelegramViewport } from "@/shared/lib/telegram";
+import { BrowserRecruitmentReminders } from "@/features/recruitment/BrowserRecruitmentReminders";
 
 const bootstrap = readBootstrap();
 
@@ -194,6 +195,7 @@ const App = () => {
 
   return (
     <AppErrorBoundary>
+      <BrowserRecruitmentReminders role={String(currentBootstrap.props.authRole || currentBootstrap.props.role || "")} />
       <Suspense
         fallback={
           <div className="flex min-h-[var(--tg-viewport-height)] items-center justify-center bg-background px-4">

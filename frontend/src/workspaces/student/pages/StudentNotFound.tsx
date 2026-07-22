@@ -15,7 +15,7 @@ export default function StudentNotFound(props: StudentNotFoundProps) {
         </div>
         <a
           href={props.returnUrl || "/"}
-          className="rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-neo transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+          className="rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-neo transition-all active:translate-x-[0.0625rem] active:translate-y-[0.0625rem] active:shadow-none"
         >
           Return to Search
         </a>

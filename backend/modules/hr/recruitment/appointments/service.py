@@ -67,6 +67,11 @@ def _appointment_payload_for_user(
     status = _text(payload.get("status"))
     payload["can_start"] = is_authorized and status == "scheduled"
     payload["can_resume"] = is_authorized and status == "in_progress"
+    payload["can_undo_start"] = (
+        is_authorized
+        and status == "in_progress"
+        and bool(_text(payload.get("pre_start_starts_at")))
+    )
     return payload
 
 
@@ -107,7 +112,7 @@ def start_appointment_session(
             conn.commit()
             return {
                 "candidate": dependencies.get_candidate(user, int(candidate_id)),
-                "appointment": _appointment_payload(appointment),
+                "appointment": _appointment_payload_for_user(user, appointment),
             }
         if _text(appointment["status"]) != "scheduled":
             raise RecruitmentError(
@@ -127,6 +132,9 @@ def start_appointment_session(
                 "This interview changed elsewhere. Refresh and try again.",
                 status_code=409,
             )
+        recruitment_notifications.cancel_appointment_reminders(
+            conn, int(appointment_id)
+        )
         repository.touch_candidate(
             conn,
             candidate_id=int(candidate_id),
@@ -162,7 +170,7 @@ def start_appointment_session(
         conn.commit()
     return {
         "candidate": dependencies.get_candidate(user, int(candidate_id)),
-        "appointment": _appointment_payload(saved) if saved else None,
+        "appointment": _appointment_payload_for_user(user, saved) if saved else None,
     }
 
 
@@ -183,6 +191,119 @@ def start_interview_session(
         expected_version=expected_version,
         dependencies=dependencies,
     )
+
+
+def undo_appointment_start(
+    user: CurrentUser,
+    candidate_id: int,
+    appointment_id: int,
+    *,
+    expected_version: int,
+    dependencies: AppointmentDependencies,
+) -> dict[str, Any]:
+    """Undo an accidental start and restore the appointment's saved schedule."""
+
+    now = _now()
+    with dependencies.connect() as conn:
+        candidate = dependencies.lock_candidate(conn, int(candidate_id))
+        if not candidate:
+            raise RecruitmentError("Candidate was not found.", status_code=404)
+        appointment = repository.get_appointment_row(
+            conn,
+            candidate_id=int(candidate_id),
+            appointment_id=int(appointment_id),
+            for_update=True,
+        )
+        if not appointment:
+            raise RecruitmentError("Appointment was not found.", status_code=404)
+        appointment_type = _text(appointment["appointment_type"])
+        if appointment_type == "job_interview" and user.role != "hr_manager":
+            raise RecruitmentError(
+                "Only HR can cancel a started job interview.", status_code=403
+            )
+        if appointment_type == "demo_lesson" and int(
+            appointment["responsible_account_id"] or 0
+        ) != int(_actor_account(user) or 0):
+            raise RecruitmentError(
+                "Only the assigned evaluator can cancel this demo lesson start.",
+                status_code=403,
+            )
+        if _text(appointment["status"]) != "in_progress":
+            raise RecruitmentError(
+                "Only an in-progress appointment can have its start cancelled.",
+                status_code=409,
+            )
+        original_starts_at = _text(
+            appointment["pre_start_starts_at"]
+            if "pre_start_starts_at" in appointment
+            else ""
+        )
+        if not original_starts_at:
+            raise RecruitmentError(
+                "The original scheduled time is unavailable. Refresh and try again after the latest update is deployed.",
+                status_code=409,
+            )
+        cancelled_started_at = _text(appointment["started_at"])
+        restored = repository.undo_appointment_start(
+            conn,
+            appointment_id=int(appointment_id),
+            candidate_id=int(candidate_id),
+            expected_version=int(expected_version),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        if not restored:
+            raise RecruitmentError(
+                "This appointment changed elsewhere. Refresh and try again.",
+                status_code=409,
+            )
+        repository.touch_candidate(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        dependencies.audit_appointment(
+            conn,
+            user=user,
+            candidate_id=int(candidate_id),
+            event_type=(
+                "candidate.interview_start_cancelled"
+                if appointment_type == "job_interview"
+                else "candidate.demo_lesson_start_cancelled"
+            ),
+            appointment_id=int(appointment_id),
+            detail={
+                "cancelled_started_at": cancelled_started_at,
+                "restored_starts_at": original_starts_at,
+                "restored_schedule": True,
+            },
+            now=now,
+        )
+        dependencies.sync_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        saved = repository.get_appointment_row(
+            conn, candidate_id=int(candidate_id), appointment_id=int(appointment_id)
+        )
+        if saved:
+            recruitment_notifications.enqueue_demo_event(
+                conn,
+                appointment=saved,
+                event_type="demo_rescheduled",
+                version_token=int(saved["version"] or 1),
+                include_reminders=True,
+            )
+        conn.commit()
+    return {
+        "candidate": dependencies.get_candidate(user, int(candidate_id)),
+        "appointment": (
+            _appointment_payload_for_user(user, saved) if saved else None
+        ),
+    }
 
 
 def complete_interview_session(
@@ -577,6 +698,9 @@ def change_appointment_status(
         changed_appointment = repository.get_appointment_row(
             conn, candidate_id=int(candidate_id), appointment_id=int(appointment_id)
         )
+        recruitment_notifications.cancel_appointment_reminders(
+            conn, int(appointment_id)
+        )
         if (
             changed_appointment
             and _text(
@@ -613,5 +737,6 @@ __all__ = [
     "list_appointments",
     "start_appointment_session",
     "start_interview_session",
+    "undo_appointment_start",
     "update_appointment",
 ]

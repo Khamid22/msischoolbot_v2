@@ -12,6 +12,7 @@ import { FieldLabel, TextInput, Select } from "../ui";
 import { weekdayLabels, timetableStartHour, timetableEndHour, isoDate, startOfWeek, addDays, formatWeekRange, timeToMinutes, formatSessionTime, lessonDateToIso, lessonStatus, scheduleTimeForLesson, type ScheduleRow, type SessionRow, type LessonHistoryRow, type RawTimetableBlock, type TimetableLessonBlock, layoutSessionsForDay } from "./model";
 import { DEFAULT_CLASS_MINUTES, SCHEDULE_SNAP_MINUTES, clampNumber, lessonDurationMinutesForSchoolCode, snapToMinutes, snappedStartMinutes } from "./scheduleMath";
 import { CalendarClosuresModal, type CalendarClosure } from "./CalendarClosuresModal";
+import { densityRem, renderedDensityPixels } from "@/shared/lib/uiDensity";
 
 // The grid scales up when the week has many overlapping classes instead of
 // squeezing those cards into unreadable strips.
@@ -114,7 +115,7 @@ function ScheduleFilterSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-7 w-full appearance-none rounded-md border border-foreground/10 bg-background/90 pl-2 pr-7 text-[11px] font-bold text-foreground shadow-sm outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
+        className="h-7 w-full appearance-none rounded-md border border-foreground/10 bg-background/90 pl-2 pr-7 text-[0.6875rem] font-bold text-foreground shadow-sm outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
       >
         {children}
       </select>
@@ -437,7 +438,7 @@ export function SchedulePanel({ state }: { state: any }) {
   const dayEndMin = displayEndHour * 60;
   const hourPx = Math.min(150, BASE_HOUR_PX + Math.max(0, busiestOverlapGrid.rows - 1) * 12 + Math.max(0, Math.min(busiestDayLoad - 7, 8)));
   const dayMinWidthPx = Math.min(240, Math.max(112, 96 + Math.min(busiestDayLoad, 8) * 6 + Math.max(0, busiestOverlapGrid.columns - 1) * 34));
-  const gridTemplateColumns = `${TIME_COLUMN_PX}px repeat(7, minmax(${dayMinWidthPx}px, 1fr))`;
+  const gridTemplateColumns = `${densityRem(TIME_COLUMN_PX)} repeat(7, minmax(${densityRem(dayMinWidthPx)}, 1fr))`;
   const gridMinWidthPx = TIME_COLUMN_PX + dayMinWidthPx * 7;
   const gridViewportMaxPx = Math.min(1240, Math.max(760, 720 + Math.min(busiestDayLoad, 10) * 28));
   const gridHeightPx = (displayEndHour - displayStartHour) * hourPx;
@@ -487,7 +488,7 @@ export function SchedulePanel({ state }: { state: any }) {
       dayStartMin,
       dayEndMin,
       durationMin,
-      hourPx,
+      hourPx: renderedDensityPixels(hourPx),
       grabOffsetY,
     });
   }
@@ -524,11 +525,11 @@ export function SchedulePanel({ state }: { state: any }) {
     const scroller = timetableScrollRef.current;
     if (!scroller) return;
     const rect = scroller.getBoundingClientRect();
-    const edge = 44;
+    const edge = renderedDensityPixels(44);
     if (clientY < rect.top + edge) {
-      scroller.scrollTop -= Math.max(6, Math.round((rect.top + edge - clientY) / 2));
+      scroller.scrollTop -= Math.max(renderedDensityPixels(6), Math.round((rect.top + edge - clientY) / 2));
     } else if (clientY > rect.bottom - edge) {
-      scroller.scrollTop += Math.max(6, Math.round((clientY - (rect.bottom - edge)) / 2));
+      scroller.scrollTop += Math.max(renderedDensityPixels(6), Math.round((clientY - (rect.bottom - edge)) / 2));
     }
   }
 
@@ -673,7 +674,7 @@ export function SchedulePanel({ state }: { state: any }) {
     if (!current || current.pointerId !== event.pointerId) return;
     event.preventDefault();
     maybeScrollGrid(event.clientY);
-    const deltaMinutes = snapToMinutes(((event.clientY - current.startY) / hourPx) * 60);
+    const deltaMinutes = snapToMinutes(((event.clientY - current.startY) / renderedDensityPixels(hourPx)) * 60);
     let previewStartMin = current.originalStartMin;
     let previewEndMin = current.originalEndMin;
     if (current.edge === "start") {
@@ -776,7 +777,7 @@ export function SchedulePanel({ state }: { state: any }) {
     <>
       {pointerDrag?.moved ? (
         <div
-          className={`pointer-events-none fixed z-[80] overflow-hidden rounded-md border px-1.5 py-1 text-[10px] shadow-2xl ring-2 ring-white/40 animate-in fade-in zoom-in-95 duration-100 motion-reduce:animate-none ${scheduleCardClass(pointerDrag.subjectName, pointerDrag.status)}`}
+          className={`pointer-events-none fixed z-[80] overflow-hidden rounded-md border px-1.5 py-1 text-[0.625rem] shadow-2xl ring-2 ring-white/40 animate-in fade-in zoom-in-95 duration-100 motion-reduce:animate-none ${scheduleCardClass(pointerDrag.subjectName, pointerDrag.status)}`}
           style={{
             left: `${pointerDrag.x - pointerDrag.grabOffsetX}px`,
             top: `${pointerDrag.y - pointerDrag.grabOffsetY}px`,
@@ -800,7 +801,7 @@ export function SchedulePanel({ state }: { state: any }) {
               <button
                 type="button"
                 onClick={() => setBreaksOpen(true)}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-amber-300/70 bg-amber-50 px-2.5 text-[11px] font-bold text-amber-900 transition-colors hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40"
+                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-amber-300/70 bg-amber-50 px-2.5 text-[0.6875rem] font-bold text-amber-900 transition-colors hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40"
               >
                 <LockKeyhole className="h-3 w-3" />
                 Manage Breaks
@@ -819,7 +820,7 @@ export function SchedulePanel({ state }: { state: any }) {
                   }));
                   setCreateOpen(true);
                 }}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-primary px-2.5 text-[11px] font-bold text-primary-foreground"
+                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-primary px-2.5 text-[0.6875rem] font-bold text-primary-foreground"
               >
                 <Plus className="h-3 w-3" />
                 Assign Time
@@ -836,7 +837,7 @@ export function SchedulePanel({ state }: { state: any }) {
             <button
               type="button"
               onClick={() => setWeekStart(startOfWeek(new Date()))}
-              className="h-7 rounded-md border border-foreground/10 px-2.5 text-[11px] font-bold hover:bg-muted"
+              className="h-7 rounded-md border border-foreground/10 px-2.5 text-[0.6875rem] font-bold hover:bg-muted"
             >
               This Week
             </button>
@@ -852,14 +853,14 @@ export function SchedulePanel({ state }: { state: any }) {
         }
       >
         {error ? (
-          <p className="mb-2 rounded-md bg-destructive/10 px-2.5 py-1.5 text-[11px] font-semibold text-destructive">
+          <p className="mb-2 rounded-md bg-destructive/10 px-2.5 py-1.5 text-[0.6875rem] font-semibold text-destructive">
             {error}
           </p>
         ) : null}
         {calendarClosures.length ? (
           <div className="mb-2 flex flex-wrap gap-1.5 rounded-lg border border-amber-200 bg-amber-50/70 px-2.5 py-2" aria-label="School holiday locks in this timetable week">
             {calendarClosures.map((closure) => (
-              <span key={closure.id} className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-background/80 px-2 py-1 text-[10px] font-bold text-amber-900">
+              <span key={closure.id} className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-background/80 px-2 py-1 text-[0.625rem] font-bold text-amber-900">
                 <LockKeyhole className="h-3 w-3" />
                 {closure.schoolName ? `${closure.schoolName} · ` : ""}{closure.title} · {closure.startDate}–{closure.endDate}
               </span>
@@ -875,13 +876,13 @@ export function SchedulePanel({ state }: { state: any }) {
             <button
               type="button"
               onClick={() => setFilterOpen((current) => !current)}
-              className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-bold ${activeFilterCount ? "border-primary/40 bg-primary/10 text-primary" : "border-foreground/10 bg-background hover:bg-muted"}`}
+              className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[0.6875rem] font-bold ${activeFilterCount ? "border-primary/40 bg-primary/10 text-primary" : "border-foreground/10 bg-background hover:bg-muted"}`}
               aria-expanded={filterOpen}
             >
               <Filter className="h-3.5 w-3.5" />
               Filter
               {activeFilterCount ? (
-                <span className="rounded-full bg-primary px-1.5 py-0.5 text-[9px] leading-none text-primary-foreground">
+                <span className="rounded-full bg-primary px-1.5 py-0.5 text-[0.5625rem] leading-none text-primary-foreground">
                   {activeFilterCount}
                 </span>
               ) : null}
@@ -918,7 +919,7 @@ export function SchedulePanel({ state }: { state: any }) {
                       setScheduleSubjectFilter("all");
                       setScheduleStatusFilter("all");
                     }}
-                    className="inline-flex h-7 items-center gap-1 rounded-md bg-background px-2 text-[11px] font-bold text-muted-foreground shadow-sm hover:bg-foreground/10 hover:text-foreground"
+                    className="inline-flex h-7 items-center gap-1 rounded-md bg-background px-2 text-[0.6875rem] font-bold text-muted-foreground shadow-sm hover:bg-foreground/10 hover:text-foreground"
                   >
                     <X className="h-3 w-3" />
                     Clear
@@ -939,28 +940,28 @@ export function SchedulePanel({ state }: { state: any }) {
             }
           }}
           style={{
-            height: `min(${gridViewportMaxPx}px, calc(var(--tg-app-height) - 8rem))`,
-            maxHeight: `min(${gridViewportMaxPx}px, calc(var(--tg-app-height) - 8rem))`,
+            height: `min(${densityRem(gridViewportMaxPx)}, calc(var(--tg-app-height) - 8rem))`,
+            maxHeight: `min(${densityRem(gridViewportMaxPx)}, calc(var(--tg-app-height) - 8rem))`,
           }}
         >
-          <div style={{ minWidth: `${gridMinWidthPx}px` }}>
+          <div style={{ minWidth: densityRem(gridMinWidthPx) }}>
             <div className="sticky top-0 z-40 grid border-b border-foreground/10 bg-muted/50 backdrop-blur" style={{ gridTemplateColumns }}>
-              <div className="px-2 py-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Time</div>
+              <div className="px-2 py-1.5 text-[0.5625rem] font-bold uppercase tracking-wider text-muted-foreground">Time</div>
               {weekDays.map((day, index) => (
                 <div key={isoDate(day)} className="border-l border-foreground/10 px-2 py-1.5">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{weekdayLabels[index]}</p>
+                  <p className="text-[0.5625rem] font-bold uppercase tracking-wider text-muted-foreground">{weekdayLabels[index]}</p>
                   <p className="text-base font-bold leading-none">{day.getDate()}</p>
                 </div>
               ))}
             </div>
             <div className="relative grid" style={{ gridTemplateColumns }}>
-              <div className="relative border-r border-foreground/10 bg-muted/20" style={{ height: `${gridHeightPx}px` }}>
+              <div className="relative border-r border-foreground/10 bg-muted/20" style={{ height: densityRem(gridHeightPx) }}>
                 {hours.map((hour) => (
                   <div
                     key={hour}
-                    className="absolute left-0 right-0 border-t border-foreground/8 px-1.5 pt-1 text-right text-[10px] font-semibold text-muted-foreground"
+                    className="absolute left-0 right-0 border-t border-foreground/8 px-1.5 pt-1 text-right text-[0.625rem] font-semibold text-muted-foreground"
                     style={{
-                      top: `${(hour - displayStartHour) * hourPx}px`,
+                      top: densityRem((hour - displayStartHour) * hourPx),
                       // Pull the final label above the bottom edge so it isn't clipped.
                       transform: hour === displayEndHour ? "translateY(-100%)" : undefined,
                     }}
@@ -980,13 +981,13 @@ export function SchedulePanel({ state }: { state: any }) {
                       ref={(node) => {
                         dayColumnRefs.current[dayIso] = node;
                       }}
-                      style={{ height: `${gridHeightPx}px` }}
+                      style={{ height: densityRem(gridHeightPx) }}
                     >
                       {hours.map((hour) => (
                         <div
                           key={`${dayIso}-${hour}`}
                           className="absolute left-0 right-0 border-t border-foreground/8"
-                          style={{ top: `${(hour - displayStartHour) * hourPx}px` }}
+                          style={{ top: densityRem((hour - displayStartHour) * hourPx) }}
                         />
                       ))}
                       {daySessions.map((session) => {
@@ -1007,8 +1008,8 @@ export function SchedulePanel({ state }: { state: any }) {
                         const useExactLayout = Boolean(activeResize);
                         const top = session.rowCount > 1 && !useExactLayout ? bandTop + slotRow * rowHeight : exactTop;
                         const height = session.rowCount > 1 && !useExactLayout ? rowHeight - 4 : exactHeight;
-                        const left = session.rowCount > 1 ? `calc(${slotColumn * columnWidth}% + 4px)` : "4px";
-                        const width = session.rowCount > 1 ? `calc(${columnWidth}% - 8px)` : undefined;
+                        const left = session.rowCount > 1 ? `calc(${slotColumn * columnWidth}% + 0.25rem)` : "0.25rem";
+                        const width = session.rowCount > 1 ? `calc(${columnWidth}% - 0.5rem)` : undefined;
                         const toneLabel = session.status === "cancelled" ? "Cancelled" : session.status === "completed" ? "Done" : "Scheduled";
                         const compactCard = height < 52;
                         return (
@@ -1028,13 +1029,13 @@ export function SchedulePanel({ state }: { state: any }) {
                             tabIndex={0}
                             role="button"
                             aria-label={`${asString(session.group_name)} ${formatSessionTime(asString(session.start_time), asString(session.end_time))}`}
-                            className={`absolute rounded-md border px-1.5 py-1 text-[10px] shadow-md transition-[box-shadow,filter] duration-150 hover:brightness-105 focus:outline-none ${isSelected ? "overflow-visible ring-2 ring-sky-300 ring-offset-1 ring-offset-background" : "overflow-hidden"} ${scheduleCardClass(session.subject_name, session.status)} ${canDrag ? "touch-none cursor-grab select-none active:cursor-grabbing" : ""}`}
+                            className={`absolute rounded-md border px-1.5 py-1 text-[0.625rem] shadow-md transition-[box-shadow,filter] duration-150 hover:brightness-105 focus:outline-none ${isSelected ? "overflow-visible ring-2 ring-sky-300 ring-offset-1 ring-offset-background" : "overflow-hidden"} ${scheduleCardClass(session.subject_name, session.status)} ${canDrag ? "touch-none cursor-grab select-none active:cursor-grabbing" : ""}`}
                             style={{
-                              top: `${Math.max(0, top)}px`,
-                              height: `${Math.max(30, height)}px`,
+                              top: densityRem(Math.max(0, top)),
+                              height: densityRem(Math.max(30, height)),
                               left,
                               width,
-                              right: session.rowCount > 1 ? undefined : "4px",
+                              right: session.rowCount > 1 ? undefined : "0.25rem",
                               zIndex: isSelected ? 35 : session.rowCount > 1 ? 12 : 2,
                             }}
                           >
@@ -1042,7 +1043,7 @@ export function SchedulePanel({ state }: { state: any }) {
                               <p className="truncate text-[clamp(0.56rem,0.8vw,0.68rem)] font-black leading-tight tracking-wide">{asString(session.group_name)}</p>
                             </div>
                             <p className="truncate text-[clamp(0.52rem,0.74vw,0.62rem)] font-semibold leading-tight text-white/90">{minutesToLabel(startMin)}–{minutesToLabel(endMin)}</p>
-                            {!compactCard ? <p className="mt-0.5 inline-flex w-fit rounded-full bg-white/15 px-1 py-0.5 text-[8px] font-black uppercase leading-none tracking-wide text-white/85 ring-1 ring-white/20">{toneLabel}</p> : null}
+                            {!compactCard ? <p className="mt-0.5 inline-flex w-fit rounded-full bg-white/15 px-1 py-0.5 text-[0.5rem] font-black uppercase leading-none tracking-wide text-white/85 ring-1 ring-white/20">{toneLabel}</p> : null}
                             {isSelected && canDrag ? (
                               <>
                                 <button
@@ -1074,11 +1075,11 @@ export function SchedulePanel({ state }: { state: any }) {
                         <div
                           className="pointer-events-none absolute left-1 right-1 z-10 rounded-md border border-dashed border-primary/60 bg-primary/5 px-1.5 py-1"
                           style={{
-                            top: `${((hint.startMin - dayStartMin) / 60) * hourPx}px`,
-                            height: `${(hint.durationMin / 60) * hourPx - 2}px`,
+                            top: densityRem(((hint.startMin - dayStartMin) / 60) * hourPx),
+                            height: densityRem((hint.durationMin / 60) * hourPx - 2),
                           }}
                         >
-                          <p className="text-[9px] font-bold text-primary">
+                          <p className="text-[0.5625rem] font-bold text-primary">
                             {minutesToLabel(hint.startMin)}–{minutesToLabel(hint.startMin + hint.durationMin)}
                           </p>
                         </div>
@@ -1102,7 +1103,7 @@ export function SchedulePanel({ state }: { state: any }) {
                   <h3 id="unscheduled-lessons-title" className="text-sm font-black">
                     Unscheduled
                   </h3>
-                  <span className="rounded-full bg-amber-200/70 px-2 py-0.5 text-[10px] font-black tabular-nums">
+                  <span className="rounded-full bg-amber-200/70 px-2 py-0.5 text-[0.625rem] font-black tabular-nums">
                     {visibleUntimedLessons.length}
                   </span>
                 </div>
@@ -1110,7 +1111,7 @@ export function SchedulePanel({ state }: { state: any }) {
                   These lessons have a date but no real start or end time, so they are not shown on the timed grid.
                 </p>
               </div>
-              <p className="text-[11px] font-bold text-amber-800">
+              <p className="text-[0.6875rem] font-bold text-amber-800">
                 {canDrag ? "Drag a card onto the timetable to assign its real time." : "Awaiting an assigned class time."}
               </p>
             </div>
@@ -1148,13 +1149,13 @@ export function SchedulePanel({ state }: { state: any }) {
                           <p className="truncate text-sm font-black">{groupName}</p>
                           <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{subjectName}</p>
                         </div>
-                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[0.5625rem] font-black uppercase tracking-wide ${
                           status === "cancelled" ? "bg-destructive/10 text-destructive" : "bg-amber-100 text-amber-800"
                         }`}>
                           {status === "cancelled" ? "Cancelled" : "No time"}
                         </span>
                       </div>
-                      <p className="mt-2 text-[11px] font-bold text-muted-foreground">
+                      <p className="mt-2 text-[0.6875rem] font-bold text-muted-foreground">
                         {weekdayLabels[dayIndex]} · {dayIso} · Time not assigned
                       </p>
                       {asString(lesson.lesson_topic) ? (
@@ -1230,7 +1231,7 @@ export function SchedulePanel({ state }: { state: any }) {
                         key={label}
                         type="button"
                         onClick={() => toggleWeekday(value)}
-                        className={`h-10 rounded-lg text-[11px] font-bold ${active ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-foreground/10"}`}
+                        className={`h-10 rounded-lg text-[0.6875rem] font-bold ${active ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-foreground/10"}`}
                       >
                         {label.slice(0, 2)}
                       </button>
@@ -1258,7 +1259,7 @@ export function SchedulePanel({ state }: { state: any }) {
                 <label className="block">
                   <FieldLabel>Predicted End Date</FieldLabel>
                   <TextInput type="date" value={form.endDate} onChange={(event) => updateField("endDate", event.target.value)} />
-                  <span className="mt-1 block text-[11px] text-muted-foreground">Leave blank to calculate from the scheme of work.</span>
+                  <span className="mt-1 block text-[0.6875rem] text-muted-foreground">Leave blank to calculate from the scheme of work.</span>
                 </label>
               </div>
               <label className="block">

@@ -101,7 +101,7 @@ describe("RoleSidebar", () => {
 
   it("uses the shared sidebar layer and hides below lg", () => {
     assert.match(src, /uiLayers\.sidebar/);
-    assert.match(src, /const widthClass = collapsible .* "w-64"/);
+    assert.match(src, /--workspace-sidebar-width/);
     assert.match(src, /hidden \$\{widthClass\} .*lg:flex/);
   });
 
@@ -242,7 +242,7 @@ describe("IconButton / ActionMenu", () => {
     assert.match(src, /uiLayers\.popover/);
   });
 
-  it("keeps icon-only triggers at least 44px square", () => {
+  it("keeps icon-only triggers at least 2.75rem square", () => {
     assert.match(source("IconButton.tsx"), /h-11 min-h-11 w-11 min-w-11/);
     const actionMenu = source("ActionMenu.tsx");
     assert.match(actionMenu, /h-11 min-h-11 w-11 min-w-11/);
@@ -260,18 +260,30 @@ describe("IconButton / ActionMenu", () => {
 });
 
 describe("Shared touch targets", () => {
-  it("keeps modal and drawer close actions at least 44px square", () => {
+  it("uses tokenized desktop density without CSS zoom and preserves mobile inputs", () => {
+    const css = readFileSync(new URL("../../index.css", import.meta.url), "utf8");
+    assert.match(css, /--ui-density-scale:\s*0\.8/);
+    assert.match(css, /--ui-root-font-size:\s*80%/);
+    assert.match(css, /font-size:\s*var\(--ui-root-font-size\)/);
+    assert.match(css, /\(pointer:\s*fine\)/);
+    assert.match(css, /font-size:\s*16px\s*!important/);
+    assert.doesNotMatch(css, /\bzoom\s*:/);
+    assert.doesNotMatch(css, /transform:\s*scale\(/);
+  });
+
+  it("keeps modal and drawer close actions at least 2.75rem square", () => {
     assert.match(source("Modal.tsx"), /h-11 w-11/);
     assert.match(source("Drawer.tsx"), /h-11 w-11/);
   });
 
-  it("keeps pagination actions and the shared touch utility at least 44px", () => {
+  it("keeps pagination actions and the shared touch utility at least 2.75rem", () => {
     const pagination = source("Pagination.tsx");
     assert.match(pagination, /h-11 min-h-11/);
 
     const css = readFileSync(new URL("../../index.css", import.meta.url), "utf8");
-    assert.match(css, /\.miniapp-touch-target\s*\{[\s\S]*?min-height:\s*2\.75rem;/);
-    assert.match(css, /\.miniapp-touch-target\s*\{[\s\S]*?min-width:\s*2\.75rem;/);
+    assert.match(css, /--control-touch-size:\s*2\.75rem;/);
+    assert.match(css, /\.miniapp-touch-target\s*\{[\s\S]*?min-height:\s*var\(--control-touch-size\);/);
+    assert.match(css, /\.miniapp-touch-target\s*\{[\s\S]*?min-width:\s*var\(--control-touch-size\);/);
   });
 
   it("keeps role navigation and account actions reachable and touch-sized", () => {

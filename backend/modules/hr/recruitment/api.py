@@ -46,6 +46,8 @@ from backend.modules.hr.recruitment.schemas import (
     PipelineStageArchive,
     PipelineStageCreate,
     PipelineStageUpdate,
+    RecruitmentAppointmentReminderUpdate,
+    RecruitmentBrowserPreferenceUpdate,
     RecruitmentSettingCreate,
     RecruitmentSettingRename,
     RecruitmentSlaRuleUpdate,
@@ -312,6 +314,79 @@ def mark_notification_read(notification_id: int, user: CurrentUser = Depends(get
     return api_success({"message": "Notification marked as read."})
 
 
+def _browser_reminder_account(user: CurrentUser) -> int:
+    if user.role not in recruitment_notifications.REMINDER_ROLES or not user.account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Browser appointment reminders are available to HR and demo evaluators.",
+        )
+    return int(user.account_id)
+
+
+@router.get(
+    "/notifications/browser-preference",
+    operation_id="api_v1_recruitment_browser_notification_preference",
+)
+def browser_notification_preference(user: CurrentUser = Depends(get_current_user)):
+    account_id = _browser_reminder_account(user)
+    return api_success(recruitment_notifications.browser_preference(account_id))
+
+
+@router.patch(
+    "/notifications/browser-preference",
+    operation_id="api_v1_recruitment_update_browser_notification_preference",
+)
+def update_browser_notification_preference(
+    payload: RecruitmentBrowserPreferenceUpdate,
+    user: CurrentUser = Depends(get_current_user),
+):
+    account_id = _browser_reminder_account(user)
+    preference = _call(
+        recruitment_notifications.update_browser_preference,
+        account_id,
+        enabled=payload.enabled,
+        expected_version=payload.expected_version,
+    )
+    return api_success(
+        {
+            "message": (
+                "Browser reminders enabled."
+                if payload.enabled
+                else "Browser reminders disabled."
+            ),
+            "preference": preference,
+        }
+    )
+
+
+@router.get(
+    "/notifications/browser-alerts",
+    operation_id="api_v1_recruitment_browser_alerts",
+)
+def browser_alerts(
+    limit: Annotated[int, Query(ge=1, le=25)] = 10,
+    user: CurrentUser = Depends(get_current_user),
+):
+    account_id = _browser_reminder_account(user)
+    return api_success(
+        recruitment_notifications.claim_browser_alerts(account_id, limit=limit)
+    )
+
+
+@router.post(
+    "/notifications/browser-test",
+    operation_id="api_v1_recruitment_browser_notification_test",
+)
+def browser_notification_test(user: CurrentUser = Depends(get_current_user)):
+    _browser_reminder_account(user)
+    config = recruitment_notifications.reminder_config()
+    return api_success(
+        recruitment_notifications.browser_test_alert(
+            int(config.get("lead_minutes") or 15)
+        )
+    )
+
+
 @router.get("/options", operation_id="api_v1_recruitment_options")
 def options():
     return api_success(_call(service.options))
@@ -420,6 +495,29 @@ def update_sla_rule(
         target_days=payload.target_days,
     )
     return api_success({"message": "SLA target updated.", "rule": rule})
+
+
+@router.patch(
+    "/settings/appointment-reminders",
+    operation_id="api_v1_recruitment_update_appointment_reminders",
+)
+def update_appointment_reminders(
+    payload: RecruitmentAppointmentReminderUpdate,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_hr_management(user)
+    config = _call(
+        service.update_appointment_reminder_config,
+        user,
+        lead_minutes=payload.lead_minutes,
+        expected_version=payload.expected_version,
+    )
+    return api_success(
+        {
+            "message": "Appointment reminder timing updated.",
+            "appointment_reminders": config,
+        }
+    )
 
 
 @router.post("/settings", status_code=201, operation_id="api_v1_recruitment_create_setting")
@@ -693,6 +791,32 @@ def start_appointment(
         expected_version=payload.expected_version,
     )
     return api_success({"message": "Appointment started at the current time.", **result})
+
+
+@router.post(
+    "/candidates/{candidate_id}/appointments/{appointment_id}/undo-start",
+    operation_id="api_v1_recruitment_undo_appointment_start",
+)
+def undo_appointment_start(
+    candidate_id: int,
+    appointment_id: int,
+    payload: InterviewSessionStart,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_candidate_view(user, candidate_id)
+    result = _call(
+        service.undo_appointment_start,
+        user,
+        candidate_id,
+        appointment_id,
+        expected_version=payload.expected_version,
+    )
+    return api_success(
+        {
+            "message": "Start cancelled. The original appointment schedule was restored.",
+            **result,
+        }
+    )
 
 
 @router.post(

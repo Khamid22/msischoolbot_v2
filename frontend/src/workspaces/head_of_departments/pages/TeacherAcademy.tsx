@@ -74,7 +74,7 @@ export default function HeadOfDepartmentTeacherAcademyPage(props: HeadOfDepartme
         title="Teacher Academy"
         subtitle="Schedule lessons, review assessments, and support academy teachers within your subject scope."
         badge={
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-primary">
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[0.6875rem] font-black uppercase tracking-wide text-primary">
             Head of Departments
           </span>
         }

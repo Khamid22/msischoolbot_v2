@@ -116,7 +116,7 @@ function SubjectSwitcher({
   });
 
   if (options.length <= 1) {
-    return <span className="block max-w-[9rem] truncate rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold sm:max-w-xs">{label}</span>;
+    return <span className="block max-w-[9rem] truncate rounded-full bg-muted px-2.5 py-1 text-[0.6875rem] font-bold sm:max-w-xs">{label}</span>;
   }
 
   return (
@@ -127,7 +127,7 @@ function SubjectSwitcher({
           event.stopPropagation();
           onToggle();
         }}
-        className="flex max-w-[9rem] items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold hover:bg-foreground/10 sm:max-w-xs"
+        className="flex max-w-[9rem] items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[0.6875rem] font-bold hover:bg-foreground/10 sm:max-w-xs"
         aria-label="Switch subject"
         aria-expanded={open}
       >
@@ -328,7 +328,7 @@ export default function DashboardPage(props: DashboardPageProps) {
                   <div className={`absolute right-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border border-foreground/5 bg-surface shadow-card-hover ${motion.panel}`}>
                     <div className="flex items-center justify-between border-b border-foreground/5 px-4 py-2.5">
                       <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Announcements</p>
-                      {announcements.length ? <span className="text-[11px] font-bold text-muted-foreground">{announcements.length}</span> : null}
+                      {announcements.length ? <span className="text-[0.6875rem] font-bold text-muted-foreground">{announcements.length}</span> : null}
                     </div>
                     {announcements.length ? (
                       <div className="max-h-80 overflow-y-auto py-1">
@@ -570,10 +570,10 @@ function announcementPriorityLabel(priority?: string) {
 function announcementBadgeClass(priority?: string) {
   const normalized = String(priority || "").trim().toLowerCase();
   if (normalized === "urgent") {
-    return "shrink-0 rounded-full border border-destructive/20 bg-destructive/5 px-2 py-0.5 text-[10px] font-bold text-destructive";
+    return "shrink-0 rounded-full border border-destructive/20 bg-destructive/5 px-2 py-0.5 text-[0.625rem] font-bold text-destructive";
   }
   if (normalized === "important") {
-    return "shrink-0 rounded-full border border-warning/30 bg-warning/15 px-2 py-0.5 text-[10px] font-bold text-foreground";
+    return "shrink-0 rounded-full border border-warning/30 bg-warning/15 px-2 py-0.5 text-[0.625rem] font-bold text-foreground";
   }
-  return "shrink-0 rounded-full border border-foreground/10 bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground";
+  return "shrink-0 rounded-full border border-foreground/10 bg-muted px-2 py-0.5 text-[0.625rem] font-bold text-muted-foreground";
 }

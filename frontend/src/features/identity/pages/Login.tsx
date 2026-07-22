@@ -54,7 +54,7 @@ export default function LoginPage(props: LoginPageProps) {
 
         <button
           type="submit"
-          className="w-full rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-primary-foreground shadow-neo transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+          className="w-full rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-primary-foreground shadow-neo transition-all active:translate-x-[0.0625rem] active:translate-y-[0.0625rem] active:shadow-none"
         >
           Sign In
         </button>

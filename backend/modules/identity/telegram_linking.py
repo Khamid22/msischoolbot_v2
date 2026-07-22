@@ -8,7 +8,6 @@ from typing import Any
 
 from backend.core.access import CurrentUser
 from backend.core.database import connect_auth_db
-from backend.modules.hr.recruitment.notifications import enqueue_linked_account_summary
 from backend.modules.identity import repository
 from backend.modules.identity import telegram_link_repository
 from backend.platform.telegram.init_data import telegram_user_from_init_data
@@ -108,8 +107,6 @@ def link_connection(user: CurrentUser, init_data: str) -> dict[str, Any]:
             entity_account_id=account_id,
             detail={"telegram_username": username, "telegram_user_id": telegram_id},
         )
-        telegram_link_repository.requeue_waiting_recruitment_notifications(conn, account_id)
-        enqueue_linked_account_summary(conn, account_id)
         conn.commit()
     return get_connection(user)
 

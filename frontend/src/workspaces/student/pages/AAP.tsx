@@ -37,11 +37,11 @@ export default function AAPPage(props: AapPageProps) {
             className="rounded-lg border border-foreground/5 p-3"
           >
             <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-[10px] font-medium text-muted-foreground">
+              <p className="text-[0.625rem] font-medium text-muted-foreground">
                 {formatLessonDateDisplay(row.lesson_date_display)}
               </p>
 
-              <p className="text-[10px] font-bold text-muted-foreground">
+              <p className="text-[0.625rem] font-bold text-muted-foreground">
                 Lesson {row.lesson_number || "-"}
               </p>
             </div>
@@ -58,29 +58,29 @@ export default function AAPPage(props: AapPageProps) {
               />
             </div>
 
-            <p className="mt-1 text-[10px] font-semibold">
+            <p className="mt-1 text-[0.625rem] font-semibold">
               {row.remark || "-"}
             </p>
           </div>
         ))}
       </div>
       <div className="miniapp-table-scroll hidden max-h-[70dvh] sm:block">
-        <table className="w-full min-w-[760px] text-left">
-          <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+        <table className="w-full min-w-[47.5rem] text-left">
+          <thead className="sticky top-0 z-20 bg-surface shadow-[0_0.0625rem_0_hsl(var(--foreground)/0.08)]">
             <tr className="border-b border-foreground/5">
-              <th className="w-[16%] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              <th className="w-[16%] px-3 py-2 text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground">
                 {firstColumnLabel}
               </th>
 
-              <th className="w-[14%] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              <th className="w-[14%] px-3 py-2 text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground">
                 Lesson Number
               </th>
 
-              <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              <th className="px-3 py-2 text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground">
                 Lesson Topic
               </th>
 
-              <th className="w-[26%] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              <th className="w-[26%] px-3 py-2 text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground">
                 Homework Progress
               </th>
             </tr>
@@ -116,7 +116,7 @@ export default function AAPPage(props: AapPageProps) {
                     />
                   </div>
 
-                  <p className="mt-0.5 text-[10px] font-semibold">
+                  <p className="mt-0.5 text-[0.625rem] font-semibold">
                     {row.remark || "-"}
                   </p>
                 </td>

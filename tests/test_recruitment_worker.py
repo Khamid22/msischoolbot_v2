@@ -1,44 +1,13 @@
-"""Dedicated Recruitment worker contracts."""
+"""Recruitment notification delivery process contracts."""
 
-from __future__ import annotations
-
-import threading
 from pathlib import Path
 
-from backend.modules.hr.recruitment import worker
 
-
-def test_worker_is_not_started_by_the_web_process():
-    server_source = Path("backend/server.py").read_text()
+def test_recruitment_telegram_worker_is_retired():
     procfile = Path("Procfile").read_text()
+    main_source = Path("main.py").read_text()
 
-    assert "process_due_notifications" not in server_source
-    assert "recruitment_notification_worker" not in server_source
-    assert "worker: python main.py worker" in procfile
-
-
-def test_worker_processes_one_bounded_batch(monkeypatch):
-    monkeypatch.setenv("RECRUITMENT_NOTIFICATION_BATCH_LIMIT", "17")
-    calls: list[int] = []
-
-    delivered = worker.run_once(
-        processor=lambda *, limit: calls.append(limit) or 4,
-    )
-
-    assert delivered == 4
-    assert calls == [17]
-
-
-def test_worker_loop_can_stop_without_sleeping_forever(monkeypatch):
-    monkeypatch.setenv("RECRUITMENT_NOTIFICATION_POLL_SECONDS", "5")
-    stop_event = threading.Event()
-    calls: list[int] = []
-
-    def process(*, limit: int) -> int:
-        calls.append(limit)
-        stop_event.set()
-        return 0
-
-    worker.run_forever(stop_event=stop_event, processor=process)
-
-    assert calls == [25]
+    assert "worker: python main.py worker" not in procfile
+    assert '"recruitment-worker": "worker"' not in main_source
+    assert "process_due_notifications" not in main_source
+    assert not Path("backend/modules/hr/recruitment/worker.py").exists()

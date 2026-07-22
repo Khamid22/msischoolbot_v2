@@ -30,7 +30,7 @@ export const Badge = forwardRef<HTMLElement, BadgeProps>(function Badge(
   ref,
 ) {
   const base =
-    "inline-flex min-h-6 max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold leading-tight";
+    "inline-flex min-h-6 max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[0.6875rem] font-bold leading-tight";
   const classes = `${base} ${toneClasses[tone]} ${className}`;
 
   if (onClick) {

@@ -68,11 +68,11 @@ export function TeachersView({ basePath, onAnnouncement }: TeachersViewProps) {
               } ${index === 0 ? "rounded-tl-lg" : ""}`}
               style={{
                 clipPath: index === 0
-                  ? "polygon(0 0, calc(100% - 20px) 0, 100% 100%, 0 100%)"
-                  : "polygon(0 0, calc(100% - 20px) 0, 100% 100%, 20px 100%)",
-                marginLeft: index ? "-10px" : 0,
-                paddingLeft: index ? "30px" : undefined,
-                paddingRight: "30px",
+                  ? "polygon(0 0, calc(100% - 1.25rem) 0, 100% 100%, 0 100%)"
+                  : "polygon(0 0, calc(100% - 1.25rem) 0, 100% 100%, 1.25rem 100%)",
+                marginLeft: index ? "-0.625rem" : 0,
+                paddingLeft: index ? "1.875rem" : undefined,
+                paddingRight: "1.875rem",
               }}
             >
               <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />

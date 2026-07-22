@@ -111,6 +111,8 @@ _CANDIDATE_COLUMNS = """
     appointment.status AS next_appointment_status,
     appointment.version AS next_appointment_version,
     appointment.started_at::text AS next_appointment_started_at,
+    appointment.pre_start_starts_at::text AS next_appointment_pre_start_starts_at,
+    appointment.pre_start_ends_at::text AS next_appointment_pre_start_ends_at,
     academy.id AS academy_teacher_id,
     academy.academy_status AS academy_status,
     COALESCE(

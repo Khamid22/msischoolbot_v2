@@ -56,6 +56,10 @@ def appointment_payload(row: Any) -> dict[str, Any]:
     payload = row_dict(row)
     payload["is_overdue"] = False
     payload["can_start"] = text(payload.get("status")) == "scheduled"
+    payload["can_undo_start"] = (
+        text(payload.get("status")) == "in_progress"
+        and bool(text(payload.get("pre_start_starts_at")))
+    )
     payload["start_available_at"] = payload.get("starts_at")
     payload["overdue_at"] = None
     status = text(payload.get("status"))
@@ -259,6 +263,8 @@ def candidate_summary(row: Any) -> dict[str, Any]:
         "next_appointment_status": "status",
         "next_appointment_version": "version",
         "next_appointment_started_at": "started_at",
+        "next_appointment_pre_start_starts_at": "pre_start_starts_at",
+        "next_appointment_pre_start_ends_at": "pre_start_ends_at",
     }
     if payload.get("next_appointment_id"):
         payload["next_appointment"] = appointment_payload(

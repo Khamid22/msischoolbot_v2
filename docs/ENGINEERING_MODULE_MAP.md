@@ -72,9 +72,9 @@ When one physical table serves closely related academic concerns, the write cont
 | Academy and active-teacher handoffs | `handoffs/service.py` | `handoffs/intake_repository.py`, `handoffs/lifecycle_repository.py` |
 | tasks and assignments | compatibility service facade | `tasks/repository.py` |
 | settings and options | compatibility service facade | `settings_repository.py` |
-| notification delivery | `notifications.py`, `worker.py` | `notification_repository.py` |
+| browser appointment reminders | `notifications.py` | `notification_repository.py` |
 
-The web process never starts notification polling. Deploy `python main.py worker` as one independently managed process.
+Recruitment reminders are browser-only. Eligible portal clients atomically claim due reminders through the Recruitment API; no Telegram notification worker is deployed.
 
 ## Explicit Size Exceptions
 

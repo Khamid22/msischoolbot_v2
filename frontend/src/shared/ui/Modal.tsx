@@ -78,7 +78,7 @@ export function ModalBody({ children, className = "" }: { children: ReactNode; c
 export function ModalFooter({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`shrink-0 border-t border-foreground/8 bg-surface/95 px-4 py-3 pb-[calc(var(--app-bottom-inset)+0.75rem)] shadow-[0_-8px_24px_hsl(var(--foreground)/0.06)] backdrop-blur sm:pb-3 ${className}`}
+      className={`shrink-0 border-t border-foreground/8 bg-surface/95 px-4 py-3 pb-[calc(var(--app-bottom-inset)+0.75rem)] shadow-[0_-0.5rem_1.5rem_hsl(var(--foreground)/0.06)] backdrop-blur sm:pb-3 ${className}`}
     >
       {children}
     </div>
@@ -189,7 +189,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className={`fixed inset-0 ${uiLayers.overlay} flex items-end justify-center bg-foreground/60 backdrop-blur-[2px] animate-in fade-in duration-200 motion-reduce:animate-none ${desktopPlacementClass}`}
+      className={`fixed inset-0 ${uiLayers.overlay} flex items-end justify-center bg-foreground/60 backdrop-blur-[0.125rem] animate-in fade-in duration-200 motion-reduce:animate-none ${desktopPlacementClass}`}
       style={{
         paddingTop: "calc(var(--app-top-inset) + 0.5rem)",
         paddingRight: "calc(var(--app-right-inset) + 0.5rem)",

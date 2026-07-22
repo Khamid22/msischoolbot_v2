@@ -553,7 +553,7 @@ function NewAcademyTeacherModal({
                       setWizardStep(item.step);
                     }
                   }}
-                  className={`min-h-10 rounded-lg border px-2 text-left text-[11px] font-black transition-colors motion-reduce:transition-none ${
+                  className={`min-h-10 rounded-lg border px-2 text-left text-[0.6875rem] font-black transition-colors motion-reduce:transition-none ${
                     active
                       ? "border-primary/40 bg-primary/10 text-primary"
                       : complete
@@ -562,7 +562,7 @@ function NewAcademyTeacherModal({
                   }`}
                   aria-current={active ? "step" : undefined}
                 >
-                  <span className="block text-[10px] uppercase tracking-wide">Step {item.step}</span>
+                  <span className="block text-[0.625rem] uppercase tracking-wide">Step {item.step}</span>
                   <span className="block leading-tight">{item.label}</span>
                 </button>
               );
@@ -792,7 +792,7 @@ function NewAcademyTeacherModal({
                   ["Selected Lessons", String(selectedLessonIds.length)],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-lg border border-foreground/10 bg-background px-3 py-2">
-                    <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">{label}</p>
+                    <p className="text-[0.625rem] font-black uppercase tracking-wide text-muted-foreground">{label}</p>
                     <p className="mt-1 break-words text-sm font-black text-foreground">{value}</p>
                   </div>
                 ))}
@@ -901,12 +901,12 @@ function AssignmentModal({
         <ModalBody className="space-y-4">
           <section className="grid gap-2 rounded-xl border border-primary/10 bg-primary/5 p-3 sm:grid-cols-2">
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher name</p>
+              <p className="text-[0.625rem] font-black uppercase tracking-wide text-primary">Teacher name</p>
               <p className="mt-1 truncate text-sm font-black text-foreground">{asString(teacher.full_name) || "Academy teacher"}</p>
               <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</p>
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Assigned lesson</p>
+              <p className="text-[0.625rem] font-black uppercase tracking-wide text-primary">Assigned lesson</p>
               <p className="mt-1 line-clamp-2 text-sm font-black text-foreground">
                 {selectedAssignment ? assignmentTitle(selectedAssignment) : "Choose an academy lesson"}
               </p>
@@ -1058,16 +1058,16 @@ function AssessmentModal({
         <ModalBody className="space-y-4">
           <div className="grid gap-2 rounded-xl border border-primary/10 bg-primary/5 p-3 sm:grid-cols-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher name</p>
+              <p className="text-[0.625rem] font-black uppercase tracking-wide text-primary">Teacher name</p>
               <p className="mt-1 truncate text-sm font-black text-foreground">{asString(teacher.full_name) || "Academy teacher"}</p>
               <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</p>
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Assigned lesson</p>
+              <p className="text-[0.625rem] font-black uppercase tracking-wide text-primary">Assigned lesson</p>
               <p className="mt-1 line-clamp-2 text-sm font-black text-foreground">{assignmentTitle(assignment)}</p>
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Date</p>
+              <p className="text-[0.625rem] font-black uppercase tracking-wide text-primary">Date</p>
               <p className="mt-1 truncate text-sm font-black text-foreground">{dateLabel(assessmentStamp)}</p>
             </div>
           </div>
@@ -1083,12 +1083,12 @@ function AssessmentModal({
               {rubric.map((item) => (
                 <div key={item.key} className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,14rem)_5.5rem_minmax(0,1fr)] sm:items-center">
                   <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="flex h-8 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[11px] font-black text-primary">
+                    <span className="flex h-8 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[0.6875rem] font-black text-primary">
                       {item.code}
                     </span>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold">{item.label}</p>
-                      <p className="text-[11px] font-semibold text-muted-foreground">{Math.round(item.weight * 100)}% weight</p>
+                      <p className="text-[0.6875rem] font-semibold text-muted-foreground">{Math.round(item.weight * 100)}% weight</p>
                     </div>
                   </div>
                   <input
@@ -1250,7 +1250,7 @@ function PromoteModal({
           <label className="block">
             <FieldLabel>Pay Rate</FieldLabel>
             <input name="teacher_pay_rate" type="number" min="0" step="0.01" defaultValue={String(suggestedRate || 0)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" />
-            <span className="mt-1 block text-[11px] font-semibold text-muted-foreground">Suggested: {formatUzs(suggestedRate) || "set manually"}</span>
+            <span className="mt-1 block text-[0.6875rem] font-semibold text-muted-foreground">Suggested: {formatUzs(suggestedRate) || "set manually"}</span>
           </label>
           <label className="block">
             <FieldLabel>Promotion Notes</FieldLabel>
@@ -1312,7 +1312,7 @@ function CurriculumSelectionTab({
       <div className="grid gap-2 sm:grid-cols-[auto_1fr_auto] sm:items-center">
         <div className="rounded-lg border border-primary/15 bg-primary/5 px-3 py-2">
           <p className="text-lg font-black leading-6 text-primary">{selectedIds.length}</p>
-          <p className="text-[10px] font-black uppercase tracking-wide text-primary/80">
+          <p className="text-[0.625rem] font-black uppercase tracking-wide text-primary/80">
             of {lessons.length} lessons selected
           </p>
         </div>
@@ -1370,13 +1370,13 @@ function CurriculumSelectionTab({
                       {asString(lesson.lesson_number) || `Lesson ${asNumber(lesson.item_order)}`} · {asString(lesson.title)}
                     </span>
                     {assessed ? (
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-primary">
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[0.625rem] font-black uppercase tracking-wide text-primary">
                         Assessed
                       </span>
                     ) : null}
                   </span>
                   {asString(lesson.specification_points) ? (
-                    <span className="mt-0.5 line-clamp-2 block text-[11px] leading-4 text-muted-foreground">
+                    <span className="mt-0.5 line-clamp-2 block text-[0.6875rem] leading-4 text-muted-foreground">
                       {asString(lesson.specification_points)}
                     </span>
                   ) : null}
@@ -1500,20 +1500,20 @@ function AcademyDetailModal({
         </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <div className="rounded-xl border border-primary/10 bg-primary/5 p-3">
-            <p className="text-[10px] font-black uppercase tracking-wide text-primary">
+            <p className="text-[0.625rem] font-black uppercase tracking-wide text-primary">
               {login ? "Account ready" : "Account pending"}
             </p>
             <p className="mt-1 truncate font-mono text-sm font-black text-foreground">
               {login || "Login is being provisioned"}
             </p>
             {login ? (
-              <p className="mt-1 text-[11px] font-semibold text-muted-foreground">
+              <p className="mt-1 text-[0.6875rem] font-semibold text-muted-foreground">
                 Temporary password equals the login and can be changed in Account Security.
               </p>
             ) : null}
           </div>
           <div className="rounded-xl border border-foreground/10 bg-muted/40 p-3">
-            <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+            <p className="text-[0.625rem] font-black uppercase tracking-wide text-muted-foreground">
               Training configuration
             </p>
             <p className="mt-1 text-sm font-black text-foreground">
@@ -1580,7 +1580,7 @@ function AcademyDetailModal({
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-sm font-bold">{asNumber(assignment.sequence_no)}. {asString(assignment.lesson_number)} · {asString(assignment.lesson_topic)}</p>
-                          <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          <p className="mt-0.5 text-[0.6875rem] text-muted-foreground">
                             {dateLabel(report ? report.assessment_datetime : assignment.session_datetime)} · {asString(teacher.department_head_name) || asString(assignment.evaluator_name) || "No evaluator"} · {asString(assignment.status)}
                           </p>
                         </div>
@@ -1593,18 +1593,18 @@ function AcademyDetailModal({
                               <button
                                 type="button"
                                 onClick={() => onReview(assignment, report)}
-                                className="inline-flex items-center gap-1 rounded-md border border-foreground/10 bg-background px-2.5 py-1 text-[11px] font-bold text-foreground hover:bg-muted"
+                                className="inline-flex items-center gap-1 rounded-md border border-foreground/10 bg-background px-2.5 py-1 text-[0.6875rem] font-bold text-foreground hover:bg-muted"
                               >
                                 <Eye className="h-3.5 w-3.5" />
                                 Review
                               </button>
                               {!isPassedReport(report) && rescheduledSinceFail(assignment, report) && canAssess ? (
-                                <button type="button" onClick={() => onReview(assignment, report)} className="inline-flex items-center gap-1 rounded-md bg-foreground px-2.5 py-1 text-[11px] font-bold text-background">
+                                <button type="button" onClick={() => onReview(assignment, report)} className="inline-flex items-center gap-1 rounded-md bg-foreground px-2.5 py-1 text-[0.6875rem] font-bold text-background">
                                   <ClipboardCheck className="h-3.5 w-3.5" />
                                   Re-assess
                                 </button>
                               ) : !isPassedReport(report) && canSchedule ? (
-                                <button type="button" onClick={() => onReschedule(assignment)} className="inline-flex items-center gap-1 rounded-md bg-foreground px-2.5 py-1 text-[11px] font-bold text-background">
+                                <button type="button" onClick={() => onReschedule(assignment)} className="inline-flex items-center gap-1 rounded-md bg-foreground px-2.5 py-1 text-[0.6875rem] font-bold text-background">
                                   <CalendarClock className="h-3.5 w-3.5" />
                                   Re-schedule
                                 </button>
@@ -1622,24 +1622,24 @@ function AcademyDetailModal({
                               ) : null}
                             </>
                           ) : canAssess ? (
-                            <button type="button" onClick={() => onAssess(assignment)} className="rounded-md bg-foreground px-2.5 py-1 text-[11px] font-bold text-background">
+                            <button type="button" onClick={() => onAssess(assignment)} className="rounded-md bg-foreground px-2.5 py-1 text-[0.6875rem] font-bold text-background">
                               Assess
                             </button>
                           ) : null}
                         </div>
                       </div>
                       {report ? (
-                        <p className="mt-1 text-[11px] font-bold">
+                        <p className="mt-1 text-[0.6875rem] font-bold">
                           {decisionLabel(report.decision)}
                           <span className="font-semibold text-muted-foreground"> · {dateLabel(report.assessment_datetime)} · {asString(teacher.department_head_name) || asString(report.evaluator_name) || "Evaluator not set"}</span>
                         </p>
                       ) : null}
                       {report && (asString(report.areas_for_improvement) || asString(report.strengths)) ? (
-                        <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+                        <p className="mt-1 line-clamp-2 text-[0.6875rem] leading-4 text-muted-foreground">
                           {asString(report.areas_for_improvement) || asString(report.strengths)}
                         </p>
                       ) : !report && asString(assignment.specification_points) ? (
-                        <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">{asString(assignment.specification_points)}</p>
+                        <p className="mt-1 line-clamp-2 text-[0.6875rem] leading-4 text-muted-foreground">{asString(assignment.specification_points)}</p>
                       ) : null}
                     </div>
                   );
@@ -1805,7 +1805,7 @@ function AcademyTeacherCard({
           <h3 className="truncate text-sm font-black text-foreground">{asString(teacher.full_name) || "Academy teacher"}</h3>
           <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</p>
         </button>
-        <StatusBadge tone={academyStatusTone(status)} className="shrink-0 text-[10px]">
+        <StatusBadge tone={academyStatusTone(status)} className="shrink-0 text-[0.625rem]">
           {asString(teacher.account_onboarding_status) === "pending" ? "Onboarding pending" : statusLabel(status)}
         </StatusBadge>
       </div>
@@ -1813,24 +1813,24 @@ function AcademyTeacherCard({
       <div className="mt-3 grid grid-cols-[6.5rem_1fr] gap-3">
         <div className="min-w-0">
           <div className="mb-1 flex items-center justify-between gap-2">
-            <span className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Progress</span>
-            <span className="text-[10px] font-black text-foreground">{percent}%</span>
+            <span className="text-[0.625rem] font-black uppercase tracking-wide text-muted-foreground">Progress</span>
+            <span className="text-[0.625rem] font-black text-foreground">{percent}%</span>
           </div>
           <ProgressBar value={percent} className="h-1.5 bg-muted" />
           <p className="mt-1 text-xs font-black text-foreground">{progress.passed}/{progress.target}</p>
         </div>
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Next</p>
+          <p className="text-[0.625rem] font-black uppercase tracking-wide text-muted-foreground">Next</p>
           <p className="mt-1 truncate text-xs font-black text-foreground">
             {nextAssignment ? assignmentTitle(nextAssignment) : assignments.length ? "No pending lesson" : "No lessons assigned"}
           </p>
-          <p className="mt-0.5 truncate text-[11px] font-semibold text-muted-foreground">
+          <p className="mt-0.5 truncate text-[0.6875rem] font-semibold text-muted-foreground">
             {nextAssignment ? `${dateLabel(nextAssignment.session_datetime)} · ${asString(nextAssignment.evaluator_name) || "No evaluator"}` : `Avg ${progress.average == null ? "-" : progress.average.toFixed(2)}`}
           </p>
         </div>
       </div>
 
-      <div className="mt-2 flex items-center gap-2 text-[11px]">
+      <div className="mt-2 flex items-center gap-2 text-[0.6875rem]">
         <span className="min-w-0 flex-1 truncate rounded-md bg-muted px-2 py-1 font-mono font-black text-foreground">
           {login || "Account pending"}
         </span>
@@ -1900,9 +1900,9 @@ function ActiveTeacherAccountModal({
         <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
           {fields.map(([label, value]) => (
             <div key={label} className="min-w-0 rounded-lg border border-border bg-background px-3 py-2">
-              <dt className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</dt>
+              <dt className="text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">{label}</dt>
               <dd className="mt-0.5 break-words font-black text-foreground">
-                {label === "Status" ? <StatusBadge status={value} className="text-[10px]" /> : value}
+                {label === "Status" ? <StatusBadge status={value} className="text-[0.625rem]" /> : value}
               </dd>
             </div>
           ))}
@@ -1926,7 +1926,7 @@ function ActiveTeacherAccountModal({
               <p className="text-xs font-black text-emerald-900">Password reset — same as the login</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 <div className="rounded-lg border border-emerald-200 bg-white px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-800">Login</p>
+                  <p className="text-[0.625rem] font-bold uppercase tracking-wide text-emerald-800">Login</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <p className="min-w-0 break-all font-mono text-sm font-black text-foreground">{asString(resetCredentials.login)}</p>
                     <IconButton label="Copy teacher login" onClick={() => onCopy(asString(resetCredentials.login), "Teacher login")}>
@@ -1935,7 +1935,7 @@ function ActiveTeacherAccountModal({
                   </div>
                 </div>
                 <div className="rounded-lg border border-emerald-200 bg-white px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-800">Password</p>
+                  <p className="text-[0.625rem] font-bold uppercase tracking-wide text-emerald-800">Password</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <p className="min-w-0 break-all font-mono text-sm font-black text-foreground">{asString(resetCredentials.temporary_password)}</p>
                     <IconButton label="Copy password" onClick={() => onCopy(asString(resetCredentials.temporary_password), "Password")}>
@@ -2848,11 +2848,11 @@ export function TeacherAcademyPanel({
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <div className="rounded-lg bg-white/70 px-3 py-2">
-                <p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">Login</p>
+                <p className="text-[0.625rem] font-black uppercase tracking-wide text-emerald-700">Login</p>
                 <p className="font-mono text-sm font-black">{asString(credentials.login) || asString(credentials.teacher_code)}</p>
               </div>
               <div className="rounded-lg bg-white/70 px-3 py-2">
-                <p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">Temporary password</p>
+                <p className="text-[0.625rem] font-black uppercase tracking-wide text-emerald-700">Temporary password</p>
                 <p className="font-mono text-sm font-black">{asString(credentials.temporary_password)}</p>
               </div>
             </div>
@@ -2883,7 +2883,7 @@ export function TeacherAcademyPanel({
                     }`}
                   >
                     {tab.label}
-                    <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px]">{tab.count}</span>
+                    <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[0.625rem]">{tab.count}</span>
                   </button>
                 );
               })}
@@ -2902,7 +2902,7 @@ export function TeacherAcademyPanel({
                       role="tab"
                       aria-selected={active}
                       onClick={() => setDirectorTeachersView(tab.key as "academy" | "active")}
-                      className={`min-h-8 rounded-md px-3 text-[11px] font-black transition-colors motion-reduce:transition-none ${
+                      className={`min-h-8 rounded-md px-3 text-[0.6875rem] font-black transition-colors motion-reduce:transition-none ${
                         active ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       }`}
                     >
@@ -2932,11 +2932,11 @@ export function TeacherAcademyPanel({
                           </p>
                         </div>
                         {report ? (
-                          <StatusBadge tone={decisionTone(report.decision)} className="shrink-0 text-[10px]">
+                          <StatusBadge tone={decisionTone(report.decision)} className="shrink-0 text-[0.625rem]">
                             {decisionLabel(report.decision)}
                           </StatusBadge>
                         ) : (
-                          <StatusBadge tone={assignmentIsScheduled(assignment) ? "success" : "info"} className="shrink-0 text-[10px]">
+                          <StatusBadge tone={assignmentIsScheduled(assignment) ? "success" : "info"} className="shrink-0 text-[0.625rem]">
                             {assignmentIsScheduled(assignment) ? "Scheduled" : "Appointed"}
                           </StatusBadge>
                         )}
@@ -2976,7 +2976,7 @@ export function TeacherAcademyPanel({
                   })}
                 </MobileCardList>
                 <ResponsiveTable className="max-h-[calc(100dvh-20rem)] rounded-xl border border-[#DDE4EF] bg-white shadow-sm 2xl:max-h-[48rem]">
-                  <table className="w-full min-w-[960px] table-fixed border-collapse text-left">
+                  <table className="w-full min-w-[60rem] table-fixed border-collapse text-left">
                     <colgroup>
                       <col className="w-[18%]" />
                       <col className="w-[13%]" />
@@ -2989,7 +2989,7 @@ export function TeacherAcademyPanel({
                     <thead className="sticky top-0 z-10 border-b border-[#DDE4EF] bg-[#F8FAFD]">
                       <tr>
                         {["Teacher", "Subject", "Appointed Lesson", "Time", "Evaluator", "Status", "Actions"].map((heading) => (
-                          <th key={heading} className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#64748B]">
+                          <th key={heading} className="px-3 py-2.5 text-[0.625rem] font-black uppercase tracking-[0.16em] text-[#64748B]">
                             {heading}
                           </th>
                         ))}
@@ -3023,11 +3023,11 @@ export function TeacherAcademyPanel({
                           </td>
                           <td className="px-3 py-2.5 align-middle">
                             {report ? (
-                              <StatusBadge tone={decisionTone(report.decision)} className="text-[10px]">
+                              <StatusBadge tone={decisionTone(report.decision)} className="text-[0.625rem]">
                                 {decisionLabel(report.decision)}
                               </StatusBadge>
                             ) : (
-                              <StatusBadge tone={assignmentIsScheduled(assignment) ? "success" : "info"} className="text-[10px]">
+                              <StatusBadge tone={assignmentIsScheduled(assignment) ? "success" : "info"} className="text-[0.625rem]">
                                 {assignmentIsScheduled(assignment) ? "Scheduled" : "Appointed"}
                               </StatusBadge>
                             )}
@@ -3035,12 +3035,12 @@ export function TeacherAcademyPanel({
                           <td className="px-3 py-2.5 align-middle">
                             <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                               {actions.scoreText ? (
-                                <span className="inline-flex h-8 items-center rounded-lg bg-primary/10 px-2.5 text-[11px] font-black text-primary">
+                                <span className="inline-flex h-8 items-center rounded-lg bg-primary/10 px-2.5 text-[0.6875rem] font-black text-primary">
                                   {actions.scoreText}
                                 </span>
                               ) : null}
                               {actions.primary ? (
-                                <button type="button" onClick={actions.primary.onClick} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+                                <button type="button" onClick={actions.primary.onClick} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[0.6875rem] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
                                   {actions.primary.icon}
                                   {actions.primary.label}
                                 </button>
@@ -3121,7 +3121,7 @@ export function TeacherAcademyPanel({
                 })}
               </MobileCardList>
               <ResponsiveTable className="max-h-[calc(100dvh-20rem)] rounded-xl border border-[#DDE4EF] bg-white shadow-sm 2xl:max-h-[48rem]">
-                <table className="w-full min-w-[980px] table-fixed border-collapse text-left">
+                <table className="w-full min-w-[61.25rem] table-fixed border-collapse text-left">
                   <colgroup>
                     <col className="w-[20%]" />
                     <col className="w-[14%]" />
@@ -3136,7 +3136,7 @@ export function TeacherAcademyPanel({
                       {["Teacher", "Subject", "Progress", "Next lesson", "Evaluator", "Score", "Actions"].map((heading) => (
                         <th
                           key={heading}
-                          className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#64748B]"
+                          className="px-3 py-2.5 text-[0.625rem] font-black uppercase tracking-[0.16em] text-[#64748B]"
                         >
                           {heading}
                         </th>
@@ -3231,7 +3231,7 @@ export function TeacherAcademyPanel({
                                 >
                                   {asString(teacher.full_name) || "Academy teacher"}
                                 </button>
-                                <span className="shrink-0 font-mono text-[11px] font-bold text-[#64748B]">{login || (asString(teacher.account_onboarding_status) === "pending" ? "Onboarding pending" : "Creating...")}</span>
+                                <span className="shrink-0 font-mono text-[0.6875rem] font-bold text-[#64748B]">{login || (asString(teacher.account_onboarding_status) === "pending" ? "Onboarding pending" : "Creating...")}</span>
                               </span>
                             </div>
                           </td>
@@ -3241,8 +3241,8 @@ export function TeacherAcademyPanel({
                           <td className="px-3 py-2.5 align-middle">
                             <div className="min-w-0">
                               <div className="mb-1 flex items-center justify-between gap-2">
-                                <span className="text-[11px] font-black text-[#0F172A]">{progress.passed}/{progress.target}</span>
-                                <span className="text-[10px] font-bold text-[#64748B]">{percent}%</span>
+                                <span className="text-[0.6875rem] font-black text-[#0F172A]">{progress.passed}/{progress.target}</span>
+                                <span className="text-[0.625rem] font-bold text-[#64748B]">{percent}%</span>
                               </div>
                               <ProgressBar value={percent} className="h-1.5 bg-[#EEF2F7]" fillClassName="bg-[#3D5AEA]" />
                             </div>
@@ -3272,18 +3272,18 @@ export function TeacherAcademyPanel({
                                 <button
                                   type="button"
                                   onClick={() => setAssessmentTarget({ teacher, assignment: nextAssignment })}
-                                  className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100"
+                                  className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[0.6875rem] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100"
                                 >
                                   <ClipboardCheck className="h-3.5 w-3.5" />
                                   Assess
                                 </button>
                               ) : academyAssignments(teacher).length ? (
-                                <button type="button" onClick={() => setDetailTeacher(teacher)} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+                                <button type="button" onClick={() => setDetailTeacher(teacher)} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[0.6875rem] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
                                   <Eye className="h-3.5 w-3.5" />
                                   Review
                                 </button>
                               ) : (
-                                <button type="button" onClick={() => setDetailTeacher(teacher)} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+                                <button type="button" onClick={() => setDetailTeacher(teacher)} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[0.6875rem] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
                                   <Eye className="h-3.5 w-3.5" />
                                   Details
                                 </button>

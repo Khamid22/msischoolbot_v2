@@ -155,7 +155,7 @@ export function TrashBinView({ basePath, options, onAnnouncement }: Props) {
           </select>
           <button type="button" className={`${secondaryButtonClass} relative`} onClick={() => { setDraftFilters(filters); setFilterOpen(true); }}>
             <Filter className="h-4 w-4" />Filter
-            {filterCount ? <span className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">{filterCount}</span> : null}
+            {filterCount ? <span className="rounded-full bg-primary px-1.5 text-[0.625rem] text-primary-foreground">{filterCount}</span> : null}
           </button>
           <button
             type="button"
@@ -174,8 +174,8 @@ export function TrashBinView({ basePath, options, onAnnouncement }: Props) {
         {candidates.data ? (
           <section className="overflow-hidden rounded-xl border border-border bg-card">
             <div className="hidden lg:block">
-              <table className="w-full table-fixed text-left text-[13px]">
-                <thead className="bg-muted/60 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <table className="w-full table-fixed text-left text-[0.8125rem]">
+                <thead className="bg-muted/60 text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="w-[25%] px-3 py-1.5">Candidate</th>
                     <th className="w-[18%] px-3 py-1.5">Position</th>
@@ -186,10 +186,10 @@ export function TrashBinView({ basePath, options, onAnnouncement }: Props) {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {deletedCandidates.map((candidate) => (
-                    <tr key={candidate.id} className="h-[58px] hover:bg-muted/30">
+                    <tr key={candidate.id} className="h-[3.625rem] hover:bg-muted/30">
                       <td className="px-3 py-1">
                         <a className="block truncate font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("trash")}>{candidate.full_name}</a>
-                        <p className="truncate text-[11px] text-muted-foreground">{candidate.phone || "No phone"}</p>
+                        <p className="truncate text-[0.6875rem] text-muted-foreground">{candidate.phone || "No phone"}</p>
                       </td>
                       <td className="truncate px-3 py-1">{candidate.applied_position || candidate.subject || "—"}</td>
                       <td className="px-3 py-1 text-muted-foreground">{dateLabel(candidate.stage_changed_at)}</td>

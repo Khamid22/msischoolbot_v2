@@ -15,6 +15,7 @@ import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { lessonDurationMinutesForSchoolCode } from "../timetable/scheduleMath";
 import { queryClient } from "@/shared/api/queryClient";
+import { densityRem } from "@/shared/lib/uiDensity";
 
 type AcademicGradebookRoutes = Pick<
   typeof routes,
@@ -136,7 +137,7 @@ function CompactChartTooltip({
         })}
       </div>
       {typeof coverage?.recordedAttendance === "number" && typeof coverage?.scheduledLessons === "number" ? (
-        <p className="mt-1.5 text-[10px] font-medium text-muted-foreground">
+        <p className="mt-1.5 text-[0.625rem] font-medium text-muted-foreground">
           Attendance recorded for {coverage.recordedAttendance} of {coverage.scheduledLessons} lessons
         </p>
       ) : null}
@@ -166,10 +167,10 @@ function MetricDelta({
   unit?: string;
 }) {
   if (current === null) {
-    return <span className="mt-1.5 block text-[10px] font-semibold text-muted-foreground">No data for selected month</span>;
+    return <span className="mt-1.5 block text-[0.625rem] font-semibold text-muted-foreground">No data for selected month</span>;
   }
   if (previous === null) {
-    return <span className="mt-1.5 block text-[10px] font-semibold text-muted-foreground">No data for {formatTrendMonth(previousMonth)}</span>;
+    return <span className="mt-1.5 block text-[0.625rem] font-semibold text-muted-foreground">No data for {formatTrendMonth(previousMonth)}</span>;
   }
   const delta = Math.round((current - previous) * 10) / 10;
   const isPositive = delta > 0;
@@ -178,7 +179,7 @@ function MetricDelta({
   const tone = isPositive ? "text-emerald-700" : isNegative ? "text-red-700" : "text-muted-foreground";
   const value = delta > 0 ? `+${delta}` : String(delta);
   return (
-    <span className={`mt-1.5 inline-flex items-center gap-1 text-[10px] font-bold ${tone}`}>
+    <span className={`mt-1.5 inline-flex items-center gap-1 text-[0.625rem] font-bold ${tone}`}>
       <Icon className="h-3 w-3" aria-hidden="true" />
       <span>{value}{unit}</span>
       <span className="font-semibold text-muted-foreground">vs {formatTrendMonth(previousMonth)}</span>
@@ -211,7 +212,7 @@ function AcademicTrendTooltip({
     <div className="min-w-52 rounded-xl border border-foreground/10 bg-popover px-3 py-2.5 text-popover-foreground shadow-card-hover">
       <p className="text-xs font-bold">{formatTrendMonth(month.month)}</p>
       {month.hasClosure ? (
-        <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900">
+        <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[0.625rem] font-bold text-amber-900">
           <LockKeyhole className="h-3 w-3" />{month.closureTitles?.join(", ") || "School holiday"}
         </p>
       ) : null}
@@ -226,7 +227,7 @@ function AcademicTrendTooltip({
           </div>
         ))}
       </div>
-      <div className="mt-2 border-t border-foreground/8 pt-2 text-[10px] leading-4 text-muted-foreground">
+      <div className="mt-2 border-t border-foreground/8 pt-2 text-[0.625rem] leading-4 text-muted-foreground">
         <p>{month.lessonCount} lessons · {month.studentsWithData} students with data</p>
         <p>{month.homeworkRecordCount} homework · {month.attendanceRecordCount} attendance records</p>
       </div>
@@ -1168,13 +1169,13 @@ export function GroupGradebook({
           )}
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
-              <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-emerald-500 text-[9px] font-bold text-white">P</span> Present
+              <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-emerald-500 text-[0.5625rem] font-bold text-white">P</span> Present
             </span>
             <span className="flex items-center gap-1">
-              <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-red-500 text-[9px] font-bold text-white">A</span> Absent
+              <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-red-500 text-[0.5625rem] font-bold text-white">A</span> Absent
             </span>
             <span className="flex items-center gap-1">
-              <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-amber-400 text-[9px] font-bold text-white">J</span> Justified
+              <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-amber-400 text-[0.5625rem] font-bold text-white">J</span> Justified
             </span>
           </div>
         </div>
@@ -1292,33 +1293,33 @@ export function GroupGradebook({
                 className="miniapp-table-scroll min-w-0 max-w-full overflow-auto [max-height:min(70dvh,calc(var(--tg-app-height)-17rem))] [scrollbar-gutter:stable]"
               >
                 <table
-                  className="w-full table-fixed border-collapse text-left text-[11px] sm:text-xs"
-                  style={{ minWidth: Math.max(gradebookTableWidth, GRADEBOOK_STUDENT_COL_WIDTH + GRADEBOOK_AAP_COL_WIDTH) }}
+                  className="w-full table-fixed border-collapse text-left text-[0.6875rem] sm:text-xs"
+                  style={{ minWidth: densityRem(Math.max(gradebookTableWidth, GRADEBOOK_STUDENT_COL_WIDTH + GRADEBOOK_AAP_COL_WIDTH)) }}
                 >
                   <colgroup>
-                    <col style={{ width: GRADEBOOK_STUDENT_COL_WIDTH }} />
-                    <col style={{ width: GRADEBOOK_AAP_COL_WIDTH }} />
+                    <col style={{ width: densityRem(GRADEBOOK_STUDENT_COL_WIDTH) }} />
+                    <col style={{ width: densityRem(GRADEBOOK_AAP_COL_WIDTH) }} />
                     {lessons.map((lesson) => (
                       <Fragment key={`gradebook-cols-${lesson.id}`}>
-                        <col style={{ width: GRADEBOOK_ATT_COL_WIDTH }} />
-                        <col style={{ width: GRADEBOOK_HW_COL_WIDTH }} />
+                        <col style={{ width: densityRem(GRADEBOOK_ATT_COL_WIDTH) }} />
+                        <col style={{ width: densityRem(GRADEBOOK_HW_COL_WIDTH) }} />
                       </Fragment>
                     ))}
                   </colgroup>
-                  <thead className="sticky top-0 z-30 shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+                  <thead className="sticky top-0 z-30 shadow-[0_0.0625rem_0_hsl(var(--foreground)/0.08)]">
                     <tr className="bg-surface">
-                      <th className="sticky left-0 z-40 border-b border-r border-foreground/10 bg-surface px-3 py-3 font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]" style={{ width: GRADEBOOK_STUDENT_COL_WIDTH, minWidth: GRADEBOOK_STUDENT_COL_WIDTH, maxWidth: GRADEBOOK_STUDENT_COL_WIDTH }}>Student</th>
-                      <th title="Overall AAP across recorded homework" className="sticky z-40 border-b border-r border-foreground/10 bg-surface px-1 py-3 text-center font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]" style={{ left: GRADEBOOK_STUDENT_COL_WIDTH, width: GRADEBOOK_AAP_COL_WIDTH, minWidth: GRADEBOOK_AAP_COL_WIDTH, maxWidth: GRADEBOOK_AAP_COL_WIDTH }}>AAP</th>
+                      <th className="sticky left-0 z-40 border-b border-r border-foreground/10 bg-surface px-3 py-3 font-bold uppercase tracking-wide text-muted-foreground shadow-[0.0625rem_0_0_hsl(var(--foreground)/0.08)]" style={{ width: densityRem(GRADEBOOK_STUDENT_COL_WIDTH), minWidth: densityRem(GRADEBOOK_STUDENT_COL_WIDTH), maxWidth: densityRem(GRADEBOOK_STUDENT_COL_WIDTH) }}>Student</th>
+                      <th title="Overall AAP across recorded homework" className="sticky z-40 border-b border-r border-foreground/10 bg-surface px-1 py-3 text-center font-bold uppercase tracking-wide text-muted-foreground shadow-[0.0625rem_0_0_hsl(var(--foreground)/0.08)]" style={{ left: densityRem(GRADEBOOK_STUDENT_COL_WIDTH), width: densityRem(GRADEBOOK_AAP_COL_WIDTH), minWidth: densityRem(GRADEBOOK_AAP_COL_WIDTH), maxWidth: densityRem(GRADEBOOK_AAP_COL_WIDTH) }}>AAP</th>
                       {lessons.map((lesson) => (
-                        <th key={lesson.id} colSpan={2} className={`border-b border-l p-0 text-center align-top ${isCancelledLesson(lesson) ? "border-red-200 bg-red-50/55" : "border-foreground/10 bg-surface"}`} style={{ width: GRADEBOOK_LESSON_COL_WIDTH, minWidth: GRADEBOOK_LESSON_COL_WIDTH }}>
+                        <th key={lesson.id} colSpan={2} className={`border-b border-l p-0 text-center align-top ${isCancelledLesson(lesson) ? "border-red-200 bg-red-50/55" : "border-foreground/10 bg-surface"}`} style={{ width: densityRem(GRADEBOOK_LESSON_COL_WIDTH), minWidth: densityRem(GRADEBOOK_LESSON_COL_WIDTH) }}>
                           <div title={`${lesson.lessonNumber} - ${lesson.topic}`} className="flex min-h-[6.25rem] w-full flex-col items-center justify-start px-1 py-2">
-                            <span className={`inline-flex max-w-full items-center justify-center gap-1 whitespace-nowrap text-[9px] font-bold leading-tight ${isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground"}`} title="Date supplied by the timetable">
+                            <span className={`inline-flex max-w-full items-center justify-center gap-1 whitespace-nowrap text-[0.5625rem] font-bold leading-tight ${isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground"}`} title="Date supplied by the timetable">
                               <CalendarDays className="h-2.5 w-2.5 shrink-0" />
                               {formatGradebookDate(lesson.date) || "Unscheduled"}
                             </span>
-                            <span className={`mt-1 block whitespace-nowrap text-[9px] font-semibold ${isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground/75"}`}>{lesson.lessonNumber}</span>
-                            <span className={`mt-1 block w-full whitespace-normal break-words text-center text-[9px] font-medium italic leading-[1.15] ${isCancelledLesson(lesson) ? "text-red-700/80" : "text-muted-foreground/70"}`}>{lesson.topic || "—"}</span>
-                            {lessonIsRecordedInsideClosure(lesson) ? <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[7px] font-bold leading-tight text-amber-900"><LockKeyhole className="h-2.5 w-2.5" />Recorded before holiday lock</span> : null}
+                            <span className={`mt-1 block whitespace-nowrap text-[0.5625rem] font-semibold ${isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground/75"}`}>{lesson.lessonNumber}</span>
+                            <span className={`mt-1 block w-full whitespace-normal break-words text-center text-[0.5625rem] font-medium italic leading-[1.15] ${isCancelledLesson(lesson) ? "text-red-700/80" : "text-muted-foreground/70"}`}>{lesson.topic || "—"}</span>
+                            {lessonIsRecordedInsideClosure(lesson) ? <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[0.4375rem] font-bold leading-tight text-amber-900"><LockKeyhole className="h-2.5 w-2.5" />Recorded before holiday lock</span> : null}
                           </div>
                         </th>
                       ))}
@@ -1327,10 +1328,10 @@ export function GroupGradebook({
                   <tbody className="divide-y divide-foreground/5 bg-surface">
                     {enrollments.map((en, enrollmentIndex) => (
                       <tr key={en.enrollmentId} className="group transition-colors hover:bg-muted/40">
-                        <td className="sticky left-0 z-20 border-r border-foreground/8 bg-surface px-3 py-1.5 font-semibold text-sm shadow-[1px_0_0_hsl(var(--foreground)/0.08)] transition-colors group-hover:bg-muted/40" style={{ width: GRADEBOOK_STUDENT_COL_WIDTH, minWidth: GRADEBOOK_STUDENT_COL_WIDTH, maxWidth: GRADEBOOK_STUDENT_COL_WIDTH }}>
+                        <td className="sticky left-0 z-20 border-r border-foreground/8 bg-surface px-3 py-1.5 font-semibold text-sm shadow-[0.0625rem_0_0_hsl(var(--foreground)/0.08)] transition-colors group-hover:bg-muted/40" style={{ width: densityRem(GRADEBOOK_STUDENT_COL_WIDTH), minWidth: densityRem(GRADEBOOK_STUDENT_COL_WIDTH), maxWidth: densityRem(GRADEBOOK_STUDENT_COL_WIDTH) }}>
                           <button type="button" onClick={() => { setSelectedStudent(en); setMoveGroupId(""); }} className="line-clamp-2 w-full text-left font-semibold text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" title={`Manage ${en.fullName}`}>{en.fullName}</button>
                         </td>
-                        <td title="Overall AAP across recorded homework" className="sticky z-20 border-r border-foreground/8 bg-surface px-1 py-1.5 text-center font-bold text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)] transition-colors group-hover:bg-muted/40" style={{ left: GRADEBOOK_STUDENT_COL_WIDTH, width: GRADEBOOK_AAP_COL_WIDTH, minWidth: GRADEBOOK_AAP_COL_WIDTH, maxWidth: GRADEBOOK_AAP_COL_WIDTH }}>{en.averageGrade > 0 ? en.averageGrade.toFixed(0) : "–"}</td>
+                        <td title="Overall AAP across recorded homework" className="sticky z-20 border-r border-foreground/8 bg-surface px-1 py-1.5 text-center font-bold text-muted-foreground shadow-[0.0625rem_0_0_hsl(var(--foreground)/0.08)] transition-colors group-hover:bg-muted/40" style={{ left: densityRem(GRADEBOOK_STUDENT_COL_WIDTH), width: densityRem(GRADEBOOK_AAP_COL_WIDTH), minWidth: densityRem(GRADEBOOK_AAP_COL_WIDTH), maxWidth: densityRem(GRADEBOOK_AAP_COL_WIDTH) }}>{en.averageGrade > 0 ? en.averageGrade.toFixed(0) : "–"}</td>
                         {lessons.map((lesson, lessonIndex) => {
                           const att = (en.attendanceByLessonId?.[String(lesson.id)] ?? en.attendance[lesson.lessonNumber] ?? "") as AttValue;
                           const hw = en.homeworkByLessonId?.[String(lesson.id)] ?? en.homework[lesson.lessonNumber];
@@ -1340,18 +1341,18 @@ export function GroupGradebook({
                           const isActiveHw = active?.enrollmentId === en.enrollmentId && active?.lesson.id === lesson.id && active?.kind === "hw";
                           if (cancelled) {
                             return (
-                              <td key={`${en.enrollmentId}-${lesson.id}-cancelled`} colSpan={2} className="border-l border-r border-red-100 bg-red-50/40 px-1 py-1.5 text-center transition-colors group-hover:bg-red-100/60" style={{ width: GRADEBOOK_LESSON_COL_WIDTH }}>
-                                <span className="inline-flex max-w-full rounded-md bg-red-100 px-1 py-1 text-[8px] font-bold uppercase tracking-wide text-red-700 shadow-sm">Cancelled</span>
+                              <td key={`${en.enrollmentId}-${lesson.id}-cancelled`} colSpan={2} className="border-l border-r border-red-100 bg-red-50/40 px-1 py-1.5 text-center transition-colors group-hover:bg-red-100/60" style={{ width: densityRem(GRADEBOOK_LESSON_COL_WIDTH) }}>
+                                <span className="inline-flex max-w-full rounded-md bg-red-100 px-1 py-1 text-[0.5rem] font-bold uppercase tracking-wide text-red-700 shadow-sm">Cancelled</span>
                               </td>
                             );
                           }
                           return (
                             <Fragment key={`${en.enrollmentId}-${lesson.id}`}>
-                              <td className="border-l border-foreground/5 p-0.5 text-center" style={{ width: GRADEBOOK_ATT_COL_WIDTH }}>
-                                <button type="button" data-gradebook-cell={`${enrollmentIndex}:${lessonIndex * 2}`} onClick={(event) => openCell(event, en.enrollmentId, lesson, "att", hw)} onKeyDown={(event) => moveGradebookCellFocus(event, enrollmentIndex, lessonIndex * 2)} title={`${en.fullName} · ${lesson.lessonNumber} · attendance`} className={`mx-auto flex h-9 w-8 items-center justify-center rounded-lg text-[10px] font-bold shadow-sm transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 sm:h-7 sm:w-7 ${att ? attCls(att) : "text-foreground/20 shadow-none"} ${isActiveAtt ? "ring-2 ring-primary/35 ring-offset-1" : ""}`}>{att ? attLabel(att) : "·"}</button>
+                              <td className="border-l border-foreground/5 p-0.5 text-center" style={{ width: densityRem(GRADEBOOK_ATT_COL_WIDTH) }}>
+                                <button type="button" data-gradebook-cell={`${enrollmentIndex}:${lessonIndex * 2}`} onClick={(event) => openCell(event, en.enrollmentId, lesson, "att", hw)} onKeyDown={(event) => moveGradebookCellFocus(event, enrollmentIndex, lessonIndex * 2)} title={`${en.fullName} · ${lesson.lessonNumber} · attendance`} className={`mx-auto flex h-9 w-8 items-center justify-center rounded-lg text-[0.625rem] font-bold shadow-sm transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 sm:h-7 sm:w-7 ${att ? attCls(att) : "text-foreground/20 shadow-none"} ${isActiveAtt ? "ring-2 ring-primary/35 ring-offset-1" : ""}`}>{att ? attLabel(att) : "·"}</button>
                               </td>
-                              <td className="border-r border-foreground/5 p-0.5 text-center" style={{ width: GRADEBOOK_HW_COL_WIDTH }}>
-                                <button type="button" data-gradebook-cell={`${enrollmentIndex}:${lessonIndex * 2 + 1}`} disabled={!canEditHomework} onClick={(event) => openCell(event, en.enrollmentId, lesson, "hw", hw)} onKeyDown={(event) => moveGradebookCellFocus(event, enrollmentIndex, lessonIndex * 2 + 1)} title={`${en.fullName} · ${lesson.lessonNumber} · homework`} className={`mx-auto flex h-9 min-w-9 items-center justify-center rounded-lg px-1 text-[10px] transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40 sm:h-7 sm:min-w-8 ${hw !== undefined ? "bg-blue-50 font-bold text-blue-700 shadow-sm" : "text-foreground/20"} ${isActiveHw ? "ring-2 ring-primary/35 ring-offset-1" : ""}`}>{canEditHomework && hw !== undefined ? hw : "·"}</button>
+                              <td className="border-r border-foreground/5 p-0.5 text-center" style={{ width: densityRem(GRADEBOOK_HW_COL_WIDTH) }}>
+                                <button type="button" data-gradebook-cell={`${enrollmentIndex}:${lessonIndex * 2 + 1}`} disabled={!canEditHomework} onClick={(event) => openCell(event, en.enrollmentId, lesson, "hw", hw)} onKeyDown={(event) => moveGradebookCellFocus(event, enrollmentIndex, lessonIndex * 2 + 1)} title={`${en.fullName} · ${lesson.lessonNumber} · homework`} className={`mx-auto flex h-9 min-w-9 items-center justify-center rounded-lg px-1 text-[0.625rem] transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40 sm:h-7 sm:min-w-8 ${hw !== undefined ? "bg-blue-50 font-bold text-blue-700 shadow-sm" : "text-foreground/20"} ${isActiveHw ? "ring-2 ring-primary/35 ring-offset-1" : ""}`}>{canEditHomework && hw !== undefined ? hw : "·"}</button>
                               </td>
                             </Fragment>
                           );
@@ -1359,7 +1360,7 @@ export function GroupGradebook({
                       </tr>
                     ))}
                     <tr className="bg-muted/10">
-                      <td className="sticky left-0 z-20 border-r border-foreground/8 bg-surface px-2 py-1.5 shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
+                      <td className="sticky left-0 z-20 border-r border-foreground/8 bg-surface px-2 py-1.5 shadow-[0.0625rem_0_0_hsl(var(--foreground)/0.08)]">
                         <button type="button" onClick={openAddStudent} className="inline-flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-xs font-bold text-primary transition-colors hover:bg-primary/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"><Plus className="h-4 w-4" /> Add student</button>
                       </td>
                       <td colSpan={1 + lessons.length * 2} aria-hidden="true" className="bg-muted/10" />
@@ -1378,19 +1379,19 @@ export function GroupGradebook({
               </div>
               <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className={detailMetricClass}>
-                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AAP</span>
+                  <span className="block text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">Avg AAP</span>
                   <span className="mt-1 block text-lg font-bold tabular-nums text-blue-600">{displayedAcademicAAP ?? "—"}</span>
-                  {academicTrendsQuery.isPending ? <span className="mt-2 block h-2.5 w-24 rounded bg-muted motion-safe:animate-pulse" /> : academicTrendsQuery.isError ? <span className="mt-1.5 block text-[10px] font-semibold text-muted-foreground">Comparison unavailable</span> : <MetricDelta current={displayedAcademicAAP} previous={academicTrendPrevious?.avgAAP ?? null} previousMonth={previousTrendMonth} />}
+                  {academicTrendsQuery.isPending ? <span className="mt-2 block h-2.5 w-24 rounded bg-muted motion-safe:animate-pulse" /> : academicTrendsQuery.isError ? <span className="mt-1.5 block text-[0.625rem] font-semibold text-muted-foreground">Comparison unavailable</span> : <MetricDelta current={displayedAcademicAAP} previous={academicTrendPrevious?.avgAAP ?? null} previousMonth={previousTrendMonth} />}
                 </div>
                 <div className={detailMetricClass}>
-                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AR</span>
+                  <span className="block text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">Avg AR</span>
                   <span className="mt-1 block text-lg font-bold tabular-nums text-emerald-600">{displayedAcademicAR ?? "—"}{displayedAcademicAR !== null ? <span className="text-xs font-normal text-muted-foreground">%</span> : null}</span>
-                  {academicTrendsQuery.isPending ? <span className="mt-2 block h-2.5 w-24 rounded bg-muted motion-safe:animate-pulse" /> : academicTrendsQuery.isError ? <span className="mt-1.5 block text-[10px] font-semibold text-muted-foreground">Comparison unavailable</span> : <MetricDelta current={displayedAcademicAR} previous={academicTrendPrevious?.avgAR ?? null} previousMonth={previousTrendMonth} unit=" pp" />}
+                  {academicTrendsQuery.isPending ? <span className="mt-2 block h-2.5 w-24 rounded bg-muted motion-safe:animate-pulse" /> : academicTrendsQuery.isError ? <span className="mt-1.5 block text-[0.625rem] font-semibold text-muted-foreground">Comparison unavailable</span> : <MetricDelta current={displayedAcademicAR} previous={academicTrendPrevious?.avgAR ?? null} previousMonth={previousTrendMonth} unit=" pp" />}
                 </div>
                 <div className={detailMetricClass}>
-                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg Performance</span>
+                  <span className="block text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">Avg Performance</span>
                   <span className="mt-1 block text-lg font-bold tabular-nums">{displayedAcademicPerformance ?? "—"}{displayedAcademicPerformance !== null ? <span className="text-xs font-normal text-muted-foreground"> / 9</span> : null}</span>
-                  {academicTrendsQuery.isPending ? <span className="mt-2 block h-2.5 w-24 rounded bg-muted motion-safe:animate-pulse" /> : academicTrendsQuery.isError ? <span className="mt-1.5 block text-[10px] font-semibold text-muted-foreground">Comparison unavailable</span> : <MetricDelta current={displayedAcademicPerformance} previous={academicTrendPrevious?.avgPerformance ?? null} previousMonth={previousTrendMonth} />}
+                  {academicTrendsQuery.isPending ? <span className="mt-2 block h-2.5 w-24 rounded bg-muted motion-safe:animate-pulse" /> : academicTrendsQuery.isError ? <span className="mt-1.5 block text-[0.625rem] font-semibold text-muted-foreground">Comparison unavailable</span> : <MetricDelta current={displayedAcademicPerformance} previous={academicTrendPrevious?.avgPerformance ?? null} previousMonth={previousTrendMonth} />}
                 </div>
               </div>
               <div className="mb-3 flex justify-end">
@@ -1452,7 +1453,7 @@ export function GroupGradebook({
                 </div>
               ) : hasAcademicIndicatorData ? (
                 <div key={`academic-students-${selectedLessonMonth}`} className={`max-w-full overflow-x-auto pb-1 ${motion.panel}`}>
-                  <div className="h-[clamp(18rem,44dvh,30rem)]" style={{ minWidth: academicChartMinWidth }}>
+                  <div className="h-[clamp(18rem,44dvh,30rem)]" style={{ minWidth: densityRem(academicChartMinWidth) }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart key={`academic-chart-${selectedLessonMonth}`} data={academicIndicatorData} barCategoryGap="18%" barGap={3} margin={{ top: 28, right: 10, left: 4, bottom: 8 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
@@ -1502,25 +1503,25 @@ export function GroupGradebook({
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className={detailMetricClass}>
-                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Exams Taken</span>
+                  <span className="block text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">Exams Taken</span>
                   <span className="mt-1 block text-lg font-bold">{selectedExamLabels.length}</span>
                 </div>
                 <div className={detailMetricClass}>
-                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Class Average</span>
+                  <span className="block text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">Class Average</span>
                   <span className="mt-1 block text-lg font-bold">
                     {filteredClassExamAverage}
                     {hasFilteredExamScores ? <span className="text-xs font-normal text-muted-foreground"> / 9.0</span> : null}
                   </span>
                 </div>
                 <div className={detailMetricClass}>
-                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Highest Score</span>
+                  <span className="block text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">Highest Score</span>
                   <span className="mt-1 block text-lg font-bold">
                     {filteredMaxScore}
                     {hasFilteredExamScores ? <span className="text-xs font-normal text-muted-foreground"> / 9</span> : null}
                   </span>
                 </div>
                 <div className={detailMetricClass}>
-                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">No Exam Score</span>
+                  <span className="block text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">No Exam Score</span>
                   <span className="mt-1 block text-lg font-bold">{studentsWithMissingExams}</span>
                 </div>
               </div>
@@ -1597,23 +1598,23 @@ export function GroupGradebook({
                     className="miniapp-table-scroll max-h-[min(76dvh,48rem)] min-h-0 w-full rounded-lg border border-foreground/8 [scrollbar-gutter:stable]"
                   >
                     <table
-                      className="w-full table-fixed border-collapse text-left text-[11px]"
-                      style={{ minWidth: examTableMinWidth }}
+                      className="w-full table-fixed border-collapse text-left text-[0.6875rem]"
+                      style={{ minWidth: densityRem(examTableMinWidth) }}
                     >
                       <colgroup>
-                        <col style={{ width: EXAM_TABLE_STUDENT_COL_WIDTH }} />
+                        <col style={{ width: densityRem(EXAM_TABLE_STUDENT_COL_WIDTH) }} />
                         {selectedExamLabels.map((label) => (
-                          <col key={`exam-col-${label}`} style={{ width: EXAM_TABLE_SCORE_COL_WIDTH }} />
+                          <col key={`exam-col-${label}`} style={{ width: densityRem(EXAM_TABLE_SCORE_COL_WIDTH) }} />
                         ))}
                       </colgroup>
-                      <thead className="sticky top-0 z-20 bg-muted/40 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+                      <thead className="sticky top-0 z-20 bg-muted/40 text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_0.0625rem_0_hsl(var(--foreground)/0.08)]">
                         <tr>
                           <th
                             className="sticky left-0 z-30 border-r border-foreground/8 bg-muted/40 px-3 py-2"
                             style={{
-                              width: EXAM_TABLE_STUDENT_COL_WIDTH,
-                              minWidth: EXAM_TABLE_STUDENT_COL_WIDTH,
-                              maxWidth: EXAM_TABLE_STUDENT_COL_WIDTH,
+                              width: densityRem(EXAM_TABLE_STUDENT_COL_WIDTH),
+                              minWidth: densityRem(EXAM_TABLE_STUDENT_COL_WIDTH),
+                              maxWidth: densityRem(EXAM_TABLE_STUDENT_COL_WIDTH),
                             }}
                           >
                             Student
@@ -1623,8 +1624,8 @@ export function GroupGradebook({
                               key={label}
                               className="border-l border-foreground/8 px-2 py-2 text-center leading-tight"
                               style={{
-                                width: EXAM_TABLE_SCORE_COL_WIDTH,
-                                minWidth: EXAM_TABLE_SCORE_COL_WIDTH,
+                                width: densityRem(EXAM_TABLE_SCORE_COL_WIDTH),
+                                minWidth: densityRem(EXAM_TABLE_SCORE_COL_WIDTH),
                               }}
                             >
                               {label}
@@ -1636,11 +1637,11 @@ export function GroupGradebook({
                         {enrollments.map((en) => (
                           <tr key={`${en.enrollmentId}-exams`} className="transition-colors hover:bg-primary/[0.025]">
                             <td
-                              className="sticky left-0 z-10 border-r border-foreground/8 bg-surface px-3 py-1.5 text-[12px] font-semibold leading-tight"
+                              className="sticky left-0 z-10 border-r border-foreground/8 bg-surface px-3 py-1.5 text-[0.75rem] font-semibold leading-tight"
                               style={{
-                                width: EXAM_TABLE_STUDENT_COL_WIDTH,
-                                minWidth: EXAM_TABLE_STUDENT_COL_WIDTH,
-                                maxWidth: EXAM_TABLE_STUDENT_COL_WIDTH,
+                                width: densityRem(EXAM_TABLE_STUDENT_COL_WIDTH),
+                                minWidth: densityRem(EXAM_TABLE_STUDENT_COL_WIDTH),
+                                maxWidth: densityRem(EXAM_TABLE_STUDENT_COL_WIDTH),
                               }}
                             >
                               {en.fullName}
@@ -1655,7 +1656,7 @@ export function GroupGradebook({
                                 <td
                                   key={`${en.enrollmentId}-${label}`}
                                   className="border-l border-foreground/5 px-2 py-1.5 text-center"
-                                  style={{ width: EXAM_TABLE_SCORE_COL_WIDTH }}
+                                  style={{ width: densityRem(EXAM_TABLE_SCORE_COL_WIDTH) }}
                                 >
                                   {editingThisExam ? (
                                     <input
@@ -1675,7 +1676,7 @@ export function GroupGradebook({
                                           cancelExamEdit();
                                         }
                                       }}
-                                      className="h-7 w-14 rounded-lg border border-blue-200 bg-background px-2 text-center text-[11px] font-bold text-blue-700 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                      className="h-7 w-14 rounded-lg border border-blue-200 bg-background px-2 text-center text-[0.6875rem] font-bold text-blue-700 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                                       aria-label={`Edit ${en.fullName} ${label} score`}
                                     />
                                   ) : (
@@ -1683,7 +1684,7 @@ export function GroupGradebook({
                                       type="button"
                                       disabled={Boolean(examSavingKey)}
                                       onClick={() => openExamEditor(en, label)}
-                                      className={`inline-flex h-7 min-w-8 items-center justify-center rounded-lg px-2 text-[11px] font-bold transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 disabled:cursor-wait disabled:opacity-60 ${
+                                      className={`inline-flex h-7 min-w-8 items-center justify-center rounded-lg px-2 text-[0.6875rem] font-bold transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 disabled:cursor-wait disabled:opacity-60 ${
                                         score !== undefined
                                           ? "bg-blue-50 text-blue-700 shadow-sm"
                                           : "text-foreground/25 hover:bg-muted"
@@ -1730,14 +1731,14 @@ export function GroupGradebook({
             <label>
               <span className="mb-1 flex items-center justify-between gap-2 text-xs font-bold uppercase text-muted-foreground">
                 Course Launch Date
-                {hasExistingSchedule() ? <button type="button" onClick={toggleCourseLaunchDateChange} className="rounded-md px-2 py-1 text-[10px] font-bold normal-case text-primary hover:bg-primary/10">{setupForm.changeLaunchDate ? "Keep saved date" : "Change"}</button> : null}
+                {hasExistingSchedule() ? <button type="button" onClick={toggleCourseLaunchDateChange} className="rounded-md px-2 py-1 text-[0.625rem] font-bold normal-case text-primary hover:bg-primary/10">{setupForm.changeLaunchDate ? "Keep saved date" : "Change"}</button> : null}
               </span>
               <input type="date" required disabled={hasExistingSchedule() && !setupForm.changeLaunchDate} value={setupForm.startDate} onChange={(event) => updateSetupField("startDate", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground" />
-              {hasExistingSchedule() ? <span className="mt-1 block text-[11px] text-muted-foreground">Saved when the course was first launched. Changing lesson days or time does not require changing this date.</span> : null}
+              {hasExistingSchedule() ? <span className="mt-1 block text-[0.6875rem] text-muted-foreground">Saved when the course was first launched. Changing lesson days or time does not require changing this date.</span> : null}
             </label>
             <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Lesson Time</span><input type="time" required value={setupForm.startTime} onChange={(event) => updateSetupField("startTime", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" /></label>
           </div>
-          <fieldset><legend className="mb-1 text-xs font-bold uppercase text-muted-foreground">Lesson Days · {setupForm.weekdays.length} per week</legend><div className="grid grid-cols-7 gap-1">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label, day) => <button key={label} type="button" onClick={() => toggleSetupWeekday(day)} className={`h-10 rounded-lg text-[11px] font-bold ${setupForm.weekdays.includes(day) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>{label.slice(0, 2)}</button>)}</div></fieldset>
+          <fieldset><legend className="mb-1 text-xs font-bold uppercase text-muted-foreground">Lesson Days · {setupForm.weekdays.length} per week</legend><div className="grid grid-cols-7 gap-1">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label, day) => <button key={label} type="button" onClick={() => toggleSetupWeekday(day)} className={`h-10 rounded-lg text-[0.6875rem] font-bold ${setupForm.weekdays.includes(day) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>{label.slice(0, 2)}</button>)}</div></fieldset>
           <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Room</span><input value={setupForm.room} onChange={(event) => updateSetupField("room", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" placeholder="Room 2" /></label>
           {hasExistingSchedule() ? (
             <fieldset className="space-y-2 rounded-lg border border-foreground/10 bg-muted/30 p-3">
@@ -1749,14 +1750,14 @@ export function GroupGradebook({
               ].map(([value, label, description]) => (
                 <label key={value} className={`flex cursor-pointer items-start gap-2 rounded-lg border p-2.5 text-sm transition-colors ${setupForm.changeScope === value ? "border-primary/30 bg-background" : "border-transparent hover:bg-background/70"}`}>
                   <input type="radio" name="changeScope" checked={setupForm.changeScope === value} onChange={() => changeSetupScope(value)} className="mt-0.5 accent-primary" />
-                  <span><span className="block font-bold">{label}</span><span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">{description}</span></span>
+                  <span><span className="block font-bold">{label}</span><span className="mt-0.5 block text-[0.6875rem] font-normal text-muted-foreground">{description}</span></span>
                 </label>
               ))}
               {setupForm.changeScope === "from_date" ? <label className="block px-2"><span className="mb-1 block text-xs font-bold text-muted-foreground">Effective from</span><input type="date" required value={setupForm.effectiveDate} onChange={(event) => updateSetupField("effectiveDate", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" /></label> : null}
               {setupForm.changeScope === "all" || setupForm.changeScope === "from_date" ? (
                 <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950">
                   <input type="checkbox" checked={setupForm.allowRecordedChanges} onChange={(event) => updateSetupField("allowRecordedChanges", event.target.checked)} className="mt-0.5 accent-amber-700" />
-                  <span><span className="block text-xs font-bold">Allow completed lessons to move</span><span className="mt-0.5 block text-[11px] leading-4 text-amber-800">Attendance and homework stay attached to their lessons, but their displayed dates may change.</span></span>
+                  <span><span className="block text-xs font-bold">Allow completed lessons to move</span><span className="mt-0.5 block text-[0.6875rem] leading-4 text-amber-800">Attendance and homework stay attached to their lessons, but their displayed dates may change.</span></span>
                 </label>
               ) : null}
             </fieldset>
@@ -1882,18 +1883,18 @@ export function GroupGradebook({
           <div className="flex items-center justify-between border-b border-foreground/8 px-3 py-2">
             <div className="min-w-0">
               <p className="truncate text-xs font-bold">{active.lesson.lessonNumber}</p>
-              <p className="truncate text-[10px] text-muted-foreground">{active.lesson.topic}</p>
-              {active.lesson.date && <p className="text-[10px] text-muted-foreground">{formatGradebookDate(active.lesson.date)}</p>}
+              <p className="truncate text-[0.625rem] text-muted-foreground">{active.lesson.topic}</p>
+              {active.lesson.date && <p className="text-[0.625rem] text-muted-foreground">{formatGradebookDate(active.lesson.date)}</p>}
             </div>
             <button type="button" onClick={close} className="ml-2 shrink-0 rounded p-0.5 hover:bg-muted">
               <X className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
           </div>
           <div className="p-3">
-            {cellError ? <p role="alert" className="mb-2 rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-[10px] font-semibold text-red-700">{cellError}</p> : null}
+            {cellError ? <p role="alert" className="mb-2 rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-[0.625rem] font-semibold text-red-700">{cellError}</p> : null}
             {active.kind === "att" ? (
               <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Attendance</p>
+                <p className="text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">Attendance</p>
                 <div className="grid grid-cols-4 gap-1">
                   {(["present", "absent", "justified", ""] as AttValue[]).map((v) => {
                     const lbl = v ? attLabel(v) : "–";
@@ -1906,7 +1907,7 @@ export function GroupGradebook({
                         type="button"
                         disabled={saving}
                         onClick={() => saveAtt(v as AttValue)}
-                        className={`inline-flex min-h-[40px] items-center justify-center rounded py-1.5 text-xs font-bold transition-opacity disabled:opacity-50 ${cls} ${currentAtt === v ? "ring-2 ring-foreground/30 ring-offset-1" : ""}`}
+                        className={`inline-flex min-h-[2.5rem] items-center justify-center rounded py-1.5 text-xs font-bold transition-opacity disabled:opacity-50 ${cls} ${currentAtt === v ? "ring-2 ring-foreground/30 ring-offset-1" : ""}`}
                       >
                         {lbl}
                       </button>
@@ -1916,12 +1917,12 @@ export function GroupGradebook({
               </div>
             ) : (
               <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Homework Score</p>
+                <p className="text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">Homework Score</p>
                 {(() => {
                   const currentEnrollment = data?.enrollments.find((e) => e.enrollmentId === active.enrollmentId);
                   const curHw = currentEnrollment?.homeworkByLessonId?.[String(active.lesson.id)] ?? currentEnrollment?.homework[active.lesson.lessonNumber];
                   return curHw !== undefined ? (
-                    <p className="text-[10px] text-muted-foreground">Current: <span className="font-bold text-foreground">{curHw}</span></p>
+                    <p className="text-[0.625rem] text-muted-foreground">Current: <span className="font-bold text-foreground">{curHw}</span></p>
                   ) : null;
                 })()}
                 <div className="flex gap-2">

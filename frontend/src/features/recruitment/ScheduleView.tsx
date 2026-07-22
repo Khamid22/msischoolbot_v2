@@ -331,11 +331,11 @@ function AppointmentRow({
             <a
               href={`${basePath}/candidates/${item.candidate_id}?tab=evaluations&origin=schedule`}
               onClick={() => rememberRecruitmentReturn("schedule")}
-              className="mt-1 block break-words rounded-sm text-[13px] font-semibold leading-snug hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              className="mt-1 block break-words rounded-sm text-[0.8125rem] font-semibold leading-snug hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             >
               {candidateName}
             </a>
-            <p className="mt-0.5 break-words text-[11px] text-muted-foreground">
+            <p className="mt-0.5 break-words text-[0.6875rem] text-muted-foreground">
               {item.subject || "Subject not set"}
             </p>
           </div>
@@ -347,18 +347,18 @@ function AppointmentRow({
           ) : null}
         </div>
         <p className="mt-2 text-xs font-semibold">{appointmentTitle(item)}</p>
-        <p className="mt-1 break-words text-[11px] leading-4 text-muted-foreground">
+        <p className="mt-1 break-words text-[0.6875rem] leading-4 text-muted-foreground">
           {evaluatorLabel}
           {item.appointment_format ? ` · ${item.appointment_format}` : ""}
         </p>
         {item.topic ? (
-          <p className="mt-1 break-words text-[11px] leading-4 text-muted-foreground">
+          <p className="mt-1 break-words text-[0.6875rem] leading-4 text-muted-foreground">
             Topic: {item.topic}
           </p>
         ) : null}
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span
-            className={`inline-flex min-h-7 items-center gap-1 rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-wide ${appearance.badge}`}
+            className={`inline-flex min-h-7 items-center gap-1 rounded-full border px-2 py-1 text-[0.5625rem] font-bold uppercase tracking-wide ${appearance.badge}`}
           >
             <StatusIcon className="h-3 w-3" />
             {appearance.label}
@@ -387,7 +387,7 @@ function AppointmentRow({
           <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground lg:hidden" />
           <div>
             {showDate ? (
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
                 {shortDateLabel(
                   schoolDateKeyFromValue(item.starts_at) || schoolDateKey(),
                 )}
@@ -417,7 +417,7 @@ function AppointmentRow({
             {appointmentTitle(item)}
           </p>
           {item.topic ? (
-            <p className="mt-0.5 break-words text-[11px] text-muted-foreground">
+            <p className="mt-0.5 break-words text-[0.6875rem] text-muted-foreground">
               Topic: {item.topic}
             </p>
           ) : null}
@@ -425,7 +425,7 @@ function AppointmentRow({
 
         <div className="min-w-0 text-xs text-muted-foreground">
           <p className="break-words">{evaluatorLabel}</p>
-          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[0.6875rem]">
             {item.appointment_format ? (
               <span>{item.appointment_format}</span>
             ) : null}
@@ -449,7 +449,7 @@ function AppointmentRow({
 
         <div className="flex min-w-0 flex-wrap items-center gap-2 lg:justify-end">
           <span
-            className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${appearance.badge}`}
+            className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.625rem] font-bold uppercase tracking-wide ${appearance.badge}`}
           >
             <StatusIcon className="h-3.5 w-3.5" />
             {appearance.label}
@@ -799,7 +799,7 @@ export function ScheduleView({
               }`}
             >
               <span>{scheduleDayLabel(day)}</span>
-              <span className="rounded-full bg-card px-2 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+              <span className="rounded-full bg-card px-2 py-0.5 text-[0.625rem] tabular-nums text-muted-foreground">
                 {dayItems.length}
               </span>
             </div>
@@ -813,7 +813,7 @@ export function ScheduleView({
                 />
               ))}
               {!dayItems.length ? (
-                <p className="rounded-lg border border-dashed border-border px-2 py-6 text-center text-[11px] text-muted-foreground">
+                <p className="rounded-lg border border-dashed border-border px-2 py-6 text-center text-[0.6875rem] text-muted-foreground">
                   No appointments
                 </p>
               ) : null}
@@ -937,7 +937,7 @@ export function ScheduleView({
               <Filter className="h-4 w-4" />
               Filters
               {activeFilters.length ? (
-                <span className="rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground">
+                <span className="rounded-full bg-primary px-1.5 py-0.5 text-[0.5625rem] font-bold text-primary-foreground">
                   {activeFilters.length}
                 </span>
               ) : null}
@@ -946,7 +946,7 @@ export function ScheduleView({
         </div>
 
         <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
-          <span className="text-[11px] font-medium text-muted-foreground">
+          <span className="text-[0.6875rem] font-medium text-muted-foreground">
             Asia/Tashkent
           </span>
           {activeFilters.map((filter) => (
@@ -960,7 +960,7 @@ export function ScheduleView({
                 }))
               }
               aria-label={`Remove ${filter.label} filter`}
-              className="inline-flex min-h-11 items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 text-[11px] font-semibold text-foreground transition-colors duration-150 hover:border-primary/40 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 motion-reduce:transition-none"
+              className="inline-flex min-h-11 items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 text-[0.6875rem] font-semibold text-foreground transition-colors duration-150 hover:border-primary/40 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 motion-reduce:transition-none"
             >
               {filter.label}
               <X className="h-3 w-3" />
@@ -970,7 +970,7 @@ export function ScheduleView({
             <button
               type="button"
               onClick={clearFilters}
-              className="min-h-11 px-2 text-[11px] font-semibold text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              className="min-h-11 px-2 text-[0.6875rem] font-semibold text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             >
               Clear all
             </button>

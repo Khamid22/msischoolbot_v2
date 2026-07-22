@@ -108,7 +108,7 @@ export function Drawer({
         aria-label="Close panel"
         tabIndex={-1}
         onClick={onClose}
-        className="absolute inset-0 h-full w-full cursor-default bg-foreground/50 backdrop-blur-[1px] animate-in fade-in duration-200 motion-reduce:animate-none"
+        className="absolute inset-0 h-full w-full cursor-default bg-foreground/50 backdrop-blur-[0.0625rem] animate-in fade-in duration-200 motion-reduce:animate-none"
       />
       <div
         ref={panelRef}
@@ -146,7 +146,7 @@ export function Drawer({
         <div data-drawer-content className="miniapp-scroll flex-1 bg-surface px-3 py-3 sm:px-5 sm:py-4">{children}</div>
 
         {footer ? (
-          <div className="shrink-0 border-t border-foreground/8 bg-surface/95 px-3 py-3 shadow-[0_-8px_24px_hsl(var(--foreground)/0.06)] backdrop-blur sm:px-5">
+          <div className="shrink-0 border-t border-foreground/8 bg-surface/95 px-3 py-3 shadow-[0_-0.5rem_1.5rem_hsl(var(--foreground)/0.06)] backdrop-blur sm:px-5">
             {footer}
           </div>
         ) : null}

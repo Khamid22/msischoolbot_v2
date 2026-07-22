@@ -32,6 +32,7 @@ import { MobileCardList } from "@/shared/ui/MobileCardList";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { Pagination } from "@/shared/ui/Pagination";
 import { ResponsiveTable } from "@/shared/ui/ResponsiveTable";
+import { renderedDensityPixels } from "@/shared/lib/uiDensity";
 
 export type TeacherRosterKind = "teacher_academy" | "active_teacher";
 export type TeacherRosterSort = "average_score" | "lessons" | "date";
@@ -163,7 +164,7 @@ function AcademyStatus({
 }) {
   if (completed) {
     return (
-      <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-900">
+      <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-[0.6875rem] font-semibold text-emerald-900">
         Academy completed
       </span>
     );
@@ -175,7 +176,7 @@ function AcademyStatus({
       ? "bg-emerald-100 text-emerald-900"
       : "bg-sky-100 text-sky-900";
   return (
-    <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${tone}`}>
+    <span className={`inline-flex rounded-full px-2 py-1 text-[0.6875rem] font-semibold ${tone}`}>
       {statusLabel(status || "in_training")}
     </span>
   );
@@ -220,9 +221,13 @@ function useViewportPageSize(
         }
         const tableTop = tableRef.current?.getBoundingClientRect().top ?? 0;
         const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+        const rowHeight = renderedDensityPixels(DESKTOP_ROW_HEIGHT);
+        const headerHeight = renderedDensityPixels(DESKTOP_HEADER_HEIGHT);
+        const paginationHeight = renderedDensityPixels(PAGINATION_HEIGHT);
+        const viewportGutter = renderedDensityPixels(VIEWPORT_GUTTER);
         const available = Math.max(
-          DESKTOP_HEADER_HEIGHT + DESKTOP_ROW_HEIGHT,
-          viewportHeight - Math.max(0, tableTop) - VIEWPORT_GUTTER,
+          headerHeight + rowHeight,
+          viewportHeight - Math.max(0, tableTop) - viewportGutter,
         );
         const next = Math.max(
           DESKTOP_MIN_PAGE_SIZE,
@@ -231,9 +236,9 @@ function useViewportPageSize(
             Math.floor(
               (
                 available
-                - DESKTOP_HEADER_HEIGHT
-                - PAGINATION_HEIGHT
-              ) / DESKTOP_ROW_HEIGHT,
+                - headerHeight
+                - paginationHeight
+              ) / rowHeight,
             ),
           ),
         );
@@ -601,8 +606,8 @@ export function TeacherAcademyRoster({
               ariaLabel={kind === "teacher_academy" ? "Teacher Academy teachers" : "Active teachers"}
               className="overflow-x-auto overflow-y-visible"
             >
-              <table className="w-full min-w-[1040px] table-fixed border-collapse text-left">
-                <thead className="bg-muted/80 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <table className="w-full min-w-[65rem] table-fixed border-collapse text-left">
+                <thead className="bg-muted/80 text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
                   <tr className="h-9">
                     <th scope="col" className="w-[20%] px-4 font-semibold">Teacher</th>
                     <th scope="col" className="w-[15%] px-3 font-semibold">
@@ -665,7 +670,7 @@ export function TeacherAcademyRoster({
                             <button
                               type="button"
                               onClick={() => setCloseSelection({ teacher, action: "trash_bin" })}
-                              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[11px] font-semibold text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+                              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[0.6875rem] font-semibold text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
                               aria-label={`Delete ${teacher.full_name} to Trash Bin`}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -676,7 +681,7 @@ export function TeacherAcademyRoster({
                             <button
                               type="button"
                               onClick={() => setCloseSelection({ teacher, action: "rejected" })}
-                              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 text-[11px] font-semibold text-destructive hover:bg-destructive/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/35"
+                              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 text-[0.6875rem] font-semibold text-destructive hover:bg-destructive/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/35"
                               aria-label={`Reject ${teacher.full_name}`}
                             >
                               <UserX className="h-3.5 w-3.5" />

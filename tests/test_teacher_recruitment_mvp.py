@@ -1259,6 +1259,11 @@ def test_recruitment_settings_listing_includes_inactive_rows_with_usage_counts(
     monkeypatch.setattr(repository, "list_recruitment_setting_rows", list_rows)
     monkeypatch.setattr(repository, "list_sla_rule_rows", lambda *_a, **_k: [])
     monkeypatch.setattr(
+        repository,
+        "recruitment_reminder_config_row",
+        lambda *_a, **_k: {"lead_minutes": 15, "version": 1},
+    )
+    monkeypatch.setattr(
         repository, "recruitment_setting_usage_counts", lambda *_a, **_k: {1: 4}
     )
 

@@ -7,6 +7,23 @@
 
 @layer base {
   :root {
+    /*
+     * Interface density
+     * -----------------
+     * Mobile and touch devices retain the browser's normal 16px root and
+     * 44px controls. Fine-pointer desktop layouts use a 0.8 root scale so
+     * 100% browser zoom has the same information density as the former 80%
+     * view, without CSS zoom/transform side effects on overlays or scrolling.
+     */
+    --ui-density-scale: 1;
+    --ui-root-font-size: 100%;
+    --control-touch-size: 2.75rem;
+    --workspace-sidebar-width: 16rem;
+    --workspace-sidebar-collapsible-width: 14rem;
+    --workspace-sidebar-compact-width: 4.5rem;
+    --workspace-gutter-desktop: 2rem;
+    --surface-radius: 0.875rem;
+
     --font-display: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
     --font-body: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 
@@ -42,10 +59,10 @@
     --hairline: 222 47% 11% / 0.08;
     --input: 220 18% 90%;
     --ring: 230 80% 60%;
-    --radius: 14px;
-    --card-shadow: 0 1px 2px hsl(222 47% 11% / 0.04), 0 4px 16px hsl(222 47% 11% / 0.06);
-    --card-shadow-hover: 0 2px 4px hsl(222 47% 11% / 0.06), 0 12px 32px hsl(230 60% 24% / 0.12);
-    --card-shadow-neo: 0 6px 0 0 hsl(230 60% 18%), 0 8px 20px -4px hsl(230 60% 24% / 0.4);
+    --radius: var(--surface-radius);
+    --card-shadow: 0 0.0625rem 0.125rem hsl(222 47% 11% / 0.04), 0 0.25rem 1rem hsl(222 47% 11% / 0.06);
+    --card-shadow-hover: 0 0.125rem 0.25rem hsl(222 47% 11% / 0.06), 0 0.75rem 2rem hsl(230 60% 24% / 0.12);
+    --card-shadow-neo: 0 0.375rem 0 0 hsl(230 60% 18%), 0 0.5rem 1.25rem -0.25rem hsl(230 60% 24% / 0.4);
     --bg-progress-accent: linear-gradient(90deg, hsl(230 60% 24%) 0%, hsl(245 70% 50%) 50%, hsl(265 80% 60%) 100%);
     --sidebar-background: 230 50% 11%;
     --sidebar-foreground: 220 14% 78%;
@@ -103,6 +120,10 @@
     @apply bg-background text-foreground;
   }
 
+  html {
+    font-size: var(--ui-root-font-size);
+  }
+
   html,
   body {
     overflow-y: auto;
@@ -127,7 +148,28 @@
   }
 
   input, select, textarea {
-    font-size: 16px;
+    font-size: 1rem;
+  }
+
+  @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+    :root {
+      --ui-density-scale: 0.8;
+      --ui-root-font-size: 80%;
+    }
+  }
+
+  /* iOS zooms focused fields below 16px. Coarse pointers also retain the
+     normal touch target even on wide tablets. */
+  @media (max-width: 1023px), (hover: none), (pointer: coarse) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+
+    button,
+    [role="button"],
+    summary {
+      min-height: 44px;
+    }
   }
 
   /* Smooth hover/focus feedback everywhere without altering the visual design.
@@ -180,8 +222,8 @@
     @apply rounded-lg border border-foreground/10 bg-surface shadow-card;
   }
   .miniapp-touch-target {
-    min-height: 2.75rem;
-    min-width: 2.75rem;
+    min-height: var(--control-touch-size);
+    min-width: var(--control-touch-size);
   }
   .safe-x {
     padding-left: max(0.75rem, calc(var(--app-left-inset) + 0.5rem));
@@ -197,7 +239,7 @@
   @media (max-width: 640px) {
     html.tg-miniapp .shadow-card,
     html.tg-miniapp .shadow-card-hover {
-      box-shadow: 0 1px 2px hsl(222 47% 11% / 0.05), 0 6px 18px hsl(222 47% 11% / 0.06);
+      box-shadow: 0 0.0625rem 0.125rem hsl(222 47% 11% / 0.05), 0 0.375rem 1.125rem hsl(222 47% 11% / 0.06);
     }
 
     html.tg-miniapp table {
@@ -262,7 +304,7 @@
 }
 .pipeline-board-scroll::-webkit-scrollbar-thumb {
   background: hsl(var(--border));
-  border: 2px solid transparent;
+  border: 0.125rem solid transparent;
   border-radius: 9999px;
   background-clip: padding-box;
 }

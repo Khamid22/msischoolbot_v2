@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useMemo, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { Ban, ChevronLeft, ChevronRight, Clock, MapPin, Pencil, RotateCcw, X } from "lucide-react";
 import { motion } from "@/shared/lib/motion";
+import { densityRem } from "@/shared/lib/uiDensity";
 import type { Lesson } from "../gradebook/model";
 import { addDays, isoDate, startOfWeek, timeToMinutes, timetableEndHour, timetableStartHour, weekdayLabels } from "./model";
 
@@ -202,18 +203,18 @@ function GridLessonCard({
       className={`absolute flex flex-col overflow-hidden rounded-lg border px-1.5 py-1 shadow-sm ${
         cancelled ? "border-red-300 bg-red-500 text-white" : "border-primary/25 bg-primary/10 text-primary"
       }`}
-      style={{ top, height, left, width }}
+      style={{ top: densityRem(top), height: densityRem(height), left, width }}
       title={`${lesson.lessonNumber}${lesson.topic ? ` · ${lesson.topic}` : ""}`}
     >
-      <p className="truncate text-[10.5px] font-black leading-tight">{lesson.lessonNumber}</p>
+      <p className="truncate text-[0.65625rem] font-black leading-tight">{lesson.lessonNumber}</p>
       {!compact && lesson.topic ? (
-        <p className={`truncate text-[9.5px] font-medium leading-tight ${cancelled ? "text-white/85" : "text-primary/75"}`}>
+        <p className={`truncate text-[0.59375rem] font-medium leading-tight ${cancelled ? "text-white/85" : "text-primary/75"}`}>
           {lesson.topic}
         </p>
       ) : null}
       {cancelled ? (
         <div className="mt-auto flex items-center justify-between gap-1">
-          <p className="truncate text-[9px] font-bold uppercase tracking-wide">Cancelled</p>
+          <p className="truncate text-[0.5625rem] font-bold uppercase tracking-wide">Cancelled</p>
           {canEdit && lesson.canRecover ? <button type="button" onClick={onRecoverLesson} title="Recover lesson" className="rounded p-1 hover:bg-white/20"><RotateCcw className="h-3 w-3" /></button> : null}
         </div>
       ) : (
@@ -223,13 +224,13 @@ function GridLessonCard({
               type="button"
               onClick={onOpenTime}
               title={`${lesson.lessonNumber} · edit class time`}
-              className="inline-flex items-center gap-0.5 rounded px-0.5 text-[9px] font-bold hover:bg-primary/20"
+              className="inline-flex items-center gap-0.5 rounded px-0.5 text-[0.5625rem] font-bold hover:bg-primary/20"
             >
               <Clock className="h-2.5 w-2.5 shrink-0" />
               {timeLabel || "Set time"}
             </button>
           ) : timeLabel ? (
-            <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold opacity-85">
+            <span className="inline-flex items-center gap-0.5 text-[0.5625rem] font-semibold opacity-85">
               <Clock className="h-2.5 w-2.5 shrink-0" />
               {timeLabel}
             </span>
@@ -239,13 +240,13 @@ function GridLessonCard({
               type="button"
               onClick={onOpenRoom}
               title={`${lesson.lessonNumber} · edit room`}
-              className="inline-flex min-w-0 items-center gap-0.5 truncate rounded px-0.5 text-[9px] font-bold hover:bg-primary/20"
+              className="inline-flex min-w-0 items-center gap-0.5 truncate rounded px-0.5 text-[0.5625rem] font-bold hover:bg-primary/20"
             >
               <MapPin className="h-2.5 w-2.5 shrink-0" />
               <span className="min-w-0 truncate">{lesson.room || "Set room"}</span>
             </button>
           ) : lesson.room ? (
-            <span className="inline-flex min-w-0 items-center gap-0.5 truncate text-[9px] font-semibold opacity-85">
+            <span className="inline-flex min-w-0 items-center gap-0.5 truncate text-[0.5625rem] font-semibold opacity-85">
               <MapPin className="h-2.5 w-2.5 shrink-0" />
               <span className="min-w-0 truncate">{lesson.room}</span>
             </span>
@@ -286,15 +287,15 @@ function TimetableDayColumn({
   const hourCount = Math.floor((dayEndMin - dayStartMin) / 60);
 
   return (
-    <div className="relative border-l border-foreground/10" style={{ height: gridHeight }}>
+    <div className="relative border-l border-foreground/10" style={{ height: densityRem(gridHeight) }}>
       {Array.from({ length: hourCount + 1 }, (_, index) => (
-        <div key={index} className="absolute left-0 right-0 border-t border-foreground/8" style={{ top: index * HOUR_PX }} />
+        <div key={index} className="absolute left-0 right-0 border-t border-foreground/8" style={{ top: densityRem(index * HOUR_PX) }} />
       ))}
       {positioned.map(({ lesson, row, rowCount, startMin, endMin }) => {
         const top = ((startMin - dayStartMin) / 60) * HOUR_PX;
         const height = Math.max(44, ((endMin - startMin) / 60) * HOUR_PX - 2);
-        const width = rowCount > 1 ? `calc(${100 / rowCount}% - 4px)` : "calc(100% - 4px)";
-        const left = rowCount > 1 ? `calc(${(row * 100) / rowCount}% + 2px)` : "2px";
+        const width = rowCount > 1 ? `calc(${100 / rowCount}% - 0.25rem)` : "calc(100% - 0.25rem)";
+        const left = rowCount > 1 ? `calc(${(row * 100) / rowCount}% + 0.125rem)` : "0.125rem";
         return (
           <GridLessonCard
             key={lesson.id}
@@ -333,14 +334,14 @@ function UnscheduledDayCell({
     <div className="space-y-1 border-l border-foreground/10 px-1.5 py-1.5">
       {lessons.map((lesson) => (
         <div key={lesson.id} className="rounded-lg border border-dashed border-foreground/20 bg-background px-1.5 py-1">
-          <p className="truncate text-[9.5px] font-bold">{lesson.lessonNumber}</p>
+          <p className="truncate text-[0.59375rem] font-bold">{lesson.lessonNumber}</p>
           {canEdit ? (
             <div className="mt-0.5 flex flex-wrap items-center gap-1">
               <button
                 type="button"
                 onClick={(e) => onOpenTime(e, lesson)}
                 title={`${lesson.lessonNumber} · set class time`}
-                className="inline-flex items-center gap-0.5 rounded-full border border-primary/25 bg-primary/8 px-1.5 py-0.5 text-[9px] font-bold text-primary hover:bg-primary/15"
+                className="inline-flex items-center gap-0.5 rounded-full border border-primary/25 bg-primary/8 px-1.5 py-0.5 text-[0.5625rem] font-bold text-primary hover:bg-primary/15"
               >
                 <Clock className="h-2.5 w-2.5" />
                 Set time
@@ -349,14 +350,14 @@ function UnscheduledDayCell({
                 type="button"
                 onClick={(e) => onOpenRoom(e, lesson)}
                 title={`${lesson.lessonNumber} · set room`}
-                className="inline-flex min-w-0 items-center gap-0.5 truncate rounded-full border border-foreground/12 bg-background px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground hover:bg-muted"
+                className="inline-flex min-w-0 items-center gap-0.5 truncate rounded-full border border-foreground/12 bg-background px-1.5 py-0.5 text-[0.5625rem] font-bold text-muted-foreground hover:bg-muted"
               >
                 <MapPin className="h-2.5 w-2.5 shrink-0" />
                 <span className="min-w-0 truncate">{lesson.room || "Set room"}</span>
               </button>
             </div>
           ) : (
-            <span className="mt-0.5 block text-[9px] font-semibold text-muted-foreground">
+            <span className="mt-0.5 block text-[0.5625rem] font-semibold text-muted-foreground">
               No time set{lesson.room ? ` · ${lesson.room}` : ""}
             </span>
           )}
@@ -393,7 +394,9 @@ function TimetableTimeGrid({
   const dayCount = days.length;
   const todayIso = isoDate(new Date());
   const gridTemplateColumns =
-    dayCount === 1 ? `${TIME_COL_PX}px 1fr` : `${TIME_COL_PX}px repeat(${dayCount}, minmax(${DAY_COL_MIN_PX}px, 1fr))`;
+    dayCount === 1
+      ? `${densityRem(TIME_COL_PX)} 1fr`
+      : `${densityRem(TIME_COL_PX)} repeat(${dayCount}, minmax(${densityRem(DAY_COL_MIN_PX)}, 1fr))`;
 
   const dayEntries = days.map((day) => {
     const iso = isoDate(day);
@@ -407,17 +410,17 @@ function TimetableTimeGrid({
 
   return (
     <div className="miniapp-table-scroll min-h-0 flex-1 [scrollbar-gutter:stable]">
-      <div style={{ minWidth: dayCount === 1 ? undefined : TIME_COL_PX + dayCount * DAY_COL_MIN_PX }}>
+      <div style={{ minWidth: dayCount === 1 ? undefined : densityRem(TIME_COL_PX + dayCount * DAY_COL_MIN_PX) }}>
         <div
           className="sticky top-0 z-20 grid border-b border-foreground/10 bg-surface/95 backdrop-blur"
           style={{ gridTemplateColumns }}
         >
-          <div className="px-2 py-2 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Time</div>
+          <div className="px-2 py-2 text-[0.5625rem] font-bold uppercase tracking-wider text-muted-foreground">Time</div>
           {dayEntries.map(({ day, iso }) => {
             const isToday = iso === todayIso;
             return (
               <div key={iso} className={`border-l border-foreground/10 px-2 py-2 text-center ${isToday ? "bg-primary/5" : ""}`}>
-                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                <p className="text-[0.5625rem] font-bold uppercase tracking-wider text-muted-foreground">
                   {weekdayLabels[(day.getDay() + 6) % 7]}
                 </p>
                 <p className={`text-sm font-black leading-tight ${isToday ? "text-primary" : ""}`}>
@@ -429,20 +432,20 @@ function TimetableTimeGrid({
         </div>
         {hasAnyUnscheduled ? (
           <div className="grid border-b border-foreground/10 bg-muted/20" style={{ gridTemplateColumns }}>
-            <div className="px-2 py-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Unscheduled</div>
+            <div className="px-2 py-1.5 text-[0.5625rem] font-bold uppercase tracking-wider text-muted-foreground">Unscheduled</div>
             {dayEntries.map(({ iso, untimed }) => (
               <UnscheduledDayCell key={iso} lessons={untimed} canEdit={canEdit} onOpenTime={onOpenTime} onOpenRoom={onOpenRoom} />
             ))}
           </div>
         ) : null}
         <div className="grid" style={{ gridTemplateColumns }}>
-          <div className="relative border-r border-foreground/10 bg-muted/10" style={{ height: ((dayEndMin - dayStartMin) / 60) * HOUR_PX }}>
+          <div className="relative border-r border-foreground/10 bg-muted/10" style={{ height: densityRem(((dayEndMin - dayStartMin) / 60) * HOUR_PX) }}>
             {hours.map((hour) => (
               <div
                 key={hour}
-                className="absolute left-0 right-0 border-t border-foreground/8 px-1.5 pt-1 text-right text-[9px] font-semibold text-muted-foreground"
+                className="absolute left-0 right-0 border-t border-foreground/8 px-1.5 pt-1 text-right text-[0.5625rem] font-semibold text-muted-foreground"
                 style={{
-                  top: (hour - timetableStartHour) * HOUR_PX,
+                  top: densityRem((hour - timetableStartHour) * HOUR_PX),
                   transform: hour === timetableEndHour ? "translateY(-100%)" : undefined,
                 }}
               >
@@ -499,7 +502,7 @@ function TimetableMonthView({
     <div className="miniapp-table-scroll min-h-0 flex-1 p-3 [scrollbar-gutter:stable]">
       <div className="grid grid-cols-7 gap-1.5">
         {weekdayLabels.map((label) => (
-          <div key={label} className="px-1 pb-1 text-center text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+          <div key={label} className="px-1 pb-1 text-center text-[0.5625rem] font-bold uppercase tracking-wider text-muted-foreground">
             {label}
           </div>
         ))}
@@ -518,7 +521,7 @@ function TimetableMonthView({
               <button
                 type="button"
                 onClick={() => onSelectDay(day)}
-                className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[0.625rem] font-bold ${
                   isToday ? "bg-primary text-primary-foreground" : inMonth ? "text-foreground hover:bg-muted" : "text-muted-foreground/50"
                 }`}
               >
@@ -535,7 +538,7 @@ function TimetableMonthView({
                       disabled={!canEdit || cancelled}
                       onClick={(e) => onOpenTime(e, lesson)}
                       title={`${lesson.lessonNumber}${hasTime ? ` · ${lesson.startTime}–${lesson.endTime}` : ""}`}
-                      className={`block w-full truncate rounded px-1 py-0.5 text-left text-[9px] font-bold ${
+                      className={`block w-full truncate rounded px-1 py-0.5 text-left text-[0.5625rem] font-bold ${
                         cancelled ? "bg-red-100 text-red-700" : hasTime ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
                       }`}
                     >
@@ -548,7 +551,7 @@ function TimetableMonthView({
                   <button
                     type="button"
                     onClick={() => onSelectDay(day)}
-                    className="block w-full truncate rounded px-1 py-0.5 text-left text-[9px] font-bold text-muted-foreground hover:text-foreground"
+                    className="block w-full truncate rounded px-1 py-0.5 text-left text-[0.5625rem] font-bold text-muted-foreground hover:text-foreground"
                   >
                     +{overflow} more
                   </button>
@@ -628,7 +631,7 @@ export function TimetableCard({
     >
       <TimetableToolbar view={view} onViewChange={setView} cursor={cursor} onCursorChange={setCursor} />
       {undatedCount > 0 ? (
-        <p className="shrink-0 border-b border-foreground/8 bg-amber-50 px-4 py-1.5 text-[11px] font-semibold text-amber-800">
+        <p className="shrink-0 border-b border-foreground/8 bg-amber-50 px-4 py-1.5 text-[0.6875rem] font-semibold text-amber-800">
           {undatedCount} lesson{undatedCount > 1 ? "s" : ""} not yet placed — configure them from Timetable setup.
         </p>
       ) : null}
@@ -707,7 +710,7 @@ function PopoverShell({
 function popoverContainerClass(isMobile: boolean) {
   return isMobile
     ? "fixed inset-x-0 bottom-0 z-[9999] w-full rounded-t-2xl border-t border-foreground/10 bg-surface shadow-xl animate-in slide-in-from-bottom duration-200 motion-reduce:animate-none"
-    : "fixed z-[9999] w-[300px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-foreground/10 bg-surface shadow-xl animate-in fade-in zoom-in-95 duration-150 motion-reduce:animate-none";
+    : "fixed z-[9999] w-[18.75rem] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-foreground/10 bg-surface shadow-xl animate-in fade-in zoom-in-95 duration-150 motion-reduce:animate-none";
 }
 
 function PopoverActions({
@@ -776,7 +779,7 @@ export const TimePopover = forwardRef<
       >
         <PopoverShell lesson={lesson} dateLabel={dateLabel} saving={saving} onClose={onClose}>
           <div className={`space-y-3 p-4 ${isMobile ? "pb-[max(1rem,env(safe-area-inset-bottom))]" : ""}`}>
-            <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Class Time</p>
+            <p className="text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">Class Time</p>
             <div className="flex items-center gap-2">
               <input
                 type="time"
@@ -830,7 +833,7 @@ export const RoomPopover = forwardRef<
       >
         <PopoverShell lesson={lesson} dateLabel={dateLabel} saving={saving} onClose={onClose}>
           <div className={`space-y-3 p-4 ${isMobile ? "pb-[max(1rem,env(safe-area-inset-bottom))]" : ""}`}>
-            <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Room</p>
+            <p className="text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">Room</p>
             <input
               autoFocus
               type="text"

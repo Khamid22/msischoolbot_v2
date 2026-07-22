@@ -17,8 +17,13 @@ def _appointment_columns() -> str:
         appointment.cancelled_at::text AS cancelled_at,
         appointment.no_show_at::text AS no_show_at,
         appointment.started_at::text AS started_at,
+        appointment.pre_start_starts_at::text AS pre_start_starts_at,
+        appointment.pre_start_ends_at::text AS pre_start_ends_at,
         appointment.started_by_account_id,
         COALESCE(started_by.full_name, started_by.login, '') AS started_by_name,
+        appointment.created_by_account_id,
+        COALESCE(created_by.full_name, created_by.login, '') AS created_by_name,
+        created_by.role AS created_by_role,
         appointment.created_at::text AS created_at,
         appointment.updated_at::text AS updated_at,
         candidate.full_name AS candidate_name,
@@ -133,6 +138,7 @@ def list_appointment_rows(
         LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
         LEFT JOIN msi_v2.accounts responsible ON responsible.id = appointment.responsible_account_id
         LEFT JOIN msi_v2.accounts started_by ON started_by.id = appointment.started_by_account_id
+        LEFT JOIN msi_v2.accounts created_by ON created_by.id = appointment.created_by_account_id
         LEFT JOIN msi_v2.teacher_candidate_interviews interview_evaluation
           ON interview_evaluation.appointment_id = appointment.id
          AND interview_evaluation.voided_at IS NULL
@@ -175,6 +181,7 @@ def get_appointment_row(
         LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
         LEFT JOIN msi_v2.accounts responsible ON responsible.id = appointment.responsible_account_id
         LEFT JOIN msi_v2.accounts started_by ON started_by.id = appointment.started_by_account_id
+        LEFT JOIN msi_v2.accounts created_by ON created_by.id = appointment.created_by_account_id
         LEFT JOIN msi_v2.teacher_candidate_interviews interview_evaluation
           ON interview_evaluation.appointment_id = appointment.id
          AND interview_evaluation.voided_at IS NULL
@@ -437,7 +444,9 @@ def start_appointment_session(
     return conn.execute(
         """
         UPDATE msi_v2.teacher_candidate_appointments
-        SET status = 'in_progress', starts_at = %s::timestamptz,
+        SET status = 'in_progress',
+            pre_start_starts_at = starts_at, pre_start_ends_at = ends_at,
+            starts_at = %s::timestamptz,
             ends_at = NULL, started_at = %s::timestamptz,
             started_by_account_id = %s, updated_by_account_id = %s,
             updated_at = %s::timestamptz, version = version + 1
@@ -449,6 +458,47 @@ def start_appointment_session(
             now,
             now,
             actor_account_id,
+            actor_account_id,
+            now,
+            int(appointment_id),
+            int(candidate_id),
+            int(expected_version),
+        ),
+    ).fetchone()
+
+
+def undo_appointment_start(
+    conn: Any,
+    *,
+    appointment_id: int,
+    candidate_id: int,
+    expected_version: int,
+    actor_account_id: int | None,
+    now: str,
+) -> Any:
+    """Return an accidentally started session to its saved schedule."""
+
+    return conn.execute(
+        """
+        UPDATE msi_v2.teacher_candidate_appointments
+        SET status = 'scheduled',
+            starts_at = pre_start_starts_at,
+            ends_at = pre_start_ends_at,
+            started_at = NULL,
+            started_by_account_id = NULL,
+            pre_start_starts_at = NULL,
+            pre_start_ends_at = NULL,
+            updated_by_account_id = %s,
+            updated_at = %s::timestamptz,
+            version = version + 1
+        WHERE id = %s AND candidate_id = %s
+          AND status = 'in_progress'
+          AND pre_start_starts_at IS NOT NULL
+          AND version = %s
+        RETURNING id, version, status, starts_at::text AS starts_at,
+                  ends_at::text AS ends_at
+        """,
+        (
             actor_account_id,
             now,
             int(appointment_id),
@@ -519,5 +569,6 @@ __all__ = [
     "list_appointment_rows",
     "set_appointment_status",
     "start_appointment_session",
+    "undo_appointment_start",
     "update_appointment",
 ]

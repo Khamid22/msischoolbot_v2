@@ -860,6 +860,7 @@ def list_settings(user: CurrentUser) -> dict[str, Any]:
     with connect_auth_db() as conn:
         rows = repository.list_recruitment_setting_rows(conn, include_inactive=True)
         sla_rows = repository.list_sla_rule_rows(conn)
+        reminder_config = repository.recruitment_reminder_config_row(conn)
         usage_counts = repository.recruitment_setting_usage_counts(conn)
     items = [_row_dict(row) for row in rows]
     for item in items:
@@ -875,6 +876,11 @@ def list_settings(user: CurrentUser) -> dict[str, Any]:
         "subsources": grouped["subsource"],
         "rejection_reasons": grouped["rejection_reason"],
         "sla_rules": [_row_dict(row) for row in sla_rows],
+        "appointment_reminders": (
+            _row_dict(reminder_config)
+            if reminder_config
+            else {"lead_minutes": 15, "version": 1}
+        ),
         "read_only": user.role == "ceo",
     }
 
@@ -910,6 +916,53 @@ def update_sla_rule(
             setting_id=0,
             event_type="recruitment.sla_rule_updated",
             detail={"stage": normalized_stage, "target_days": int(target_days)},
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        conn.commit()
+    return _row_dict(saved)
+
+
+def update_appointment_reminder_config(
+    user: CurrentUser,
+    *,
+    lead_minutes: int,
+    expected_version: int,
+) -> dict[str, Any]:
+    if user.role != "hr_manager":
+        raise RecruitmentError(
+            "Only HR Manager can change appointment reminder timing.",
+            status_code=403,
+        )
+    if int(lead_minutes) < 5 or int(lead_minutes) > 120:
+        raise RecruitmentError(
+            "Reminder time must be between 5 and 120 minutes."
+        )
+    now = _now()
+    with connect_auth_db() as conn:
+        saved = repository.update_recruitment_reminder_config(
+            conn,
+            lead_minutes=int(lead_minutes),
+            expected_version=int(expected_version),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        if not saved:
+            raise RecruitmentError(
+                "Reminder settings changed elsewhere. Refresh and try again.",
+                status_code=409,
+            )
+        repository.recalculate_future_appointment_reminders(
+            conn,
+            lead_minutes=int(lead_minutes),
+            config_version=int(saved["version"]),
+        )
+        repository.insert_recruitment_setting_audit(
+            conn,
+            setting_id=0,
+            event_type="recruitment.appointment_reminder_updated",
+            detail={"lead_minutes": int(lead_minutes)},
             actor_account_id=_actor_account(user),
             actor_staff_id=_actor_staff(user),
             now=now,
@@ -1208,6 +1261,22 @@ def start_appointment_session(
     expected_version: int,
 ) -> dict[str, Any]:
     return appointment_service.start_appointment_session(
+        user,
+        candidate_id,
+        appointment_id,
+        expected_version=expected_version,
+        dependencies=_appointment_dependencies(),
+    )
+
+
+def undo_appointment_start(
+    user: CurrentUser,
+    candidate_id: int,
+    appointment_id: int,
+    *,
+    expected_version: int,
+) -> dict[str, Any]:
+    return appointment_service.undo_appointment_start(
         user,
         candidate_id,
         appointment_id,

@@ -1,4 +1,4 @@
-import { Check, Clock3, Link2, Loader2, LockKeyhole, Pencil, Plus, RotateCcw, Search, Tags, Trash2, X } from "lucide-react";
+import { BellRing, Check, Clock3, Link2, Loader2, LockKeyhole, Pencil, Plus, RotateCcw, Search, Tags, Trash2, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent, type ReactNode } from "react";
 
@@ -10,6 +10,51 @@ import type { FloatingToastTone } from "@/shared/ui/FloatingToast";
 
 type SettingCategory = RecruitmentSetting["category"];
 type MutationPayload = { message: string; setting: RecruitmentSetting };
+
+function AppointmentReminderSettings({
+  leadMinutes,
+  version,
+  readOnly,
+  busy,
+  onSave,
+}: {
+  leadMinutes: number;
+  version: number;
+  readOnly: boolean;
+  busy: boolean;
+  onSave: (leadMinutes: number, version: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(leadMinutes));
+  return (
+    <section className="mb-3 rounded-xl border border-border bg-card p-3 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-2">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><BellRing className="h-4 w-4" /></span>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold">Appointment reminder timing</h2>
+            <p className="mt-0.5 text-xs leading-5 text-muted-foreground">One browser alert before each scheduled interview or demo. Future reminders are recalculated when this changes.</p>
+          </div>
+        </div>
+        <form className="flex w-full items-end gap-2 sm:w-auto" onSubmit={(event) => {
+          event.preventDefault();
+          const value = Number(draft);
+          if (!Number.isInteger(value) || value < 5 || value > 120 || value === leadMinutes) return;
+          onSave(value, version);
+        }}>
+          <label className="min-w-0 flex-1 text-xs font-semibold sm:w-36 sm:flex-none">Remind before
+            <span className="mt-1 flex items-center gap-2">
+              <input type="number" min={5} max={120} value={draft} disabled={readOnly || busy} onChange={(event) => setDraft(event.target.value)} className={`${fieldClass} min-w-0`} aria-describedby="reminder-minutes-help" />
+              <span className="text-xs font-medium text-muted-foreground">min</span>
+            </span>
+          </label>
+          {!readOnly ? <button type="submit" className={buttonClass} disabled={busy || Number(draft) === leadMinutes || Number(draft) < 5 || Number(draft) > 120}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Save</button> : null}
+        </form>
+      </div>
+      <p id="reminder-minutes-help" className="mt-2 text-[0.6875rem] text-muted-foreground">Allowed range: 5–120 minutes. Short-notice appointments created inside this window do not send a reminder.</p>
+      {readOnly ? <p className="mt-1 text-xs text-muted-foreground">Read-only CEO view.</p> : null}
+    </section>
+  );
+}
 
 function groupByParent(items: RecruitmentSetting[], parentOrderIds: number[], parentLabelById: Record<number, string>) {
   const buckets = new Map<number, RecruitmentSetting[]>();
@@ -99,9 +144,9 @@ function SettingsPanel({
         </form>
       ) : (
         <>
-          <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
+          <span className="min-w-0 truncate text-[0.8125rem] font-medium text-foreground">
             {item.label}
-            {item.is_system ? <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"><LockKeyhole className="h-3 w-3" />System</span> : null}
+            {item.is_system ? <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[0.625rem] text-muted-foreground"><LockKeyhole className="h-3 w-3" />System</span> : null}
             {item.usage_count ? <span className="ml-2 font-normal text-muted-foreground">· {item.usage_count} candidate{item.usage_count === 1 ? "" : "s"}</span> : null}
           </span>
           {!readOnly && !item.is_system ? (
@@ -153,7 +198,7 @@ function SettingsPanel({
         <div className="mt-3 overflow-hidden rounded-lg border border-border">
           {grouped.map((group, index) => (
             <div key={group.key} className={index > 0 ? "border-t border-border" : undefined}>
-              <div className="bg-muted/40 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</div>
+              <div className="bg-muted/40 px-3 py-1 text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</div>
               <div className="divide-y divide-border border-t border-border">{group.items.map(renderRow)}</div>
             </div>
           ))}
@@ -171,7 +216,7 @@ function SettingsPanel({
             <div className="mt-2 divide-y divide-dashed divide-border overflow-hidden rounded-lg border border-dashed border-border">
               {inactiveItems.map((item) => (
                 <div key={item.id} className="flex min-h-12 items-center justify-between gap-2 px-3 py-1.5">
-                  <span className="min-w-0 truncate text-[13px] text-muted-foreground line-through">{item.label}</span>
+                  <span className="min-w-0 truncate text-[0.8125rem] text-muted-foreground line-through">{item.label}</span>
                   <button type="button" onClick={() => onRestore(item)} disabled={busy} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-primary hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50">
                     <RotateCcw className="h-3.5 w-3.5" />Restore
                   </button>
@@ -215,6 +260,18 @@ export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: str
     },
     onError: (error) => onAnnouncement(queryError(error), "error"),
   });
+  const reminderMutation = useMutation({
+    mutationFn: ({ leadMinutes, expectedVersion }: { leadMinutes: number; expectedVersion: number }) =>
+      recruitmentRequest<{ message: string; appointment_reminders: unknown }>(`${RECRUITMENT_API}/settings/appointment-reminders`, {
+        method: "PATCH",
+        body: jsonBody({ lead_minutes: leadMinutes, expected_version: expectedVersion }),
+      }),
+    onSuccess: (result) => {
+      onAnnouncement(result.message || "Appointment reminder timing updated.");
+      void queryClient.invalidateQueries({ queryKey: ["recruitment", "settings"] });
+    },
+    onError: (error) => onAnnouncement(queryError(error), "error"),
+  });
 
   if (settings.isLoading) return <PageState>Loading recruitment settings…</PageState>;
   if (settings.error || !settings.data) return <PageState tone="error">{queryError(settings.error)}</PageState>;
@@ -253,11 +310,19 @@ export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: str
 
   return (
     <>
+      <AppointmentReminderSettings
+        key={`${settings.data.appointment_reminders.version}:${settings.data.appointment_reminders.lead_minutes}`}
+        leadMinutes={settings.data.appointment_reminders.lead_minutes}
+        version={settings.data.appointment_reminders.version}
+        readOnly={settings.data.read_only}
+        busy={reminderMutation.isPending}
+        onSave={(leadMinutes, expectedVersion) => reminderMutation.mutate({ leadMinutes, expectedVersion })}
+      />
       <section className="mb-3 rounded-xl border border-border bg-card p-3 shadow-sm">
         <div className="flex items-start gap-2"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Clock3 className="h-4 w-4" /></span><div><h2 className="text-sm font-semibold">Stage SLA targets</h2><p className="mt-0.5 text-xs text-muted-foreground">Calendar days in Asia/Tashkent. Changes apply only to future stage entries.</p></div></div>
         <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
           {settings.data.sla_rules.map((rule) => (
-            <label key={rule.stage} className="rounded-lg border border-border p-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <label key={rule.stage} className="rounded-lg border border-border p-2 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
               {rule.stage_label || humanize(rule.stage)}
               <div className="mt-1 flex items-center gap-2">
                 <input

@@ -100,6 +100,7 @@
 /api/v1/recruitment/candidates/{candidate_id}/appointments/{appointment_id}/no-show | POST
 /api/v1/recruitment/candidates/{candidate_id}/appointments/{appointment_id}/start | POST
 /api/v1/recruitment/candidates/{candidate_id}/appointments/{appointment_id}/start-interview | POST
+/api/v1/recruitment/candidates/{candidate_id}/appointments/{appointment_id}/undo-start | POST
 /api/v1/recruitment/candidates/{candidate_id}/approval-requests | POST
 /api/v1/recruitment/candidates/{candidate_id}/approval-requests/{approval_id}/review | POST
 /api/v1/recruitment/candidates/{candidate_id}/assignments | PUT
@@ -122,6 +123,10 @@
 /api/v1/recruitment/candidates/{candidate_id}/tasks/{task_id} | PUT
 /api/v1/recruitment/decision-queue | GET
 /api/v1/recruitment/notifications | GET
+/api/v1/recruitment/notifications/browser-alerts | GET
+/api/v1/recruitment/notifications/browser-preference | GET
+/api/v1/recruitment/notifications/browser-preference | PATCH
+/api/v1/recruitment/notifications/browser-test | POST
 /api/v1/recruitment/notifications/unread-count | GET
 /api/v1/recruitment/notifications/{notification_id}/read | POST
 /api/v1/recruitment/options | GET
@@ -132,6 +137,7 @@
 /api/v1/recruitment/pipeline-stages/{stage_key}/archive | POST
 /api/v1/recruitment/settings | GET
 /api/v1/recruitment/settings | POST
+/api/v1/recruitment/settings/appointment-reminders | PATCH
 /api/v1/recruitment/settings/sla-rules/{stage} | PATCH
 /api/v1/recruitment/settings/{setting_id} | DELETE
 /api/v1/recruitment/settings/{setting_id} | PATCH

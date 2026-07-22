@@ -21,6 +21,7 @@ import { queryClient } from "@/shared/api/queryClient";
 import { motion } from "@/shared/lib/motion";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
+import { densityRem } from "@/shared/lib/uiDensity";
 import { calculateAdaptiveHourRange } from "./timetableMath";
 import { CalendarClosuresModal, type CalendarClosure } from "./CalendarClosuresModal";
 
@@ -245,12 +246,12 @@ function scheduleSummary(schedule?: ScheduleRow | null) {
 
 function StatusBadge({ item }: { item: TimetableItem }) {
   if (item.isCancellation) {
-    return <span className="rounded-full bg-red-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-red-700">Cancelled</span>;
+    return <span className="rounded-full bg-red-100 px-2 py-1 text-[0.625rem] font-bold uppercase tracking-wide text-red-700">Cancelled</span>;
   }
   if (item.hasAcademicRecords) {
-    return <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3 w-3" />Recorded</span>;
+    return <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[0.625rem] font-bold text-emerald-700"><CheckCircle2 className="h-3 w-3" />Recorded</span>;
   }
-  return <span className="rounded-full bg-primary/8 px-2 py-1 text-[10px] font-bold text-primary">Scheduled</span>;
+  return <span className="rounded-full bg-primary/8 px-2 py-1 text-[0.625rem] font-bold text-primary">Scheduled</span>;
 }
 
 function AgendaView({ items, onOpen }: { items: TimetableItem[]; onOpen: (item: TimetableItem) => void }) {
@@ -305,10 +306,10 @@ function AgendaView({ items, onOpen }: { items: TimetableItem[]; onOpen: (item: 
                     <span className="min-w-0">
                       <span className="flex flex-wrap items-center gap-2">
                         <span className="truncate text-sm font-bold">{item.lessonNumber}</span>
-                        {upcoming ? <span className="text-[10px] font-bold uppercase tracking-wide text-primary">Next</span> : null}
+                        {upcoming ? <span className="text-[0.625rem] font-bold uppercase tracking-wide text-primary">Next</span> : null}
                       </span>
                       <span className="mt-0.5 block truncate text-xs text-muted-foreground">{item.topic || "No topic"}</span>
-                      <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-muted-foreground">
+                      <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.6875rem] font-semibold text-muted-foreground">
                         {item.endTime ? <span className="inline-flex items-center gap-1"><Clock3 className="h-3 w-3" />{item.startTime}–{item.endTime}</span> : null}
                         <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{item.room || "Room not set"}</span>
                         {item.cancellationReason ? <span className="text-red-700">{item.cancellationReason}</span> : null}
@@ -365,7 +366,7 @@ function WeekCalendar({
             const selected = key === cursorKey;
             return (
               <button key={key} type="button" onClick={() => onCursorChange(key)} className={`min-h-11 rounded-lg text-center ${selected ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>
-                <span className="block text-[9px] font-bold uppercase">{WEEKDAYS[(day.getDay() + 6) % 7]}</span>
+                <span className="block text-[0.5625rem] font-bold uppercase">{WEEKDAYS[(day.getDay() + 6) % 7]}</span>
                 <span className="block text-xs font-black">{day.getDate()}</span>
               </button>
             );
@@ -379,13 +380,13 @@ function WeekCalendar({
             {visibleDays.map((day) => {
               const key = dateKey(day);
               const closure = closureForDate(closures, key);
-              return <div key={key} className={`border-l border-foreground/8 px-2 py-2 text-center ${closure ? "bg-amber-50 text-amber-900" : key === today ? "bg-primary/5 text-primary" : ""}`}><span className="block text-[9px] font-bold uppercase text-muted-foreground">{WEEKDAYS[(day.getDay() + 6) % 7]}</span><span className="text-sm font-black">{day.getDate()} {day.toLocaleDateString("en-US", { month: "short" })}</span>{closure ? <span className="mt-0.5 block truncate text-[8px] font-bold uppercase">Holiday</span> : null}</div>;
+              return <div key={key} className={`border-l border-foreground/8 px-2 py-2 text-center ${closure ? "bg-amber-50 text-amber-900" : key === today ? "bg-primary/5 text-primary" : ""}`}><span className="block text-[0.5625rem] font-bold uppercase text-muted-foreground">{WEEKDAYS[(day.getDay() + 6) % 7]}</span><span className="text-sm font-black">{day.getDate()} {day.toLocaleDateString("en-US", { month: "short" })}</span>{closure ? <span className="mt-0.5 block truncate text-[0.5rem] font-bold uppercase">Holiday</span> : null}</div>;
             })}
           </div>
           <div className="grid" style={{ gridTemplateColumns: `3.5rem repeat(${visibleDays.length}, minmax(0,1fr))` }}>
-            <div className="relative bg-muted/15" style={{ height: totalHeight }}>
+            <div className="relative bg-muted/15" style={{ height: densityRem(totalHeight) }}>
               {Array.from({ length: hours.endHour - hours.startHour + 1 }, (_, index) => (
-                <span key={index} className="absolute right-2 text-[9px] font-semibold text-muted-foreground" style={{ top: index * HOUR_HEIGHT - 6 }}>{String(hours.startHour + index).padStart(2, "0")}:00</span>
+                <span key={index} className="absolute right-2 text-[0.5625rem] font-semibold text-muted-foreground" style={{ top: densityRem(index * HOUR_HEIGHT - 6) }}>{String(hours.startHour + index).padStart(2, "0")}:00</span>
               ))}
             </div>
             {visibleDays.map((day) => {
@@ -393,8 +394,8 @@ function WeekCalendar({
               const dayItems = items.filter((item) => item.isoDate === key && item.startTime && item.endTime);
               const closure = closureForDate(closures, key);
               return (
-                <div key={key} className={`relative border-l border-foreground/8 ${closure ? "bg-amber-50/55" : ""}`} style={{ height: totalHeight }}>
-                  {Array.from({ length: hours.endHour - hours.startHour + 1 }, (_, index) => <span key={index} className="absolute inset-x-0 border-t border-foreground/8" style={{ top: index * HOUR_HEIGHT }} />)}
+                <div key={key} className={`relative border-l border-foreground/8 ${closure ? "bg-amber-50/55" : ""}`} style={{ height: densityRem(totalHeight) }}>
+                  {Array.from({ length: hours.endHour - hours.startHour + 1 }, (_, index) => <span key={index} className="absolute inset-x-0 border-t border-foreground/8" style={{ top: densityRem(index * HOUR_HEIGHT) }} />)}
                   {dayItems.map((item) => {
                     const top = ((timeMinutes(item.startTime) - hours.startHour * 60) / 60) * HOUR_HEIGHT;
                     const height = Math.max(44, ((timeMinutes(item.endTime) - timeMinutes(item.startTime)) / 60) * HOUR_HEIGHT - 3);
@@ -405,11 +406,11 @@ function WeekCalendar({
                         type="button"
                         onClick={() => onOpen(item)}
                         className={`absolute inset-x-1 z-10 overflow-hidden rounded-lg border px-2 py-1 text-left shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${item.isCancellation ? "border-red-300 bg-red-100 text-red-800" : "border-primary/25 bg-primary/10 text-primary"}`}
-                        style={{ top: Math.max(1, top), height }}
+                        style={{ top: densityRem(Math.max(1, top)), height: densityRem(height) }}
                       >
-                        <span className="block truncate text-[10px] font-black">{item.lessonNumber}</span>
-                        <span className="block truncate text-[9px] font-semibold opacity-80">{item.topic || (item.isCancellation ? item.cancellationReason : "Scheduled lesson")}</span>
-                        <span className="absolute bottom-1 left-2 text-[9px] font-bold">{item.startTime}–{item.endTime}</span>
+                        <span className="block truncate text-[0.625rem] font-black">{item.lessonNumber}</span>
+                        <span className="block truncate text-[0.5625rem] font-semibold opacity-80">{item.topic || (item.isCancellation ? item.cancellationReason : "Scheduled lesson")}</span>
+                        <span className="absolute bottom-1 left-2 text-[0.5625rem] font-bold">{item.startTime}–{item.endTime}</span>
                       </button>
                     );
                   })}
@@ -431,7 +432,7 @@ function MonthCalendar({ cursorKey, items, closures, onSelectDay }: { cursorKey:
   return (
     <div className="miniapp-table-scroll overflow-x-auto p-2 animate-in fade-in duration-300 motion-reduce:animate-none sm:p-4">
       <div className="min-w-[42rem]">
-        <div className="grid grid-cols-7">{WEEKDAYS.map((day) => <div key={day} className="pb-2 text-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{day}</div>)}</div>
+        <div className="grid grid-cols-7">{WEEKDAYS.map((day) => <div key={day} className="pb-2 text-center text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">{day}</div>)}</div>
         <div className="grid grid-cols-7 overflow-hidden rounded-xl border border-foreground/8">
           {days.map((day) => {
             const key = dateKey(day);
@@ -443,7 +444,7 @@ function MonthCalendar({ cursorKey, items, closures, onSelectDay }: { cursorKey:
             return (
               <button key={key} type="button" onClick={() => onSelectDay(key)} className={`min-h-24 border-b border-r border-foreground/8 p-2 text-left hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 ${closure ? "bg-amber-50 text-amber-950" : outside ? "bg-muted/20 text-muted-foreground" : "bg-background"}`}>
                 <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-black ${key === today ? "bg-primary text-primary-foreground" : ""}`}>{day.getDate()}</span>
-                {closure ? <span className="mt-1 flex items-center gap-1 truncate text-[9px] font-bold uppercase text-amber-800"><LockKeyhole className="h-3 w-3 shrink-0" />Holiday</span> : null}
+                {closure ? <span className="mt-1 flex items-center gap-1 truncate text-[0.5625rem] font-bold uppercase text-amber-800"><LockKeyhole className="h-3 w-3 shrink-0" />Holiday</span> : null}
                 {dayItems.length ? <span className="mt-2 block text-xs font-bold">{dayItems.length} lesson{dayItems.length === 1 ? "" : "s"}</span> : null}
                 <span className="mt-1 flex gap-1" aria-label={`${cancellations} cancelled, ${recorded} recorded`}>
                   {dayItems.slice(0, 4).map((item) => <span key={item.key} className={`h-2 w-2 rounded-full ${item.isCancellation ? "bg-red-500" : item.hasAcademicRecords ? "bg-emerald-500" : "bg-primary"}`} />)}
@@ -703,21 +704,21 @@ export function ModernGroupTimetable({
         <div className="border-b border-foreground/8 px-4 py-4 sm:px-5">
           <div><h3 className="text-base font-black">Lesson Timetable</h3><p className="mt-0.5 text-xs text-muted-foreground">Timetable dates flow directly into the Gradebook.</p></div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-wrap gap-2 text-[11px] font-semibold text-muted-foreground">
+            <div className="flex min-w-0 flex-wrap gap-2 text-[0.6875rem] font-semibold text-muted-foreground">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><UserRound className="h-3.5 w-3.5" />{summary.teacher}</span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><CalendarDays className="h-3.5 w-3.5" />{summary.days}</span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><Clock3 className="h-3.5 w-3.5" />{summary.time}</span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><MapPin className="h-3.5 w-3.5" />{summary.room}</span>
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <button type="button" onClick={() => setBreaksOpen(true)} className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-amber-300/70 bg-amber-50 px-2.5 text-[11px] font-bold text-amber-900 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 sm:min-h-9 ${motion.button}`}><LockKeyhole className="h-3.5 w-3.5" />Breaks</button>
-              <button type="button" onClick={onChangeSchedule} className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 text-[11px] font-bold text-primary hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-9 ${motion.button}`}><Settings className="h-3.5 w-3.5" />Configure</button>
+              <button type="button" onClick={() => setBreaksOpen(true)} className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-amber-300/70 bg-amber-50 px-2.5 text-[0.6875rem] font-bold text-amber-900 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 sm:min-h-9 ${motion.button}`}><LockKeyhole className="h-3.5 w-3.5" />Breaks</button>
+              <button type="button" onClick={onChangeSchedule} className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 text-[0.6875rem] font-bold text-primary hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-9 ${motion.button}`}><Settings className="h-3.5 w-3.5" />Configure</button>
             </div>
           </div>
         </div>
         {closures.length ? (
           <div className="flex flex-wrap gap-2 border-b border-amber-200 bg-amber-50/70 px-4 py-2" aria-label="Holiday locks in this period">
-            {closures.map((closure) => <span key={closure.id} className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-white/80 px-2.5 py-1 text-[10px] font-bold text-amber-900"><LockKeyhole className="h-3 w-3" />{closure.title} · {closure.startDate}–{closure.endDate}{closure.scope === "school" ? " · School" : " · Group"}</span>)}
+            {closures.map((closure) => <span key={closure.id} className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-white/80 px-2.5 py-1 text-[0.625rem] font-bold text-amber-900"><LockKeyhole className="h-3 w-3" />{closure.title} · {closure.startDate}–{closure.endDate}{closure.scope === "school" ? " · School" : " · Group"}</span>)}
           </div>
         ) : null}
         <div className="flex flex-col gap-3 border-b border-foreground/8 px-3 py-3 lg:flex-row lg:items-center lg:justify-between sm:px-5">
@@ -732,14 +733,14 @@ export function ModernGroupTimetable({
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground" />
             </label>
             <button type="button" onClick={() => movePeriod(1)} aria-label="Next period" className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:h-9 sm:w-9 ${motion.button}`}><ChevronRight className="h-4 w-4" /></button>
-            <button type="button" onClick={() => setCursorKey(schoolTodayKey())} className={`min-h-11 rounded-lg border border-foreground/10 px-2.5 text-[11px] font-bold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-9 ${motion.button}`}>Today</button>
+            <button type="button" onClick={() => setCursorKey(schoolTodayKey())} className={`min-h-11 rounded-lg border border-foreground/10 px-2.5 text-[0.6875rem] font-bold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-9 ${motion.button}`}>Today</button>
           </div>
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
             <div className="inline-flex rounded-lg border border-foreground/10 bg-muted/40 p-0.5">
-              {(["agenda", "calendar"] as PrimaryMode[]).map((value) => <button key={value} type="button" aria-pressed={mode === value} onClick={() => setMode(value)} className={`min-h-11 rounded-md px-3 text-[11px] font-bold capitalize focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:min-h-9 ${motion.button} ${mode === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{value}</button>)}
+              {(["agenda", "calendar"] as PrimaryMode[]).map((value) => <button key={value} type="button" aria-pressed={mode === value} onClick={() => setMode(value)} className={`min-h-11 rounded-md px-3 text-[0.6875rem] font-bold capitalize focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:min-h-9 ${motion.button} ${mode === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{value}</button>)}
             </div>
-            {mode === "calendar" ? <div className="inline-flex rounded-lg border border-foreground/10 bg-muted/40 p-0.5">{(["week", "month"] as CalendarMode[]).map((value) => <button key={value} type="button" onClick={() => setCalendarMode(value)} aria-pressed={calendarMode === value} className={`min-h-11 rounded-md px-2.5 text-[11px] font-bold capitalize focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:min-h-9 ${motion.button} ${calendarMode === value ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>{value}</button>)}</div> : null}
-            {mode === "calendar" && calendarMode === "week" ? <button type="button" aria-pressed={fullDay} onClick={() => setFullDay((value) => !value)} className={`min-h-11 rounded-lg border px-2.5 text-[11px] font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:min-h-9 ${motion.button} ${fullDay ? "border-primary/30 bg-primary/8 text-primary" : "border-foreground/10 text-muted-foreground"}`}>{fullDay ? "Adaptive hours" : "Show full day"}</button> : null}
+            {mode === "calendar" ? <div className="inline-flex rounded-lg border border-foreground/10 bg-muted/40 p-0.5">{(["week", "month"] as CalendarMode[]).map((value) => <button key={value} type="button" onClick={() => setCalendarMode(value)} aria-pressed={calendarMode === value} className={`min-h-11 rounded-md px-2.5 text-[0.6875rem] font-bold capitalize focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:min-h-9 ${motion.button} ${calendarMode === value ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>{value}</button>)}</div> : null}
+            {mode === "calendar" && calendarMode === "week" ? <button type="button" aria-pressed={fullDay} onClick={() => setFullDay((value) => !value)} className={`min-h-11 rounded-lg border px-2.5 text-[0.6875rem] font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:min-h-9 ${motion.button} ${fullDay ? "border-primary/30 bg-primary/8 text-primary" : "border-foreground/10 text-muted-foreground"}`}>{fullDay ? "Adaptive hours" : "Show full day"}</button> : null}
           </div>
         </div>
         {Number(query.data?.unscheduledLessonCount || 0) > 0 ? (

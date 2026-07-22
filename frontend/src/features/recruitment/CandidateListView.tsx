@@ -147,7 +147,7 @@ export function CandidateListView({ basePath }: { basePath: string }) {
   return (
     <div className="space-y-2">
       <section className="rounded-xl border border-border bg-card p-3">
-        <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_220px_auto]">
+        <div className="grid gap-2 md:grid-cols-[minmax(13.75rem,1fr)_13.75rem_auto]">
           <label className="text-xs font-semibold text-muted-foreground">
             Search
             <span className="relative mt-1 block">
@@ -190,8 +190,8 @@ export function CandidateListView({ basePath }: { basePath: string }) {
       {candidates.data ? (
         <section className="overflow-hidden rounded-xl border border-border bg-card">
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[760px] text-left text-[13px]">
-              <thead className="bg-muted/60 text-[11px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-1.5">Candidate</th><th className="px-3 py-1.5">Position</th><th className="px-3 py-1.5">Stage</th><th className="px-3 py-1.5">Applied</th><th className="px-3 py-1.5">Next action</th></tr></thead>
+            <table className="w-full min-w-[47.5rem] text-left text-[0.8125rem]">
+              <thead className="bg-muted/60 text-[0.6875rem] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-1.5">Candidate</th><th className="px-3 py-1.5">Position</th><th className="px-3 py-1.5">Stage</th><th className="px-3 py-1.5">Applied</th><th className="px-3 py-1.5">Next action</th></tr></thead>
               <tbody className="divide-y divide-border">{candidates.data.items.map((candidate) => <tr key={candidate.id} className="hover:bg-muted/30"><td className="px-3 py-1.5"><a className="inline-flex min-h-9 items-center font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("candidates")}>{candidate.full_name}</a><p className="text-xs text-muted-foreground">{candidate.phone || "No phone"}</p></td><td className="px-3 py-1.5">{candidate.applied_position || candidate.subject || "—"}</td><td className="px-3 py-1.5"><StatusBadge status={candidate.status}>{candidate.status_label || recruitmentStageLabel(candidate.status, options.data?.stage_labels)}</StatusBadge></td><td className="px-3 py-1.5">{dateLabel(candidate.application_date)}</td><td className="px-3 py-1.5">{candidate.next_task?.title || "—"}</td></tr>)}</tbody>
             </table>
           </div>

@@ -47,16 +47,16 @@ const densityClasses: Record<
 > = {
   default: {
     section: "min-h-[5.25rem] px-3 py-3",
-    label: "line-clamp-2 text-[10px] leading-4",
+    label: "line-clamp-2 text-[0.625rem] leading-4",
     value: "mt-1 break-words text-2xl",
-    detail: "mt-2 line-clamp-2 text-[11px] leading-4",
+    detail: "mt-2 line-clamp-2 text-[0.6875rem] leading-4",
     icon: "h-8 w-8",
   },
   compact: {
     section: "min-h-[3.875rem] px-2 py-2",
-    label: "truncate text-[9px] leading-3",
+    label: "truncate text-[0.5625rem] leading-3",
     value: "mt-0.5 truncate text-lg sm:text-xl",
-    detail: "mt-0.5 truncate text-[10px] leading-3",
+    detail: "mt-0.5 truncate text-[0.625rem] leading-3",
     icon: "h-6 w-6",
   },
 };

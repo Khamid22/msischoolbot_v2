@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Loader2,
   Play,
+  RotateCcw,
   XCircle,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -69,6 +70,7 @@ export function InterviewSessionModal({
   const formRef = useRef<HTMLFormElement>(null);
   const [session, setSession] = useState(appointment);
   const [confirmStart, setConfirmStart] = useState(false);
+  const [confirmUndoStart, setConfirmUndoStart] = useState(false);
   const [confirmFail, setConfirmFail] = useState(false);
   const [failReason, setFailReason] = useState("");
   const supplemental = candidate.status === "teacher_academy";
@@ -76,6 +78,7 @@ export function InterviewSessionModal({
   useEffect(() => {
     setSession(appointment);
     setConfirmStart(false);
+    setConfirmUndoStart(false);
     setConfirmFail(false);
     setFailReason("");
   }, [appointment]);
@@ -124,7 +127,25 @@ export function InterviewSessionModal({
     },
     onError: (error) => onAnnouncement(queryError(error), "error"),
   });
-  const pending = start.isPending || complete.isPending;
+  const undoStart = useMutation({
+    mutationFn: () =>
+      recruitmentRequest<SessionResponse>(
+        `${RECRUITMENT_API}/candidates/${candidate.id}/appointments/${session.id}/undo-start`,
+        {
+          method: "POST",
+          body: jsonBody({ expected_version: session.version }),
+        },
+      ),
+    onSuccess: (result) => {
+      onAnnouncement(
+        result.message || "Interview returned to its original schedule.",
+      );
+      void queryClient.invalidateQueries({ queryKey: ["recruitment"] });
+      onClose();
+    },
+    onError: (error) => onAnnouncement(queryError(error), "error"),
+  });
+  const pending = start.isPending || complete.isPending || undoStart.isPending;
   const inProgress = session.status === "in_progress";
   const englishOptions =
     options?.option_categories.english_level || [];
@@ -154,7 +175,7 @@ export function InterviewSessionModal({
         <ModalBody className="space-y-4">
           <section className="grid gap-2 rounded-xl border border-border bg-muted/35 p-3 sm:grid-cols-2">
             <div>
-              <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+              <span className="text-[0.625rem] font-semibold uppercase text-muted-foreground">
                 {inProgress ? "Actual start" : "Scheduled"}
               </span>
               <strong className="mt-1 block text-sm">
@@ -164,7 +185,7 @@ export function InterviewSessionModal({
               </strong>
             </div>
             <div>
-              <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+              <span className="text-[0.625rem] font-semibold uppercase text-muted-foreground">
                 Format
               </span>
               <strong className="mt-1 block break-words text-sm">
@@ -173,7 +194,7 @@ export function InterviewSessionModal({
             </div>
             {session.location_or_link ? (
               <div className="sm:col-span-2">
-                <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                <span className="text-[0.625rem] font-semibold uppercase text-muted-foreground">
                   Room or link
                 </span>
                 <strong className="mt-1 block break-all text-sm">
@@ -296,6 +317,23 @@ export function InterviewSessionModal({
               ) : null}
             </div>
           ) : null}
+
+          {confirmUndoStart ? (
+            <div
+              role="alert"
+              className="rounded-xl border border-amber-400/50 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100"
+            >
+              <p className="flex items-center gap-2 font-semibold">
+                <RotateCcw className="h-4 w-4" />
+                Cancel this interview start?
+              </p>
+              <p className="mt-1 text-xs leading-5">
+                No result will be recorded. The interview will return to
+                Scheduled at {dateTimeLabel(session.pre_start_starts_at)}, and
+                you can reschedule it normally.
+              </p>
+            </div>
+          ) : null}
         </ModalBody>
         <ModalFooter>
           {!inProgress ? (
@@ -342,6 +380,30 @@ export function InterviewSessionModal({
                 </button>
               </div>
             )
+          ) : confirmUndoStart ? (
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className={secondaryButtonClass}
+                disabled={pending}
+                onClick={() => setConfirmUndoStart(false)}
+              >
+                Keep active
+              </button>
+              <button
+                type="button"
+                className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-amber-500 bg-amber-50 px-3 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-amber-950/20 dark:text-amber-100"
+                disabled={pending}
+                onClick={() => undoStart.mutate()}
+              >
+                {undoStart.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="h-4 w-4" />
+                )}
+                Restore schedule
+              </button>
+            </div>
           ) : confirmFail ? (
             <div className="flex flex-wrap justify-end gap-2">
               <button
@@ -374,15 +436,27 @@ export function InterviewSessionModal({
             </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <button
-                type="button"
-                className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-destructive/40 px-3 text-sm font-semibold text-destructive"
-                disabled={pending}
-                onClick={() => setConfirmFail(true)}
-              >
-                <XCircle className="h-4 w-4" />
-                Fail
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-amber-400/60 px-3 text-sm font-semibold text-amber-800 dark:text-amber-200"
+                  disabled={pending || !session.can_undo_start}
+                  title={session.can_undo_start ? undefined : "The original schedule is unavailable."}
+                  onClick={() => setConfirmUndoStart(true)}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Cancel start
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-destructive/40 px-3 text-sm font-semibold text-destructive"
+                  disabled={pending}
+                  onClick={() => setConfirmFail(true)}
+                >
+                  <XCircle className="h-4 w-4" />
+                  Fail
+                </button>
+              </div>
               <button
                 type="submit"
                 className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-emerald-700 px-3 text-sm font-semibold text-white"

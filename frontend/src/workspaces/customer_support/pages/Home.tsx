@@ -113,7 +113,7 @@ function readLocation() {
 function Field({ label, value, mono = false }: { label: string; value: ReactNode; mono?: boolean }) {
   return (
     <div className="min-w-0 rounded-lg border border-border/80 bg-background px-3 py-2.5">
-      <dt className="text-[11px] font-black uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dt className="text-[0.6875rem] font-black uppercase tracking-wide text-muted-foreground">{label}</dt>
       <dd className={`mt-1 break-words text-sm font-bold text-foreground ${mono ? "font-mono" : ""}`}>{value || "Not set"}</dd>
     </div>
   );
@@ -149,7 +149,7 @@ function RecordCard({ item, selected, onSelect }: { item: SupportRecordSummary; 
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-start justify-between gap-2">
           <span className="min-w-0 break-words text-sm font-black text-foreground">{item.display_name}</span>
-          <StatusBadge status={item.status} className="shrink-0 text-[10px]" />
+          <StatusBadge status={item.status} className="shrink-0 text-[0.625rem]" />
         </span>
         <span className="mt-1 block break-words text-xs font-semibold text-muted-foreground">{item.secondary}</span>
         <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold text-muted-foreground">
@@ -181,7 +181,7 @@ function ActivityList({ items }: { items: Array<Record<string, unknown>> }) {
     <ol className="space-y-3">
       {items.map((item) => (
         <li key={asText(item.id)} className="relative border-l-2 border-primary/20 pl-4">
-          <span className="absolute -left-[5px] top-1.5 h-2 w-2 rounded-full bg-primary" />
+          <span className="absolute -left-[0.3125rem] top-1.5 h-2 w-2 rounded-full bg-primary" />
           <p className="break-words text-sm font-black text-foreground">{asText(item.eventType).replace(/\./g, " · ").replace(/_/g, " ")}</p>
           <p className="mt-0.5 text-xs font-semibold text-muted-foreground">{asText(item.actor)} · {formatDate(item.createdAt, true)}</p>
         </li>
@@ -214,7 +214,7 @@ function PaymentsSection({
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {(["paid", "due", "debt", "upcoming"] as const).map((key) => (
           <div key={key} className="rounded-lg bg-muted px-3 py-2">
-            <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">{key}</p>
+            <p className="text-[0.625rem] font-black uppercase tracking-wide text-muted-foreground">{key}</p>
             <p className="mt-1 break-words text-sm font-black tabular-nums text-foreground">{money(payload.totals?.[key] || 0, payload.currency)}</p>
           </div>
         ))}
@@ -232,7 +232,7 @@ function PaymentsSection({
                     <p className="mt-1 text-xs font-semibold text-muted-foreground">Due {formatDate(payment.due_date)} · {money(payment.amount, asText(payment.currency) || payload.currency)}</p>
                     {voided && asText(payment.void_reason) ? <p className="mt-1 text-xs font-bold text-destructive">Voided: {asText(payment.void_reason)}</p> : null}
                   </div>
-                  <StatusBadge status={state} className="text-[10px]" />
+                  <StatusBadge status={state} className="text-[0.625rem]" />
                 </div>
                 {!voided ? (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -315,7 +315,7 @@ function StudentView({
       <Section title="Account access" icon={<KeyRound className="h-4 w-4" />} action={<button type="button" onClick={onReset} className={secondaryButton}><KeyRound className="h-4 w-4" />Reset access</button>}>
         <dl className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <Field label="Login" value={asText(profile.login)} mono />
-          <Field label="Account status" value={<StatusBadge status={asText(profile.account_status)} className="text-[10px]" />} />
+          <Field label="Account status" value={<StatusBadge status={asText(profile.account_status)} className="text-[0.625rem]" />} />
           <Field label="Last login" value={formatDate(profile.last_login_at, true)} />
         </dl>
         <p className="mt-3 text-xs font-semibold leading-5 text-muted-foreground">Passwords are protected and cannot be viewed. A reset creates a temporary password, invalidates existing sessions, and forces a password change.</p>
@@ -344,12 +344,12 @@ function StudentView({
                     <p className="break-words text-sm font-black text-foreground">{asText(item.subject_name)}</p>
                     <p className="mt-1 break-words text-xs font-semibold text-muted-foreground">{asText(item.group_name)}</p>
                   </div>
-                  <StatusBadge status={asText(item.status)} className="text-[10px]" />
+                  <StatusBadge status={asText(item.status)} className="text-[0.625rem]" />
                 </div>
                 <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
-                  <div><dt className="text-[10px] font-bold text-muted-foreground">HOMEWORK</dt><dd className="mt-1 text-sm font-black">{asNumber(item.homework_average).toFixed(1)}</dd></div>
-                  <div><dt className="text-[10px] font-bold text-muted-foreground">EXAM</dt><dd className="mt-1 text-sm font-black">{asNumber(item.exam_average).toFixed(1)}</dd></div>
-                  <div><dt className="text-[10px] font-bold text-muted-foreground">ATTENDANCE</dt><dd className="mt-1 text-sm font-black">{asNumber(item.attendanceRate)}%</dd></div>
+                  <div><dt className="text-[0.625rem] font-bold text-muted-foreground">HOMEWORK</dt><dd className="mt-1 text-sm font-black">{asNumber(item.homework_average).toFixed(1)}</dd></div>
+                  <div><dt className="text-[0.625rem] font-bold text-muted-foreground">EXAM</dt><dd className="mt-1 text-sm font-black">{asNumber(item.exam_average).toFixed(1)}</dd></div>
+                  <div><dt className="text-[0.625rem] font-bold text-muted-foreground">ATTENDANCE</dt><dd className="mt-1 text-sm font-black">{asNumber(item.attendanceRate)}%</dd></div>
                 </dl>
               </article>
             ))}
@@ -405,7 +405,7 @@ function ParentView({
           <Field label="Phone" value={asText(profile.phone)} />
           <Field label="Telegram" value={asText(profile.telegram_username) ? `@${asText(profile.telegram_username)}` : "Not linked"} />
           <Field label="Language" value={asText(profile.preferred_language).toUpperCase()} />
-          <Field label="Account status" value={<StatusBadge status={asText(profile.account_status)} className="text-[10px]" />} />
+          <Field label="Account status" value={<StatusBadge status={asText(profile.account_status)} className="text-[0.625rem]" />} />
           <Field label="Last login" value={formatDate(profile.last_login_at, true)} />
         </dl>
       </Section>
@@ -857,7 +857,7 @@ export default function CustomerSupportWorkspace({
         <PageHeader
           title={title}
           subtitle={description}
-          badge={<span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-primary">Customer Support</span>}
+          badge={<span className="rounded-full bg-primary/10 px-2.5 py-1 text-[0.6875rem] font-black uppercase tracking-wide text-primary">Customer Support</span>}
           actions={<span className="inline-flex min-h-10 max-w-full items-center gap-2 rounded-lg border border-border bg-muted px-3 text-xs font-black text-muted-foreground"><ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" /><span className="truncate">{authLogin}</span></span>}
         />
 

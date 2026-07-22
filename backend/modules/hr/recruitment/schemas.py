@@ -251,6 +251,16 @@ class RecruitmentSlaRuleUpdate(StrictModel):
     target_days: int = Field(ge=1, le=90)
 
 
+class RecruitmentAppointmentReminderUpdate(StrictModel):
+    lead_minutes: int = Field(ge=5, le=120)
+    expected_version: int = Field(ge=1)
+
+
+class RecruitmentBrowserPreferenceUpdate(StrictModel):
+    enabled: bool
+    expected_version: int = Field(ge=0)
+
+
 class PipelineStageCreate(StrictModel):
     label: str = Field(min_length=1, max_length=80)
     color_token: str = Field(
@@ -309,6 +319,8 @@ __all__ = [
     "PipelineStageCreate",
     "PipelineStageUpdate",
     "RecruitmentSettingCreate",
+    "RecruitmentAppointmentReminderUpdate",
+    "RecruitmentBrowserPreferenceUpdate",
     "RecruitmentSlaRuleUpdate",
     "RecruitmentMutationResult",
     "ScheduledStageMove",

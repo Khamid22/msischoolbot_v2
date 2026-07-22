@@ -191,9 +191,9 @@ function AccountDetailSheet({
         <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
           {fields.map(([label, value]) => (
             <div key={label} className="min-w-0 rounded-lg border border-border bg-background px-3 py-2">
-              <dt className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</dt>
+              <dt className="text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">{label}</dt>
               <dd className="mt-0.5 break-words font-black text-foreground">
-                {label === "Status" ? <StatusBadge status={value} className="text-[10px]" /> : value}
+                {label === "Status" ? <StatusBadge status={value} className="text-[0.625rem]" /> : value}
               </dd>
             </div>
           ))}
@@ -390,7 +390,7 @@ function CredentialsSheet({
           {rows.map(([label, value]) => (
             <div key={label} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2">
               <div className="min-w-0">
-                <dt className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</dt>
+                <dt className="text-[0.625rem] font-bold uppercase tracking-wide text-muted-foreground">{label}</dt>
                 <dd className="mt-0.5 break-all font-mono text-sm font-black text-foreground">{value || "-"}</dd>
               </div>
               <IconButton label={`Copy ${label.toLowerCase()}`} onClick={() => onCopy(value, label)}>
@@ -450,7 +450,7 @@ function SubjectCoverage({
                 {owners.length ? (
                   <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-label="Covered" />
                 ) : (
-                  <StatusBadge status="missing" className="shrink-0 text-[10px]" />
+                  <StatusBadge status="missing" className="shrink-0 text-[0.625rem]" />
                 )}
               </li>
             );
@@ -596,7 +596,7 @@ export default function HeadOfDepartmentsPage({
         title="Head of Departments"
         subtitle="Manage subject department heads and their Teacher Academy access."
         badge={
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-primary">
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[0.6875rem] font-black uppercase tracking-wide text-primary">
             Academic Director
           </span>
         }
@@ -647,12 +647,12 @@ export default function HeadOfDepartmentsPage({
           <section className="hidden rounded-xl border border-border bg-surface shadow-card md:block">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
               <h2 className="text-sm font-black text-foreground">Accounts</h2>
-              <StatusBadge tone="neutral" className="text-[10px]">
+              <StatusBadge tone="neutral" className="text-[0.625rem]">
                 Read-only records
               </StatusBadge>
             </div>
             <ResponsiveTable showAt="md" className="rounded-b-xl">
-              <table className="w-full min-w-[720px] divide-y divide-border text-left text-sm">
+              <table className="w-full min-w-[45rem] divide-y divide-border text-left text-sm">
                 <thead className="bg-muted/60 text-xs font-black uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3">Name</th>
@@ -683,7 +683,7 @@ export default function HeadOfDepartmentsPage({
                         </p>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <StatusBadge status={asText(account.status) || "active"} className="text-[10px]" />
+                        <StatusBadge status={asText(account.status) || "active"} className="text-[0.625rem]" />
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 font-semibold text-muted-foreground">
                         {dateLabel(account.updated_at || account.created_at)}

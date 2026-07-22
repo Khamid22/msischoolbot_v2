@@ -5,9 +5,9 @@ export const RECRUITMENT_API = "/api/v1/recruitment";
 export const fieldClass =
   "min-h-9 w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground outline-none transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20";
 export const buttonClass =
-  "inline-flex min-h-9 min-w-9 items-center justify-center gap-2 rounded-lg bg-primary px-2.5 py-1.5 text-[13px] font-semibold text-primary-foreground transition-colors hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex min-h-9 min-w-9 items-center justify-center gap-2 rounded-lg bg-primary px-2.5 py-1.5 text-[0.8125rem] font-semibold text-primary-foreground transition-colors hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50";
 export const secondaryButtonClass =
-  "inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[13px] font-semibold text-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[0.8125rem] font-semibold text-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50";
 
 export function roleLabel(role: string) {
   return {
@@ -52,8 +52,8 @@ export function DefinitionGrid({ values }: { values: Array<[string, unknown]> })
         const displayValue = value === null || value === undefined || value === "" ? "Not set" : String(value);
         return (
           <div key={label} className="min-w-0 rounded-lg bg-muted/45 px-2.5 py-1.5">
-            <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
-            <dd className="mt-0.5 break-words text-[13px] font-semibold text-foreground">{displayValue}</dd>
+            <dt className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
+            <dd className="mt-0.5 break-words text-[0.8125rem] font-semibold text-foreground">{displayValue}</dd>
           </div>
         );
       })}
