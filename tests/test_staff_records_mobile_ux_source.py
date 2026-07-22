@@ -21,18 +21,18 @@ def test_academy_uses_shared_accessible_modal_and_action_menu():
     assert "Modal" in source
 
 
-def test_teacher_academy_uses_cards_at_every_roster_breakpoint_and_a_hybrid_lessons_view():
+def test_teacher_academy_uses_compact_cards_at_every_roster_breakpoint():
     panel = _read("features/teacher-academy/TeacherAcademyPanel.tsx")
     cards = _read("features/teacher-academy/TeacherAcademyCards.tsx")
-    lessons = _read("features/teacher-academy/AppointedLessonsView.tsx")
     assert "TeacherCardGrid" in cards
     assert "grid-cols-1" in cards
     assert "md:grid-cols-2" in cards
     assert "xl:grid-cols-3" in cards
+    assert "min-h-[15rem]" in cards
     assert "TeacherAcademyRoster" in panel
     assert "ScopedTeacherAcademyRoster" in panel
-    assert "MobileCardList" in lessons
-    assert "ResponsiveTable" in lessons
+    assert "AppointedLessonsView" not in panel
+    assert not (ROOT / "features/teacher-academy/AppointedLessonsView.tsx").exists()
 
 
 def test_head_of_departments_workspace_uses_exact_folder_and_shared_shell():

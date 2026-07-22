@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { BookOpenCheck, CalendarClock, ClipboardCheck, Copy, Eye, KeyRound, Trash2, Trophy } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { BookOpenCheck, CalendarClock, ClipboardCheck, Copy, KeyRound, Trash2, Trophy } from "lucide-react";
 import type { ActionMenuItem } from "@/shared/ui/ActionMenu";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { routes } from "@/shared/lib/routes";
@@ -15,10 +15,6 @@ import {
 import { TeacherAcademyDashboard } from "@/features/teacher-academy/TeacherAcademyDashboard";
 import { ScopedTeacherAcademyRoster } from "@/features/teacher-academy/ScopedTeacherAcademyRoster";
 import {
-  AppointedLessonsView,
-  type AppointedLessonCardModel,
-} from "@/features/teacher-academy/AppointedLessonsView";
-import {
   ActiveTeacherAccountModal,
   AcademyDetailModal,
   AssessmentModal,
@@ -29,16 +25,8 @@ import {
   PromoteModal,
   academyAssessments,
   academyAssignments,
-  assessmentForAssignment,
   assignmentIsScheduled,
-  assignmentTitle,
-  dateLabel,
-  decisionLabel,
-  decisionTone,
-  isPassedReport,
   nextAcademyAssignment,
-  parseSchoolInstant,
-  rescheduledSinceFail,
   type TeacherAcademyPanelState,
   type TeacherPasswordResetCredentials,
 } from "@/features/teacher-academy/TeacherAcademyWorkflowModals";
@@ -322,97 +310,6 @@ export function TeacherAcademyPanel({
     }
     showToast("The Teacher Academy details could not be loaded. Refresh and try again.", "danger");
   };
-  const appointedLessons = useMemo(
-    () =>
-      academyTeachers
-        .flatMap((teacher) =>
-          academyAssignments(teacher).map((assignment) => {
-            const report = assessmentForAssignment(teacher, assignment);
-            // Assessed rows carry a recorded (correct) date; otherwise use the scheduled session.
-            const dateSource = asString(report?.assessment_datetime) || asString(assignment.session_datetime);
-            const at = parseSchoolInstant(dateSource);
-            return {
-              key: `${asNumber(teacher.id)}:${asNumber(assignment.id)}`,
-              teacher,
-              assignment,
-              report,
-              at: Number.isFinite(at) ? at : null,
-            };
-          }),
-        )
-        .sort((left, right) => {
-          // Most recent first; rows with no date sink to the bottom.
-          if (left.at != null && right.at != null && left.at !== right.at) return right.at - left.at;
-          if ((left.at == null) !== (right.at == null)) return left.at == null ? 1 : -1;
-          const teacherCompare = asString(left.teacher.full_name).localeCompare(asString(right.teacher.full_name));
-          if (teacherCompare !== 0) return teacherCompare;
-          return asNumber(left.assignment.sequence_no) - asNumber(right.assignment.sequence_no);
-        }),
-    [academyTeachers],
-  );
-
-  // Actions for one appointed lesson row, shared by the desktop table, the mobile
-  // cards and the detail modal. Encodes the retry flow: un-assessed lessons can be
-  // assessed straight away (flexible); passed lessons only offer Review; a failed
-  // lesson must be re-scheduled, and only then can be re-assessed.
-  type LessonAction = { label: string; icon: ReactNode; onClick: () => void; tone?: "primary" | "muted" };
-  function buildLessonActions(
-    teacher: AcademyTeacher,
-    assignment: AcademyAssignment,
-    report: AcademyAssessment | null,
-  ): { scoreText: string | null; primary: LessonAction | null; menu: ActionMenuItem[] } {
-    const numericScore = Number(report?.weighted_overall_score);
-    const scoreText = report?.weighted_overall_score != null && Number.isFinite(numericScore)
-      ? numericScore.toFixed(2)
-      : null;
-    const review = () => {
-      if (report) setReportTarget({ teacher, assignment, report });
-    };
-    const reschedule = () => setScheduleTarget({ teacher, assignment });
-    const reviewMenu: ActionMenuItem = { key: "review", label: "Review report", icon: <Eye className="h-4 w-4" />, onClick: review };
-    const rescheduleMenu: ActionMenuItem = {
-      key: "reschedule",
-      label: assignmentIsScheduled(assignment) ? "Re-schedule" : "Schedule",
-      icon: <CalendarClock className="h-4 w-4" />,
-      onClick: reschedule,
-    };
-
-    if (!report) {
-      const menu: ActionMenuItem[] = canScheduleAcademyLesson && canAssessAcademyLesson ? [rescheduleMenu] : [];
-      let primary: LessonAction | null = null;
-      if (canAssessAcademyLesson) {
-        primary = { label: "Assess", icon: <ClipboardCheck className="h-3.5 w-3.5" />, onClick: () => setAssessmentTarget({ teacher, assignment }), tone: "primary" };
-      } else if (canScheduleAcademyLesson) {
-        primary = { label: assignmentIsScheduled(assignment) ? "Reschedule" : "Schedule", icon: <CalendarClock className="h-3.5 w-3.5" />, onClick: reschedule, tone: "primary" };
-      }
-      return { scoreText, primary, menu };
-    }
-
-    if (isPassedReport(report)) {
-      return { scoreText, primary: { label: "Review", icon: <Eye className="h-3.5 w-3.5" />, onClick: review, tone: "primary" }, menu: [] };
-    }
-
-    // Failed (needs improvement): re-schedule, then re-assess.
-    if (rescheduledSinceFail(assignment, report) && canAssessAcademyLesson) {
-      const menu: ActionMenuItem[] = [reviewMenu];
-      if (canScheduleAcademyLesson) menu.push(rescheduleMenu);
-      return {
-        scoreText,
-        primary: {
-          label: "Re-assess",
-          icon: <ClipboardCheck className="h-3.5 w-3.5" />,
-          onClick: () => setAssessmentTarget({ teacher, assignment }),
-          tone: "primary",
-        },
-        menu,
-      };
-    }
-    if (canScheduleAcademyLesson) {
-      return { scoreText, primary: { label: "Re-schedule", icon: <CalendarClock className="h-3.5 w-3.5" />, onClick: reschedule, tone: "primary" }, menu: [reviewMenu] };
-    }
-    return { scoreText, primary: { label: "Review", icon: <Eye className="h-3.5 w-3.5" />, onClick: review, tone: "primary" }, menu: [] };
-  }
-
   function copyLogin(login: string) {
     const normalizedLogin = login.trim();
     if (!normalizedLogin) return;
@@ -610,30 +507,6 @@ export function TeacherAcademyPanel({
     }
     return actions;
   }
-
-  const appointedLessonCards: AppointedLessonCardModel[] = appointedLessons.map((item) => {
-    const actions = buildLessonActions(item.teacher, item.assignment, item.report);
-    return {
-      key: item.key,
-      teacherName: asString(item.teacher.full_name) || "Academy teacher",
-      subject: asString(item.teacher.subject) || "Subject not set",
-      lessonTitle: assignmentTitle(item.assignment),
-      dateLabel: dateLabel(item.report?.assessment_datetime || item.assignment.session_datetime),
-      evaluator: asString(item.teacher.department_head_name)
-        || asString(item.assignment.evaluator_name)
-        || "Not assigned",
-      statusLabel: item.report
-        ? decisionLabel(item.report.decision)
-        : assignmentIsScheduled(item.assignment) ? "Scheduled" : "Appointed",
-      statusTone: item.report
-        ? decisionTone(item.report.decision)
-        : assignmentIsScheduled(item.assignment) ? "success" : "info",
-      scoreText: actions.scoreText,
-      onOpenTeacher: () => setDetailTeacher(item.teacher),
-      primaryAction: actions.primary,
-      menuActions: actions.menu,
-    };
-  });
 
   return (
     <>
@@ -856,7 +729,7 @@ export function TeacherAcademyPanel({
         }}
       />
 
-      <div className="space-y-4">
+      <div className="space-y-2">
         <TeacherAcademyDashboard
           mode={mode}
           stats={dashboardStats}
@@ -918,14 +791,13 @@ export function TeacherAcademyPanel({
 
         <section
           id={`academy-panel-${activeView}`}
-          role="tabpanel"
-          aria-labelledby={`academy-tab-${activeView}`}
+          role={isAcademicDirectorMode ? "tabpanel" : "region"}
+          aria-labelledby={isAcademicDirectorMode ? `academy-tab-${activeView}` : undefined}
+          aria-label={isAcademicDirectorMode ? undefined : "Teacher Academy roster"}
           tabIndex={0}
-          className="min-w-0 rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          className="min-w-0 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         >
-          {activeView === "appointed_lessons" ? (
-            <AppointedLessonsView items={appointedLessonCards} />
-          ) : isAcademicDirectorMode ? (
+          {isAcademicDirectorMode ? (
             <TeacherAcademyRoster
               key={activeView}
               kind={activeView === "active_teachers" ? "active_teacher" : "teacher_academy"}

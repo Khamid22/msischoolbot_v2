@@ -50,12 +50,12 @@ export default function HeadOfDepartmentTeacherAcademyPage(props: HeadOfDepartme
       authLogin={props.authLogin}
       csrfToken={props.csrfToken}
       active="academy"
-      sectionClassName="gap-4"
-      maxWidthClass="max-w-[96rem]"
+      sectionClassName="gap-2"
+      maxWidthClass="max-w-[100rem]"
     >
       <Suspense
         fallback={
-          <section className="rounded-xl border border-border bg-surface p-5 text-sm font-bold text-muted-foreground shadow-card">
+          <section className="rounded-xl border border-border bg-surface p-3 text-sm font-semibold text-muted-foreground shadow-card">
             Loading Teacher Academy...
           </section>
         }

@@ -1,5 +1,4 @@
 import {
-  CalendarClock,
   CheckCircle2,
   GraduationCap,
   Plus,
@@ -62,12 +61,6 @@ export function TeacherAcademyDashboard({
           icon: UsersRound,
         }]
       : []),
-    {
-      key: "appointed_lessons",
-      label: "Appointed Lessons",
-      count: stats.appointedLessons,
-      icon: CalendarClock,
-    },
   ];
 
   const handleTabKeyDown = (
@@ -87,24 +80,24 @@ export function TeacherAcademyDashboard({
 
   return (
     <>
-      <header className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-card">
-        <div className="relative px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
+      <header className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-card">
+        <div className="relative p-4">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-primary/5 blur-3xl"
           />
-          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="relative flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 max-w-4xl">
               <div className="flex flex-wrap items-center gap-2.5">
-                <h1 className="font-display text-2xl font-black leading-tight tracking-tight text-foreground sm:text-3xl">
+                <h1 className="font-display text-xl font-black leading-tight tracking-tight text-foreground sm:text-2xl">
                   Teacher Academy
                 </h1>
-                <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[0.6875rem] font-black uppercase tracking-wide text-primary">
+                <span className="inline-flex min-h-6 items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[0.625rem] font-black uppercase tracking-wide text-primary">
                   <GraduationCap className="h-3.5 w-3.5" aria-hidden="true" />
                   {isDirector ? "Academic Director" : "Head of Departments"}
                 </span>
               </div>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
+              <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">
                 {isDirector
                   ? "Register academy teachers, schedule lessons, write assessments, and review teacher journeys from one command center."
                   : "Schedule lessons, review assessments, and support academy teachers within your assigned subject scope."}
@@ -112,11 +105,11 @@ export function TeacherAcademyDashboard({
             </div>
 
             {isDirector ? (
-              <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:w-auto lg:shrink-0">
+              <div className="grid w-full grid-cols-1 gap-1.5 sm:grid-cols-2 lg:w-auto lg:shrink-0">
                 <button
                   type="button"
                   onClick={onCreateHeadOfDepartment}
-                  className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground shadow-sm hover:bg-muted ${focusClasses}`}
+                  className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-[0.8125rem] font-semibold text-foreground shadow-sm hover:bg-muted lg:min-h-9 ${focusClasses}`}
                 >
                   <Plus className="h-4 w-4" aria-hidden="true" />
                   New HOD
@@ -124,7 +117,7 @@ export function TeacherAcademyDashboard({
                 <button
                   type="button"
                   onClick={onCreateAcademyTeacher}
-                  className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground shadow-card hover:bg-primary/90 ${focusClasses}`}
+                  className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-[0.8125rem] font-semibold text-primary-foreground shadow-card hover:bg-primary/90 lg:min-h-9 ${focusClasses}`}
                 >
                   <Plus className="h-4 w-4" aria-hidden="true" />
                   New Academy Teacher
@@ -133,13 +126,14 @@ export function TeacherAcademyDashboard({
             ) : null}
           </div>
 
-          <div className="relative mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="relative mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <MetricCard
               label="In Academy"
               value={stats.total}
               detail="active academy paths"
               icon={<UsersRound className="h-4 w-4" />}
-              className="min-h-[7.5rem] bg-background/80"
+              density="compact"
+              className="bg-background/80"
             />
             <MetricCard
               label="Ready"
@@ -147,7 +141,7 @@ export function TeacherAcademyDashboard({
               detail="promotion review"
               icon={<CheckCircle2 className="h-4 w-4" />}
               tone="success"
-              className="min-h-[7.5rem]"
+              density="compact"
             />
             <MetricCard
               label="Avg Score"
@@ -155,16 +149,16 @@ export function TeacherAcademyDashboard({
               detail="assessment-weighted"
               icon={<TrendingUp className="h-4 w-4" />}
               tone="info"
-              className="min-h-[7.5rem]"
+              density="compact"
             />
           </div>
         </div>
       </header>
 
-      <nav
+      {tabs.length > 1 ? <nav
         role="tablist"
         aria-label="Teacher Academy views"
-        className="no-scrollbar flex max-w-full gap-1.5 overflow-x-auto rounded-2xl border border-border bg-card p-1.5 shadow-sm"
+        className="no-scrollbar flex max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 shadow-sm"
       >
         {tabs.map((tab, index) => {
           const Icon = tab.icon;
@@ -183,7 +177,7 @@ export function TeacherAcademyDashboard({
               tabIndex={active ? 0 : -1}
               onClick={() => onViewChange(tab.key)}
               onKeyDown={(event) => handleTabKeyDown(event, index)}
-              className={`inline-flex min-h-14 min-w-[11rem] flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition-colors duration-150 motion-reduce:transition-none ${focusClasses} ${
+              className={`inline-flex min-h-11 min-w-[9rem] flex-1 items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-[0.8125rem] font-semibold transition-colors duration-150 motion-reduce:transition-none lg:min-h-9 ${focusClasses} ${
                 active
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -201,7 +195,7 @@ export function TeacherAcademyDashboard({
             </button>
           );
         })}
-      </nav>
+      </nav> : null}
     </>
   );
 }

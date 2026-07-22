@@ -2,8 +2,7 @@ export type TeacherAcademyMode = "academic_director" | "head_of_department";
 
 export type TeacherAcademyView =
   | "teacher_academy"
-  | "active_teachers"
-  | "appointed_lessons";
+  | "active_teachers";
 
 export type TeacherAcademySort = "average_score" | "lessons" | "date";
 
@@ -168,7 +167,6 @@ export interface TeacherAcademyStats {
   total: number;
   ready: number;
   weightedAverage: number | null;
-  appointedLessons: number;
 }
 
 function finiteNumber(value: unknown): number | null {
@@ -235,10 +233,6 @@ export function calculateTeacherAcademyStats(
     weightedAverage: assessmentCount
       ? weightedScoreTotal / assessmentCount
       : null,
-    appointedLessons: teachers.reduce(
-      (total, teacher) => total + academyAssignments(teacher).length,
-      0,
-    ),
   };
 }
 
@@ -276,7 +270,6 @@ export function academyViewFromSearch(
   mode: TeacherAcademyMode,
 ): TeacherAcademyView {
   const requested = new URLSearchParams(search).get("academy_view");
-  if (requested === "appointed_lessons") return requested;
   if (requested === "active_teachers" && mode === "academic_director") return requested;
   return "teacher_academy";
 }

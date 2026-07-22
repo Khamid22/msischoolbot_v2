@@ -55,7 +55,6 @@ test("calculates dashboard totals from real assignments and assessment weighting
   const stats = calculateTeacherAcademyStats(teachers);
   assert.equal(stats.total, 2);
   assert.equal(stats.ready, 1);
-  assert.equal(stats.appointedLessons, 4);
   assert.equal(stats.weightedAverage?.toFixed(2), "7.67");
 });
 
@@ -111,7 +110,8 @@ test("selects responsive page sizes at the approved breakpoints", () => {
 
 test("rejects unavailable and invalid URL views for HOD", () => {
   assert.equal(academyViewFromSearch("?academy_view=active_teachers", "head_of_department"), "teacher_academy");
-  assert.equal(academyViewFromSearch("?academy_view=appointed_lessons", "head_of_department"), "appointed_lessons");
+  assert.equal(academyViewFromSearch("?academy_view=appointed_lessons", "head_of_department"), "teacher_academy");
+  assert.equal(academyViewFromSearch("?academy_view=appointed_lessons", "academic_director"), "teacher_academy");
   assert.equal(academyViewFromSearch("?academy_view=active_teachers", "academic_director"), "active_teachers");
   assert.equal(academyViewFromSearch("?academy_view=unknown", "academic_director"), "teacher_academy");
 });
