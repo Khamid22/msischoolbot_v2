@@ -11,18 +11,28 @@ def _read(path: str) -> str:
 
 
 def test_academy_uses_shared_accessible_modal_and_action_menu():
-    source = _read("features/teacher-academy/TeacherAcademyPanel.tsx")
+    source = "\n".join([
+        _read("features/teacher-academy/TeacherAcademyPanel.tsx"),
+        _read("features/teacher-academy/TeacherAcademyWorkflowModals.tsx"),
+    ])
     assert 'from "@/shared/ui/ActionMenu"' in source
     assert 'from "@/shared/ui/Modal"' in source
     assert "ActionMenu" in source
     assert "Modal" in source
 
 
-def test_teacher_academy_has_mobile_cards_and_desktop_table():
-    source = _read("features/teacher-academy/TeacherAcademyPanel.tsx")
-    assert "MobileCardList" in source
-    assert "ResponsiveTable" in source
-    assert "AcademyTeacherCard" in source
+def test_teacher_academy_uses_cards_at_every_roster_breakpoint_and_a_hybrid_lessons_view():
+    panel = _read("features/teacher-academy/TeacherAcademyPanel.tsx")
+    cards = _read("features/teacher-academy/TeacherAcademyCards.tsx")
+    lessons = _read("features/teacher-academy/AppointedLessonsView.tsx")
+    assert "TeacherCardGrid" in cards
+    assert "grid-cols-1" in cards
+    assert "md:grid-cols-2" in cards
+    assert "xl:grid-cols-3" in cards
+    assert "TeacherAcademyRoster" in panel
+    assert "ScopedTeacherAcademyRoster" in panel
+    assert "MobileCardList" in lessons
+    assert "ResponsiveTable" in lessons
 
 
 def test_head_of_departments_workspace_uses_exact_folder_and_shared_shell():

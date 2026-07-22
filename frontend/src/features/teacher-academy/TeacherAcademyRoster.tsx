@@ -1,21 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowDownWideNarrow,
-  Loader2,
-  Search,
-  Trash2,
-  UserX,
-} from "lucide-react";
+import { Loader2, Trash2, UserX } from "lucide-react";
 import {
   useEffect,
   useMemo,
   useRef,
   useState,
   type FormEvent,
-  type KeyboardEvent,
-  type MouseEvent,
   type ReactNode,
-  type RefObject,
 } from "react";
 
 import { jsonBody, recruitmentRequest } from "@/features/recruitment/api";
@@ -28,14 +19,23 @@ import {
   replaceUrlParams,
   secondaryButtonClass,
 } from "@/features/recruitment/ui";
-import { MobileCardList } from "@/shared/ui/MobileCardList";
+import {
+  TeacherCardGrid,
+  TeacherCardGridSkeleton,
+  TeacherGridEmptyState,
+  TeacherRosterToolbar,
+  type TeacherAcademyCardModel,
+} from "@/features/teacher-academy/TeacherAcademyCards";
+import {
+  academyRosterPageSize,
+  academyStatusPresentation,
+  type TeacherAcademySort,
+} from "@/features/teacher-academy/model";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { Pagination } from "@/shared/ui/Pagination";
-import { ResponsiveTable } from "@/shared/ui/ResponsiveTable";
-import { renderedDensityPixels } from "@/shared/lib/uiDensity";
 
 export type TeacherRosterKind = "teacher_academy" | "active_teacher";
-export type TeacherRosterSort = "average_score" | "lessons" | "date";
+export type TeacherRosterSort = TeacherAcademySort;
 
 export type TeacherRosterItem = {
   kind: TeacherRosterKind;
@@ -109,25 +109,9 @@ type TeacherAcademyRosterProps = {
   toolbarLeading?: ReactNode;
 };
 
-const DESKTOP_ROW_HEIGHT = 48;
-const DESKTOP_HEADER_HEIGHT = 36;
-const PAGINATION_HEIGHT = 48;
-const VIEWPORT_GUTTER = 16;
-const DESKTOP_MIN_PAGE_SIZE = 10;
-const MOBILE_PAGE_SIZE = 5;
-
-function statusLabel(value: string) {
-  return value.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
 function initialRosterFilters() {
   if (typeof window === "undefined") {
-    return {
-      search: "",
-      subjectId: "",
-      sort: "average_score" as TeacherRosterSort,
-      page: 1,
-    };
+    return { search: "", subjectId: "", sort: "average_score" as TeacherRosterSort, page: 1 };
   }
   const params = new URLSearchParams(window.location.search);
   const requestedSort = params.get("teacher_sort");
@@ -138,9 +122,7 @@ function initialRosterFilters() {
     sort: requestedSort === "lessons" || requestedSort === "date"
       ? requestedSort
       : "average_score" as TeacherRosterSort,
-    page: Number.isFinite(requestedPage) && requestedPage > 0
-      ? Math.floor(requestedPage)
-      : 1,
+    page: Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1,
   };
 }
 
@@ -150,212 +132,40 @@ function profileHref(teacher: TeacherRosterItem, basePath: string) {
     : "";
 }
 
-function isInteractiveTarget(target: EventTarget | null) {
-  return target instanceof Element
-    && Boolean(target.closest("a,button,input,select,textarea,[role='menuitem']"));
-}
-
-function AcademyStatus({
-  status,
-  completed = false,
-}: {
-  status: string;
-  completed?: boolean;
-}) {
-  if (completed) {
-    return (
-      <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-[0.6875rem] font-semibold text-emerald-900">
-        Academy completed
-      </span>
-    );
-  }
-  const normalized = String(status || "").toLowerCase();
-  const tone = normalized.includes("improvement")
-    ? "bg-rose-100 text-rose-900"
-    : normalized.includes("ready") || normalized.includes("passed")
-      ? "bg-emerald-100 text-emerald-900"
-      : "bg-sky-100 text-sky-900";
-  return (
-    <span className={`inline-flex rounded-full px-2 py-1 text-[0.6875rem] font-semibold ${tone}`}>
-      {statusLabel(status || "in_training")}
-    </span>
-  );
-}
-
-function LessonsCompleted({ teacher }: { teacher: TeacherRosterItem }) {
-  if (teacher.assigned_count <= 0) {
-    return <span className="text-xs font-medium text-muted-foreground">Not started</span>;
-  }
-  return (
-    <span className="text-xs font-semibold tabular-nums text-foreground">
-      {teacher.passed_count}/{teacher.assigned_count}
-    </span>
-  );
-}
-
-function AverageScore({ teacher }: { teacher: TeacherRosterItem }) {
-  return (
-    <span className="text-xs font-semibold tabular-nums text-foreground">
-      {teacher.average_score === null ? "No score" : teacher.average_score.toFixed(1)}
-    </span>
-  );
-}
-
-function useViewportPageSize(
-  tableRef: RefObject<HTMLDivElement | null>,
-) {
-  const [perPage, setPerPage] = useState(() => (
-    typeof window !== "undefined" && window.innerWidth < 1024
-      ? MOBILE_PAGE_SIZE
-      : DESKTOP_MIN_PAGE_SIZE
+function useResponsivePageSize() {
+  const [pageSize, setPageSize] = useState(() => (
+    academyRosterPageSize(typeof window === "undefined" ? 1280 : window.innerWidth)
   ));
-
   useEffect(() => {
     let frame = 0;
-    const calculate = () => {
+    const update = () => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        if (window.matchMedia("(max-width: 1023px)").matches) {
-          setPerPage(MOBILE_PAGE_SIZE);
-          return;
-        }
-        const tableTop = tableRef.current?.getBoundingClientRect().top ?? 0;
-        const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-        const rowHeight = renderedDensityPixels(DESKTOP_ROW_HEIGHT);
-        const headerHeight = renderedDensityPixels(DESKTOP_HEADER_HEIGHT);
-        const paginationHeight = renderedDensityPixels(PAGINATION_HEIGHT);
-        const viewportGutter = renderedDensityPixels(VIEWPORT_GUTTER);
-        const available = Math.max(
-          headerHeight + rowHeight,
-          viewportHeight - Math.max(0, tableTop) - viewportGutter,
-        );
-        const next = Math.max(
-          DESKTOP_MIN_PAGE_SIZE,
-          Math.min(
-            100,
-            Math.floor(
-              (
-                available
-                - headerHeight
-                - paginationHeight
-              ) / rowHeight,
-            ),
-          ),
-        );
-        setPerPage(next);
-      });
+      frame = requestAnimationFrame(() => setPageSize(academyRosterPageSize(window.innerWidth)));
     };
-
-    calculate();
-    const observer = typeof ResizeObserver === "function"
-      ? new ResizeObserver(calculate)
-      : null;
-    if (tableRef.current) observer?.observe(tableRef.current);
-    window.addEventListener("resize", calculate);
-    window.visualViewport?.addEventListener("resize", calculate);
+    window.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("resize", update);
     return () => {
       cancelAnimationFrame(frame);
-      observer?.disconnect();
-      window.removeEventListener("resize", calculate);
-      window.visualViewport?.removeEventListener("resize", calculate);
+      window.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("resize", update);
     };
-  }, [tableRef]);
-
-  return perPage;
+  }, []);
+  return pageSize;
 }
 
-function TeacherMobileCard({
-  teacher,
-  onOpen,
-  onDelete,
-  onReject,
-}: {
-  teacher: TeacherRosterItem;
-  onOpen: () => void;
-  onDelete: () => void;
-  onReject: () => void;
-}) {
-  const isAcademy = teacher.kind === "teacher_academy";
-  return (
-    <article className={`rounded-xl border p-3 shadow-sm ${
-      teacher.academy_completed
-        ? "border-emerald-300 bg-emerald-50/70"
-        : "border-border bg-card"
-    }`}>
-      <div className="flex items-start gap-2">
-        <button
-          type="button"
-          onClick={onOpen}
-          className="min-w-0 flex-1 rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
-        >
-          <strong className="block truncate text-sm">{teacher.full_name}</strong>
-          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-            {teacher.position || "Position not set"}
-          </span>
-        </button>
-      </div>
-      <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-        <div>
-          <dt className="font-medium text-muted-foreground">
-            {isAcademy ? "Added to Academy" : "Active since"}
-          </dt>
-          <dd className="mt-0.5 font-semibold">
-            {teacher.added_on ? dateLabel(teacher.added_on) : "Not recorded"}
-          </dd>
-        </div>
-        <div>
-          <dt className="font-medium text-muted-foreground">Subject</dt>
-          <dd className="mt-0.5 truncate font-semibold">{teacher.subject || "Not set"}</dd>
-        </div>
-        <div>
-          <dt className="font-medium text-muted-foreground">
-            {isAcademy ? "Academy status" : "Status"}
-          </dt>
-          <dd className="mt-1">
-            {isAcademy
-              ? <AcademyStatus status={teacher.status} completed={teacher.academy_completed} />
-              : statusLabel(teacher.status)}
-          </dd>
-        </div>
-        {isAcademy ? (
-          <>
-            <div>
-              <dt className="font-medium text-muted-foreground">Lessons completed</dt>
-              <dd className="mt-1"><LessonsCompleted teacher={teacher} /></dd>
-            </div>
-            <div>
-              <dt className="font-medium text-muted-foreground">Average score</dt>
-              <dd className="mt-1"><AverageScore teacher={teacher} /></dd>
-            </div>
-          </>
-        ) : null}
-      </dl>
-      {teacher.can_delete || teacher.can_reject ? (
-        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3">
-          {teacher.can_delete ? (
-            <button
-              type="button"
-              onClick={onDelete}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </button>
-          ) : null}
-          {teacher.can_reject ? (
-            <button
-              type="button"
-              onClick={onReject}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 text-xs font-semibold text-destructive hover:bg-destructive/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/35"
-            >
-              <UserX className="h-4 w-4" />
-              Reject
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-    </article>
-  );
+function useDebouncedValue(value: string, delay = 250) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [delay, value]);
+  return debounced;
+}
+
+function activeStatusLabel(value: string) {
+  return String(value || "active")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 export function TeacherAcademyRoster({
@@ -370,6 +180,7 @@ export function TeacherAcademyRoster({
 }: TeacherAcademyRosterProps) {
   const initial = useMemo(initialRosterFilters, []);
   const [search, setSearch] = useState(initial.search);
+  const debouncedSearch = useDebouncedValue(search);
   const [subjectId, setSubjectId] = useState(initial.subjectId);
   const [sort, setSort] = useState<TeacherRosterSort>(
     kind === "teacher_academy" ? initial.sort : "date",
@@ -381,21 +192,9 @@ export function TeacherAcademyRoster({
     action: "trash_bin" | "rejected";
   } | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
-  const tableViewportRef = useRef<HTMLDivElement>(null);
-  const previousPerPageRef = useRef(0);
-  const perPage = useViewportPageSize(tableViewportRef);
+  const perPage = useResponsivePageSize();
+  const previousPageSize = useRef(perPage);
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    if (!previousPerPageRef.current) {
-      previousPerPageRef.current = perPage;
-      return;
-    }
-    if (previousPerPageRef.current === perPage) return;
-    const firstItemOffset = (page - 1) * previousPerPageRef.current;
-    previousPerPageRef.current = perPage;
-    setPage(Math.floor(firstItemOffset / perPage) + 1);
-  }, [page, perPage]);
 
   useEffect(() => {
     replaceUrlParams({
@@ -406,6 +205,12 @@ export function TeacherAcademyRoster({
     });
   }, [kind, page, search, sort, subjectId]);
 
+  useEffect(() => {
+    if (previousPageSize.current === perPage) return;
+    previousPageSize.current = perPage;
+    setPage(1);
+  }, [perPage]);
+
   const options = useQuery({
     queryKey: ["recruitment", "options"],
     queryFn: () => recruitmentRequest<RecruitmentOptions>(`${RECRUITMENT_API}/options`),
@@ -414,7 +219,7 @@ export function TeacherAcademyRoster({
     kind,
     page: String(page),
     per_page: String(perPage),
-    search,
+    search: debouncedSearch,
     sort: kind === "teacher_academy" ? sort : "date",
   });
   if (subjectId) queryParams.set("subject_id", subjectId);
@@ -425,7 +230,7 @@ export function TeacherAcademyRoster({
       kind,
       page,
       perPage,
-      search,
+      debouncedSearch,
       subjectId,
       sort,
       refreshToken,
@@ -449,21 +254,16 @@ export function TeacherAcademyRoster({
       action: "trash_bin" | "rejected";
       rejection_reason: string;
       reason_detail: string;
-    }) =>
-      recruitmentRequest<CloseResult>(
-        `${RECRUITMENT_API}/teachers/${closeSelection?.teacher.kind}/${closeSelection?.teacher.record_id}/close`,
-        { method: "POST", body: jsonBody(values) },
-      ),
+    }) => recruitmentRequest<CloseResult>(
+      `${RECRUITMENT_API}/teachers/${closeSelection?.teacher.kind}/${closeSelection?.teacher.record_id}/close`,
+      { method: "POST", body: jsonBody(values) },
+    ),
     onSuccess: (result) => {
       const closedTeacher = closeSelection?.teacher;
       setCloseSelection(null);
       setRejectionReason("");
       onAnnouncement(
-        result.message || (
-          result.action === "trash_bin"
-            ? "Teacher moved to Trash Bin."
-            : "Teacher rejected."
-        ),
+        result.message || (result.action === "trash_bin" ? "Teacher moved to Trash Bin." : "Teacher rejected."),
         "success",
       );
       if (closedTeacher) onRemoved?.(closedTeacher);
@@ -480,20 +280,6 @@ export function TeacherAcademyRoster({
     }
     const href = profileHref(teacher, basePath);
     if (href) window.location.assign(href);
-  };
-  const handleRowClick = (
-    event: MouseEvent<HTMLTableRowElement>,
-    teacher: TeacherRosterItem,
-  ) => {
-    if (!isInteractiveTarget(event.target)) openTeacher(teacher);
-  };
-  const handleRowKeyboard = (
-    event: KeyboardEvent<HTMLTableRowElement>,
-    teacher: TeacherRosterItem,
-  ) => {
-    if (isInteractiveTarget(event.target) || !["Enter", " "].includes(event.key)) return;
-    event.preventDefault();
-    openTeacher(teacher);
   };
   const closeAction = () => {
     if (closeTeacher.isPending) return;
@@ -513,218 +299,108 @@ export function TeacherAcademyRoster({
       reason_detail: String(form.get("reason_detail") || "").trim(),
     });
   };
-  const updateSearch = (value: string) => {
-    setSearch(value);
+
+  const clearFilters = () => {
+    setSearch("");
+    setSubjectId("");
+    setSort(kind === "teacher_academy" ? "average_score" : "date");
     setPage(1);
   };
-  const updateSubject = (value: string) => {
-    setSubjectId(value);
-    setPage(1);
-  };
-  const updateSort = (value: TeacherRosterSort) => {
-    setSort(value);
-    setPage(1);
-  };
+  const hasFilters = Boolean(search || subjectId || (kind === "teacher_academy" && sort !== "average_score"));
   const firstItem = knownTotal ? ((page - 1) * perPage) + 1 : 0;
   const lastItem = Math.min(knownTotal, (page - 1) * perPage + items.length);
 
-  return (
-    <div className="space-y-3">
-      <div className={`flex flex-col gap-2 xl:flex-row xl:items-end ${
-        toolbarLeading ? "border-b-2 border-amber-500" : ""
-      }`}>
-        {toolbarLeading ? (
-          <div className="min-w-0 flex-1">{toolbarLeading}</div>
-        ) : null}
-        <div className={`grid shrink-0 gap-2 pb-2 sm:grid-cols-2 xl:pb-1 ${
-          kind === "teacher_academy"
-            ? "xl:grid-cols-[10.5rem_10.5rem_15rem]"
-            : "xl:grid-cols-[10.5rem_15rem]"
-        }`}>
-          {kind === "teacher_academy" ? (
-            <label className="relative">
-              <span className="sr-only">Sort Teacher Academy teachers</span>
-              <ArrowDownWideNarrow className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <select
-                value={sort}
-                onChange={(event) => updateSort(event.target.value as TeacherRosterSort)}
-                className={`${fieldClass} min-h-11 pl-9 text-xs`}
-                aria-label="Sort Teacher Academy teachers"
-              >
-                <option value="average_score">Average score</option>
-                <option value="lessons">Lessons completed</option>
-                <option value="date">Date added</option>
-              </select>
-            </label>
-          ) : null}
-          <label>
-            <span className="sr-only">Filter teachers by subject</span>
-            <select
-              value={subjectId}
-              onChange={(event) => updateSubject(event.target.value)}
-              className={`${fieldClass} min-h-11 text-xs`}
-              aria-label="Filter teachers by subject"
-            >
-              <option value="">All subjects</option>
-              {(options.data?.subjects || []).map((subject) => (
-                <option key={subject.id} value={subject.id}>{subject.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="relative sm:col-span-2 xl:col-span-1">
-            <span className="sr-only">Search teachers</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => updateSearch(event.target.value)}
-              className={`${fieldClass} min-h-11 pl-9 text-xs`}
-              placeholder="Search teachers"
-            />
-          </label>
-        </div>
-      </div>
+  const cards: TeacherAcademyCardModel[] = items.map((teacher) => {
+    const academyStatus = academyStatusPresentation(teacher.status);
+    const actions = [];
+    if (teacher.can_delete) {
+      actions.push({
+        key: "delete",
+        label: "Delete to Trash Bin",
+        icon: <Trash2 className="h-4 w-4" />,
+        onClick: () => setCloseSelection({ teacher, action: "trash_bin" }),
+        danger: true,
+      });
+    }
+    if (teacher.can_reject) {
+      actions.push({
+        key: "reject",
+        label: "Reject teacher",
+        icon: <UserX className="h-4 w-4" />,
+        onClick: () => setCloseSelection({ teacher, action: "rejected" }),
+        danger: true,
+      });
+    }
+    return {
+      key: `${teacher.kind}:${teacher.record_id}`,
+      kind: teacher.kind,
+      fullName: teacher.full_name || "Teacher",
+      position: teacher.position || (teacher.kind === "teacher_academy" ? "Trainee Teacher" : "Teacher"),
+      subject: teacher.subject || "Subject not set",
+      statusLabel: teacher.kind === "teacher_academy" ? academyStatus.label : activeStatusLabel(teacher.status),
+      statusTone: teacher.kind === "teacher_academy" ? academyStatus.tone : "success",
+      joinedLabel: teacher.added_on ? dateLabel(teacher.added_on) : "Not recorded",
+      passed: teacher.passed_count,
+      target: teacher.assigned_count,
+      averageScore: teacher.average_score,
+      completed: teacher.academy_completed,
+      primaryLabel: teacher.kind === "teacher_academy" ? "View journey" : "View profile",
+      onOpen: () => openTeacher(teacher),
+      actions,
+    };
+  });
 
-      <div ref={tableViewportRef}>
-        {teachers.isLoading ? (
-          <div className="hidden overflow-hidden rounded-xl border border-border bg-card lg:block" aria-label="Loading teachers">
-            <div className="h-10 animate-pulse border-b border-border bg-muted/60 motion-reduce:animate-none" />
-            {Array.from({ length: perPage }, (_, row) => (
-              <div key={row} className="h-14 animate-pulse border-b border-border/70 bg-muted/25 last:border-0 motion-reduce:animate-none" />
-            ))}
-          </div>
-        ) : null}
-        {teachers.error ? (
-          <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-            {queryError(teachers.error)}
-          </div>
-        ) : null}
-        {!teachers.isLoading && !teachers.error ? (
-          <>
-            <ResponsiveTable
-              showAt="lg"
-              ariaLabel={kind === "teacher_academy" ? "Teacher Academy teachers" : "Active teachers"}
-              className="overflow-x-auto overflow-y-visible"
-            >
-              <table className="w-full min-w-[65rem] table-fixed border-collapse text-left">
-                <thead className="bg-muted/80 text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
-                  <tr className="h-9">
-                    <th scope="col" className="w-[20%] px-4 font-semibold">Teacher</th>
-                    <th scope="col" className="w-[15%] px-3 font-semibold">
-                      {kind === "teacher_academy" ? "Added to Teacher Academy" : "Active since"}
-                    </th>
-                    <th scope="col" className="w-[17%] px-3 font-semibold">Position</th>
-                    <th scope="col" className="w-[13%] px-3 font-semibold">
-                      {kind === "teacher_academy" ? "Academy status" : "Status"}
-                    </th>
-                    <th scope="col" className="w-[11%] px-3 font-semibold">Lessons completed</th>
-                    <th scope="col" className="w-[10%] px-3 font-semibold">Average score</th>
-                    <th scope="col" className="w-[14%] px-3 text-right font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {items.map((teacher) => (
-                    <tr
-                      key={`${teacher.kind}:${teacher.record_id}`}
-                      tabIndex={0}
-                      onClick={(event) => handleRowClick(event, teacher)}
-                      onKeyDown={(event) => handleRowKeyboard(event, teacher)}
-                      className={`group h-12 cursor-pointer transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 motion-reduce:transition-none ${
-                        teacher.academy_completed
-                          ? "bg-emerald-50/70 hover:bg-emerald-50 focus-visible:bg-emerald-50"
-                          : "bg-card hover:bg-muted/40 focus-visible:bg-muted/50"
-                      }`}
-                    >
-                      <td className="px-4 py-0.5">
-                        <button
-                          type="button"
-                          onClick={() => openTeacher(teacher)}
-                          className="block w-full rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
-                        >
-                          <span className="block truncate text-sm font-semibold text-foreground group-hover:text-primary">
-                            {teacher.full_name}
-                          </span>
-                          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                            {teacher.subject || "Subject not set"}
-                          </span>
-                        </button>
-                      </td>
-                      <td className="px-3 py-0.5 text-xs font-medium text-foreground">
-                        {teacher.added_on ? dateLabel(teacher.added_on) : "Not recorded"}
-                      </td>
-                      <td className="px-3 py-0.5">
-                        <span className="line-clamp-2 text-xs text-foreground">
-                          {teacher.position || "Position not set"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-0.5">
-                        {kind === "teacher_academy"
-                          ? <AcademyStatus status={teacher.status} completed={teacher.academy_completed} />
-                          : <span className="text-xs font-medium">{statusLabel(teacher.status)}</span>}
-                      </td>
-                      <td className="px-3 py-0.5"><LessonsCompleted teacher={teacher} /></td>
-                      <td className="px-3 py-0.5"><AverageScore teacher={teacher} /></td>
-                      <td className="px-3 py-0.5">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {teacher.can_delete ? (
-                            <button
-                              type="button"
-                              onClick={() => setCloseSelection({ teacher, action: "trash_bin" })}
-                              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[0.6875rem] font-semibold text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
-                              aria-label={`Delete ${teacher.full_name} to Trash Bin`}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Delete
-                            </button>
-                          ) : null}
-                          {teacher.can_reject ? (
-                            <button
-                              type="button"
-                              onClick={() => setCloseSelection({ teacher, action: "rejected" })}
-                              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 text-[0.6875rem] font-semibold text-destructive hover:bg-destructive/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/35"
-                              aria-label={`Reject ${teacher.full_name}`}
-                            >
-                              <UserX className="h-3.5 w-3.5" />
-                              Reject
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {!items.length ? (
-                <div className="border-t border-border p-8 text-center text-sm text-muted-foreground">
-                  No teachers in this view.
-                </div>
-              ) : null}
-            </ResponsiveTable>
-            <MobileCardList hideAt="lg">
-              {items.map((teacher) => (
-                <TeacherMobileCard
-                  key={`${teacher.kind}:${teacher.record_id}`}
-                  teacher={teacher}
-                  onOpen={() => openTeacher(teacher)}
-                  onDelete={() => setCloseSelection({ teacher, action: "trash_bin" })}
-                  onReject={() => setCloseSelection({ teacher, action: "rejected" })}
-                />
-              ))}
-              {!items.length ? (
-                <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-                  No teachers in this view.
-                </div>
-              ) : null}
-            </MobileCardList>
-            <Pagination
-              page={page}
-              totalPages={teachers.data?.total_pages || 1}
-              onPageChange={setPage}
-              label={`Showing ${firstItem}–${lastItem} of ${knownTotal}`}
-            />
-          </>
-        ) : null}
-      </div>
+  return (
+    <div className="space-y-4">
+      <TeacherRosterToolbar
+        search={search}
+        subjectId={subjectId}
+        sort={sort}
+        subjects={(options.data?.subjects || []).map((subject) => ({ id: subject.id, label: subject.name }))}
+        showSort={kind === "teacher_academy"}
+        leading={toolbarLeading}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
+        onSubjectChange={(value) => {
+          setSubjectId(value);
+          setPage(1);
+        }}
+        onSortChange={(value) => {
+          setSort(value);
+          setPage(1);
+        }}
+        onClear={clearFilters}
+      />
+
+      {teachers.isLoading ? <TeacherCardGridSkeleton count={perPage} /> : null}
+      {teachers.error ? (
+        <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
+          <p className="font-bold">{queryError(teachers.error)}</p>
+          <button
+            type="button"
+            onClick={() => void teachers.refetch()}
+            className="mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-destructive/30 bg-card px-4 font-black text-destructive hover:bg-destructive/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/35"
+          >
+            Try again
+          </button>
+        </div>
+      ) : null}
+      {!teachers.isLoading && !teachers.error ? (
+        cards.length ? <TeacherCardGrid teachers={cards} /> : (
+          <TeacherGridEmptyState filtered={hasFilters} onClear={clearFilters} />
+        )
+      ) : null}
+
+      {!teachers.isLoading && !teachers.error && knownTotal ? (
+        <Pagination
+          page={page}
+          totalPages={teachers.data?.total_pages || 1}
+          onPageChange={setPage}
+          label={`Showing ${firstItem}–${lastItem} of ${knownTotal}`}
+        />
+      ) : null}
 
       <Modal
         open={Boolean(closeSelection)}
@@ -775,12 +451,11 @@ export function TeacherAcademyRoster({
             ) : (
               <input autoFocus className="sr-only" aria-label="Confirm delete to Trash Bin" />
             )}
-            <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
+            <p className="rounded-lg border border-warning/35 bg-warning/10 p-3 text-xs leading-5 text-warning-foreground">
               {closeSelection?.action === "trash_bin"
-                ? "This removes the teacher from the active roster and disables their login. The same profile and roster record can be recovered from Trash Bin."
+                ? "This removes the teacher from the active roster and disables their login. The profile can be recovered from Trash Bin."
                 : "This moves the profile to Rejected. Lessons, assessments, documents, and audit history remain preserved."}
-              {closeSelection?.action === "rejected"
-                && closeSelection.teacher.generated_login_will_be_deleted
+              {closeSelection?.action === "rejected" && closeSelection.teacher.generated_login_will_be_deleted
                 ? " The Academy-generated login will be deleted and must be provisioned again if the teacher is accepted later."
                 : ""}
             </p>
@@ -792,7 +467,7 @@ export function TeacherAcademyRoster({
               </button>
               <button type="submit" className={`${buttonClass} !bg-destructive !text-destructive-foreground`} disabled={closeTeacher.isPending || (closeSelection?.action === "rejected" && options.isLoading)}>
                 {closeTeacher.isPending
-                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
                   : closeSelection?.action === "trash_bin"
                     ? <Trash2 className="h-4 w-4" />
                     : <UserX className="h-4 w-4" />}

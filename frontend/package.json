@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test:logic": "node --experimental-strip-types --test src/shared/lib/bootstrap.test.ts src/shared/lib/metricMath.test.ts src/shared/lib/schoolTime.test.ts src/shared/lib/uiDensity.test.ts",
+    "test:logic": "node --experimental-strip-types --test src/shared/lib/bootstrap.test.ts src/shared/lib/metricMath.test.ts src/shared/lib/schoolTime.test.ts src/shared/lib/uiDensity.test.ts src/features/teacher-academy/model.test.ts",
     "test:schedule": "node --experimental-strip-types --test src/features/academics/timetable/scheduleMath.test.ts src/features/academics/timetable/timetableMath.test.ts",
     "test:shared-ui": "node --experimental-strip-types --test src/shared/ui/roleNav.test.ts src/shared/ui/statusTones.test.ts src/shared/ui/sharedUiContract.test.ts",
     "test:academic": "node --experimental-strip-types --test src/workspaces/academic_shared/academicNav.test.ts src/workspaces/academic_shared/academicPages.contract.test.ts",

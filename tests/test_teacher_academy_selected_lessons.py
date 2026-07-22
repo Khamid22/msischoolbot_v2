@@ -260,7 +260,9 @@ def test_create_academy_teacher_rejects_cross_program_or_non_lesson_ids(monkeypa
 
 
 def test_teacher_academy_frontend_source_includes_selected_lesson_ui():
-    source = Path("frontend/src/features/teacher-academy/TeacherAcademyPanel.tsx").read_text()
+    source = Path(
+        "frontend/src/features/teacher-academy/TeacherAcademyWorkflowModals.tsx"
+    ).read_text()
 
     assert "Select Academy Lessons" in source
     assert "Selected {selectedLessonIds.length} lessons" in source

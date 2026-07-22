@@ -484,6 +484,9 @@ def test_hod_teacher_routes_enforce_subject_scope(client, monkeypatch, path, ser
 
 def test_frontend_teacher_academy_uses_clean_role_routes_without_admin_action_fallback():
     panel_source = Path("frontend/src/features/teacher-academy/TeacherAcademyPanel.tsx").read_text()
+    workflow_source = Path(
+        "frontend/src/features/teacher-academy/TeacherAcademyWorkflowModals.tsx"
+    ).read_text()
     routes_source = Path("frontend/src/shared/lib/routes.ts").read_text()
     api_routes_source = Path("frontend/src/shared/api/routes.ts").read_text()
     ad_page = Path("frontend/src/workspaces/academic_director/pages/TeacherAcademy.tsx").read_text()
@@ -495,8 +498,8 @@ def test_frontend_teacher_academy_uses_clean_role_routes_without_admin_action_fa
     assert "routes.academicDirectorTeacherAcademyAssessmentDelete" in panel_source
     assert "routes.academicDirectorTeacherAcademyDelete" not in panel_source
     assert "routes.academicDirectorTeacherPasswordReset" in panel_source
-    assert "Password reset — same as the login" in panel_source
-    assert "Delete assessment report" in panel_source
+    assert "Password reset — same as the login" in workflow_source
+    assert "Delete assessment report" in workflow_source
     assert "assessmentDelete" in panel_source
     assert "routes.headOfDepartmentTeacherAcademyAssignmentUpdate" in panel_source
     assert "routes.headOfDepartmentTeacherAcademyAssessmentCreate" in panel_source
@@ -518,8 +521,8 @@ def test_frontend_teacher_academy_uses_clean_role_routes_without_admin_action_fa
     assert "/head-of-departments/api" not in routes_source
     assert "/academic-director/api" not in api_routes_source
     assert "/head-of-departments/api" not in api_routes_source
-    assert 'managementMode: props.managementMode || "academic_director"' in ad_page
-    assert 'managementMode: "head_of_department"' in hod_page
+    assert 'mode="academic_director"' in ad_page
+    assert 'mode="head_of_department"' in hod_page
 
 
 def test_teacher_academy_legacy_deletion_plan_documents_completed_admin_cleanup():

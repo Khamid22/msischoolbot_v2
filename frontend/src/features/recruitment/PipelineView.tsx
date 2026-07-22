@@ -12,6 +12,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
+import { createPortal, flushSync } from "react-dom";
 
 import { AppointmentForm } from "@/features/recruitment/AppointmentForm";
 import { InterviewSessionModal } from "@/features/recruitment/InterviewSessionModal";
@@ -69,6 +70,8 @@ type ScheduleSelection = { candidate: RecruitmentCandidate; appointmentType: "jo
 type RescheduleSelection = { candidate: RecruitmentCandidate; appointment: RecruitmentAppointment };
 type CancelSelection = { candidate: RecruitmentCandidate; appointment: RecruitmentAppointment };
 type UndoTrash = { candidate: RecruitmentCandidate; previousCandidate: RecruitmentCandidate };
+const candidateOutcomeTargets = ["trash_bin", "rejected", "candidate_withdrew"] as const;
+type CandidateOutcomeTarget = (typeof candidateOutcomeTargets)[number];
 
 type PipelineStagesData = {
   items: RecruitmentPipelineStage[];
@@ -588,7 +591,7 @@ export function PipelineView({
   const [boardPanning, setBoardPanning] = useState(false);
   const [draggedCandidate, setDraggedCandidate] = useState<RecruitmentCandidate | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
-  const [dragOverOutcome, setDragOverOutcome] = useState<"trash_bin" | "rejected" | "candidate_withdrew" | null>(null);
+  const [dragOverOutcome, setDragOverOutcome] = useState<CandidateOutcomeTarget | null>(null);
   const [rejectSelection, setRejectSelection] = useState<RejectSelection | null>(null);
   const [withdrawSelection, setWithdrawSelection] = useState<RejectSelection | null>(null);
   const [scheduleSelection, setScheduleSelection] = useState<ScheduleSelection | null>(null);
@@ -733,7 +736,12 @@ export function PipelineView({
     window.requestAnimationFrame(() => searchTriggerRef.current?.focus());
   };
   const finishDrag = useCallback(() => { draggedCandidateRef.current = null; setDraggedCandidate(null); setDragOverStage(null); setDragOverOutcome(null); }, []);
-  const handleCardDragStart = useCallback((value: RecruitmentCandidate) => { draggedCandidateRef.current = value; setDraggedCandidate(value); }, []);
+  const handleCardDragStart = useCallback((value: RecruitmentCandidate) => {
+    draggedCandidateRef.current = value;
+    // Native drag-and-drop can take over painting as soon as dragstart returns.
+    // Commit the tray first so it is visible throughout the initial drag frame.
+    flushSync(() => setDraggedCandidate(value));
+  }, []);
   const handleCardSchedule = useCallback((value: RecruitmentCandidate, appointmentType: "job_interview" | "demo_lesson") => { setScheduleSelection({ candidate: value, appointmentType }); }, []);
   const handleCardInterview = useCallback((value: RecruitmentCandidate, appointment: RecruitmentAppointment) => setInterviewSelection({ candidate: value, appointment }), []);
   const handleCardReschedule = useCallback((value: RecruitmentCandidate, appointment: RecruitmentAppointment) => { setRescheduleSelection({ candidate: value, appointment }); }, []);
@@ -948,22 +956,20 @@ export function PipelineView({
         {desktopBoard}
       </div>
 
-      {draggedCandidate ? (() => {
-        const targets = ["trash_bin", "rejected", "candidate_withdrew"] as const;
-        return (
-          <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--app-bottom-inset)+1rem)] z-40 flex justify-center px-3">
-            <section aria-label="Candidate outcome drop targets" className="pointer-events-auto grid w-full max-w-2xl grid-cols-3 gap-2 rounded-xl border border-border bg-card/95 p-2 shadow-card-hover backdrop-blur">
-              {targets.map((target) => {
-                const highlighted = dragOverOutcome === target;
-                const Icon = target === "trash_bin" ? Trash2 : target === "rejected" ? Ban : UserMinus;
-                const label = target === "trash_bin" ? "Trash Bin" : target === "rejected" ? "Reject" : "Withdraw";
-                const toneCls = target === "trash_bin" ? "border-destructive/50 bg-destructive/10 text-destructive" : target === "rejected" ? "border-red-700/40 bg-red-700/5 text-red-800 dark:text-red-300" : "border-rose-400/50 bg-rose-100/70 text-rose-800 dark:bg-rose-400/10 dark:text-rose-200";
-                return <div key={target} onDragEnter={(event) => { event.preventDefault(); setDragOverOutcome(target); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragOverOutcome(null)} onDrop={(event) => { event.preventDefault(); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate) return; if (target === "trash_bin") move.mutate({ candidate, stage: "trash_bin" }); else if (target === "rejected") setRejectSelection({ candidate }); else setWithdrawSelection({ candidate }); }} className={`flex min-h-14 items-center justify-center gap-2 rounded-lg border border-dashed px-2 text-center text-xs font-semibold transition-colors sm:text-sm ${toneCls} ${highlighted ? "ring-2 ring-current/20" : ""}`}><Icon className="h-4 w-4 shrink-0" />{label}</div>;
-              })}
-            </section>
-          </div>
-        );
-      })() : null}
+      {draggedCandidate && typeof document !== "undefined" ? createPortal(
+        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--app-bottom-inset)+1rem)] z-[90] flex justify-center px-3 animate-in fade-in slide-in-from-bottom-2 duration-150 motion-reduce:animate-none">
+          <section aria-label="Candidate outcome drop targets" aria-live="assertive" className="pointer-events-auto grid w-full max-w-2xl grid-cols-3 gap-2 rounded-xl border border-border bg-card/95 p-2 shadow-card-hover backdrop-blur">
+            {candidateOutcomeTargets.map((target) => {
+              const highlighted = dragOverOutcome === target;
+              const Icon = target === "trash_bin" ? Trash2 : target === "rejected" ? Ban : UserMinus;
+              const label = target === "trash_bin" ? "Trash Bin" : target === "rejected" ? "Reject" : "Withdraw";
+              const toneCls = target === "trash_bin" ? "border-destructive/50 bg-destructive/10 text-destructive" : target === "rejected" ? "border-red-700/40 bg-red-700/5 text-red-800 dark:text-red-300" : "border-rose-400/50 bg-rose-100/70 text-rose-800 dark:bg-rose-400/10 dark:text-rose-200";
+              return <div key={target} data-outcome-drop-target={target} onDragEnter={(event) => { event.preventDefault(); setDragOverOutcome(target); }} onDragOver={(event) => event.preventDefault()} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverOutcome(null); }} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate) return; if (target === "trash_bin") move.mutate({ candidate, stage: "trash_bin" }); else if (target === "rejected") setRejectSelection({ candidate }); else setWithdrawSelection({ candidate }); }} className={`flex min-h-14 items-center justify-center gap-2 rounded-lg border border-dashed px-2 text-center text-xs font-semibold transition-colors motion-reduce:transition-none sm:text-sm ${toneCls} ${highlighted ? "ring-2 ring-current/20" : ""}`}><Icon className="h-4 w-4 shrink-0" />{label}</div>;
+            })}
+          </section>
+        </div>,
+        document.body,
+      ) : null}
 
       {undoTrash ? <div role="status" className="fixed bottom-[calc(var(--app-bottom-inset)+1rem)] left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-foreground px-3 py-1.5 text-sm font-semibold text-background shadow-card-hover"><span>{undoTrash.candidate.full_name} moved to Trash Bin.</span><button type="button" className="min-h-9 rounded-md px-2 text-primary underline" onClick={() => { move.mutate({ candidate: undoTrash.candidate, stage: undoTrash.previousCandidate.status }); setUndoTrash(null); }}>Undo</button></div> : null}
 
