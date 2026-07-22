@@ -220,7 +220,8 @@ def _candidate_joins() -> str:
         LEFT JOIN LATERAL (
             SELECT a.id, a.appointment_type, a.starts_at, a.ends_at,
                    a.responsible_account_id, a.appointment_format,
-                   a.location_or_link, a.topic, a.status, a.version, a.started_at
+                   a.location_or_link, a.topic, a.status, a.version, a.started_at,
+                   a.pre_start_starts_at, a.pre_start_ends_at
             FROM msi_v2.teacher_candidate_appointments a
             WHERE a.candidate_id = candidate.id
               AND a.status IN ('scheduled', 'in_progress')

@@ -64,6 +64,22 @@ def test_pipeline_orders_evaluations_by_appointment_and_other_cards_by_business_
     assert "END DESC" in pipeline_sql
 
 
+def test_pipeline_appointment_projection_includes_start_rollback_columns():
+    conn = _CaptureConnection()
+    repository.list_pipeline_rows(conn)
+    pipeline_sql = conn.calls[-1][0]
+
+    assert "a.pre_start_starts_at, a.pre_start_ends_at" in pipeline_sql
+    assert (
+        "appointment.pre_start_starts_at::text "
+        "AS next_appointment_pre_start_starts_at"
+    ) in pipeline_sql
+    assert (
+        "appointment.pre_start_ends_at::text "
+        "AS next_appointment_pre_start_ends_at"
+    ) in pipeline_sql
+
+
 def test_candidate_summary_exposes_one_academy_block_and_exact_identity_state():
     payload = service._candidate_summary(
         {
