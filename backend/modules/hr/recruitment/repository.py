@@ -114,7 +114,6 @@ from backend.modules.hr.recruitment.notification_repository import (
     mark_recruitment_notification_read,
     recalculate_future_appointment_reminders,
     recruitment_notification_unread_count,
-    recruitment_unreviewed_candidate_count,
     recruitment_reminder_config_row,
     unreviewed_recruitment_candidate_ids,
     update_browser_preference,

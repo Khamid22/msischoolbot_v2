@@ -925,9 +925,9 @@ def test_academic_recruitment_badge_counts_unreviewed_candidates_and_clears_on_r
 ):
     state = {"unreviewed_count": 6}
     monkeypatch.setattr(
-        notifications,
-        "unreviewed_candidate_count",
-        lambda account_id: state["unreviewed_count"] if account_id == 14 else 0,
+        service,
+        "academic_unreviewed_candidate_count",
+        lambda user: state["unreviewed_count"] if user.account_id == 14 else 0,
     )
     monkeypatch.setattr(
         notifications,

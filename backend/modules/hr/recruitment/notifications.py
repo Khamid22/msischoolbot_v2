@@ -295,14 +295,6 @@ def unread_count(account_id: int) -> int:
         return repository.recruitment_notification_unread_count(conn, int(account_id))
 
 
-def unreviewed_candidate_count(account_id: int) -> int:
-    with connect_auth_db() as conn:
-        return repository.recruitment_unreviewed_candidate_count(
-            conn,
-            int(account_id),
-        )
-
-
 def mark_notification_read(account_id: int, notification_id: int) -> bool:
     with connect_auth_db() as conn:
         updated = repository.mark_recruitment_notification_read(
@@ -395,6 +387,5 @@ __all__ = [
     "mark_notification_read",
     "reminder_config",
     "unread_count",
-    "unreviewed_candidate_count",
     "update_browser_preference",
 ]

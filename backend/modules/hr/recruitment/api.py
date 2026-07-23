@@ -318,7 +318,7 @@ def _notification_unread_count_for_user(user: CurrentUser) -> int:
     if not user.account_id:
         return 0
     return (
-        recruitment_notifications.unreviewed_candidate_count(int(user.account_id))
+        service.academic_unreviewed_candidate_count(user)
         if user.role in {"academic_director", "head_of_department"}
         else recruitment_notifications.unread_count(int(user.account_id))
     )

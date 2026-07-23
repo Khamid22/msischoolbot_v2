@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import pytest
 
 from backend.core.access import CurrentUser
+from backend.modules.hr.recruitment import service as recruitment_service
 from backend.modules.hr.recruitment.candidates import read_repository, read_service
 
 
@@ -125,6 +126,65 @@ def test_subject_test_group_contains_demo_passes_without_a_test_result():
     assert "candidate.status NOT IN ('rejected', 'candidate_withdrew', 'trash_bin')" in subject_test
     assert "latest_demo.result, '') = 'passed'" in subject_test
     assert "latest_subject_test.result, '') = ''" in subject_test
+
+
+def test_unreviewed_badge_count_uses_the_visible_new_candidate_query():
+    conn = _CandidateQueryConnection()
+
+    rows, total = read_repository.list_candidate_rows(
+        conn,
+        visible_account_id=41,
+        include_decision_queue=True,
+        candidate_group="new",
+        unreviewed_account_id=41,
+        limit=0,
+    )
+
+    assert rows == []
+    assert total == 2
+    assert len(conn.calls) == 1
+    count_sql, count_params = conn.calls[0]
+    assert "teacher_candidate_assignments visibility" in count_sql
+    assert "teacher_candidate_hire_approvals queue_approval" in count_sql
+    assert "teacher_recruitment_notifications review_notification" in count_sql
+    assert "review_notification.read_at IS NULL" in count_sql
+    assert "academic_demo_appointment.id IS NOT NULL" in count_sql
+    assert count_params == (41, 41)
+
+
+def test_academic_unreviewed_badge_service_counts_only_new_candidates(monkeypatch):
+    captured = {}
+
+    @contextmanager
+    def connect():
+        yield object()
+
+    def list_rows(_conn, **values):
+        captured.update(values)
+        return [], 2
+
+    monkeypatch.setattr(recruitment_service, "connect_auth_db", connect)
+    monkeypatch.setattr(
+        recruitment_service.repository,
+        "list_candidate_rows",
+        list_rows,
+    )
+
+    total = recruitment_service.academic_unreviewed_candidate_count(
+        CurrentUser(
+            login="director@test",
+            role="academic_director",
+            account_id=41,
+            staff_id=51,
+        )
+    )
+
+    assert total == 2
+    assert captured["candidate_group"] == "new"
+    assert captured["unreviewed_account_id"] == 41
+    assert captured["visible_account_id"] == 41
+    assert captured["include_decision_queue"] is True
+    assert captured["limit"] == 0
 
 
 def test_successful_group_excludes_closed_non_evaluation_outcomes():

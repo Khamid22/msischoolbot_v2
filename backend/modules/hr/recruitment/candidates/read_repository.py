@@ -538,6 +538,7 @@ def list_candidate_rows(
     final_decision: str = "",
     evaluator_account_id: int | None = None,
     candidate_group: str = "",
+    unreviewed_account_id: int | None = None,
     relevant_from: str = "",
     relevant_to: str = "",
     limit: int = 25,
@@ -637,6 +638,24 @@ def list_candidate_rows(
         if relevant_to:
             clauses.append(f"({relevant_expression})::date <= %s::date")
             params.append(relevant_to)
+    if unreviewed_account_id:
+        clauses.append(
+            """
+            EXISTS (
+                SELECT 1
+                FROM msi_v2.teacher_recruitment_notifications review_notification
+                WHERE review_notification.candidate_id = candidate.id
+                  AND review_notification.recipient_account_id = %s
+                  AND review_notification.read_at IS NULL
+                  AND review_notification.deliver_at <= now()
+                  AND (
+                      review_notification.notification_type <> 'appointment_reminder'
+                      OR review_notification.browser_delivered_at IS NOT NULL
+                  )
+            )
+            """
+        )
+        params.append(int(unreviewed_account_id))
 
     where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     base_from = f"""

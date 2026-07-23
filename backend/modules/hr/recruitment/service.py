@@ -625,6 +625,28 @@ def list_candidates(
     )
 
 
+def academic_unreviewed_candidate_count(user: CurrentUser) -> int:
+    if user.role not in {"academic_director", "head_of_department"}:
+        raise RecruitmentError(
+            "Academic recruitment access is required.",
+            status_code=403,
+        )
+    account_id = _academic_visible_id(user)
+    if not account_id:
+        return 0
+    with connect_auth_db() as conn:
+        _rows, total = repository.list_candidate_rows(
+            conn,
+            visible_account_id=account_id,
+            visible_subject_ids=_visible_subject_ids(user, conn),
+            include_decision_queue=user.role == "academic_director",
+            candidate_group="new",
+            unreviewed_account_id=account_id,
+            limit=0,
+        )
+    return total
+
+
 def restore_closed_candidate(
     user: CurrentUser,
     candidate_id: int,

@@ -227,7 +227,7 @@ def list_candidates(
                 account_id=int(user.account_id),
                 candidate_ids=candidate_ids,
             )
-            if normalized_candidate_group and user.account_id and rows
+            if normalized_candidate_group == "new" and user.account_id and rows
             else set()
         )
     items = []

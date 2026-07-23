@@ -316,25 +316,6 @@ def recruitment_notification_unread_count(conn: Any, account_id: int) -> int:
     return int(row["total"] or 0) if row else 0
 
 
-def recruitment_unreviewed_candidate_count(conn: Any, account_id: int) -> int:
-    row = conn.execute(
-        """
-        SELECT count(DISTINCT candidate_id) AS total
-        FROM msi_v2.teacher_recruitment_notifications
-        WHERE recipient_account_id = %s
-          AND candidate_id IS NOT NULL
-          AND read_at IS NULL
-          AND deliver_at <= now()
-          AND (
-              notification_type <> 'appointment_reminder'
-              OR browser_delivered_at IS NOT NULL
-          )
-        """,
-        (int(account_id),),
-    ).fetchone()
-    return int(row["total"] or 0) if row else 0
-
-
 def unreviewed_recruitment_candidate_ids(
     conn: Any,
     *,
@@ -409,7 +390,6 @@ __all__ = [
     "mark_recruitment_notification_read",
     "recalculate_future_appointment_reminders",
     "recruitment_notification_unread_count",
-    "recruitment_unreviewed_candidate_count",
     "recruitment_reminder_config_row",
     "unreviewed_recruitment_candidate_ids",
     "update_browser_preference",
