@@ -572,6 +572,14 @@ export type HrAnalyticsDashboard = {
       turnover_rate: number;
     }>;
   };
+  applications_received_trend: {
+    from: string;
+    to: string;
+    monthly: Array<{
+      bucket: string;
+      applications_received: number;
+    }>;
+  };
   outcome_reason_breakdown: Record<"rejected" | "candidate_withdrew", {
     total: number;
     items: Array<{

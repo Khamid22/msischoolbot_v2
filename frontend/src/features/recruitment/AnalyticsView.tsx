@@ -59,7 +59,8 @@ type Options = {
   responsible_people: Array<{ id: number; name: string }>;
 };
 
-type TurnoverPoint = HrAnalyticsDashboard["turnover"]["monthly"][number];
+type ApplicationsReceivedPoint =
+  HrAnalyticsDashboard["applications_received_trend"]["monthly"][number];
 
 const api = "/api/v1/hr/analytics";
 const filterKeys = [
@@ -345,12 +346,12 @@ function FilterDrawer({
   );
 }
 
-function TurnoverTooltip({
+function ApplicationsReceivedTooltip({
   active,
   payload,
 }: {
   active?: boolean;
-  payload?: Array<{ payload: TurnoverPoint }>;
+  payload?: Array<{ payload: ApplicationsReceivedPoint }>;
 }) {
   const point = payload?.[0]?.payload;
   if (!active || !point) return null;
@@ -358,17 +359,9 @@ function TurnoverTooltip({
     <div className="rounded-lg border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-lg">
       <p className="font-bold">{shortMonthLabel(point.bucket)}</p>
       <dl className="mt-1.5 grid grid-cols-[auto_auto] gap-x-4 gap-y-1">
-        <dt className="text-muted-foreground">Turnover rate</dt>
+        <dt className="text-muted-foreground">Applications received</dt>
         <dd className="text-right font-bold tabular-nums">
-          {numberValue(point.turnover_rate, "%")}
-        </dd>
-        <dt className="text-muted-foreground">Departures</dt>
-        <dd className="text-right font-semibold tabular-nums">
-          {numberValue(point.departures)}
-        </dd>
-        <dt className="text-muted-foreground">Average headcount</dt>
-        <dd className="text-right font-semibold tabular-nums">
-          {numberValue(point.average_headcount)}
+          {numberValue(point.applications_received)}
         </dd>
       </dl>
     </div>
@@ -549,16 +542,22 @@ export function AnalyticsView({
           : null,
     };
   });
-  const turnoverMaximum = Math.max(
-    10,
+  const applicationsMaximum = Math.max(
+    5,
     Math.ceil(
-      Math.max(0, ...data.turnover.monthly.map((item) => item.turnover_rate)) /
+      Math.max(
+        0,
+        ...data.applications_received_trend.monthly.map(
+          (item) => item.applications_received,
+        ),
+      ) /
         5,
     ) * 5,
   );
-  const turnoverRange =
-    data.turnover.from && data.turnover.to
-      ? `${shortMonthLabel(data.turnover.from)}–${shortMonthLabel(data.turnover.to)}`
+  const applicationsRange =
+    data.applications_received_trend.from &&
+    data.applications_received_trend.to
+      ? `${shortMonthLabel(data.applications_received_trend.from)}–${shortMonthLabel(data.applications_received_trend.to)}`
       : "Trailing 12 months";
 
   return (
@@ -656,18 +655,18 @@ export function AnalyticsView({
 
       <div className="grid gap-3 xl:grid-cols-12">
         <Panel
-          title="Employees Turnover"
-          description={`Recruited Active Teachers · ${turnoverRange}`}
+          title="Applications Received per Month"
+          description={`Distinct applications · ${applicationsRange}`}
           className="xl:col-span-7"
         >
           <div className="h-[20rem] min-w-0 px-2 pb-2 pt-4 sm:px-4">
             <p className="sr-only">
-              Monthly turnover rate for recruited Active Teachers. Tooltips
-              include departures and average headcount.
+              Distinct applications received during each of the trailing twelve
+              months.
             </p>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
-                data={data.turnover.monthly}
+                data={data.applications_received_trend.monthly}
                 margin={{ top: 8, right: 14, left: -10, bottom: 4 }}
               >
                 <CartesianGrid
@@ -687,8 +686,8 @@ export function AnalyticsView({
                   minTickGap={16}
                 />
                 <YAxis
-                  domain={[0, turnoverMaximum]}
-                  tickFormatter={(value) => `${value}%`}
+                  domain={[0, applicationsMaximum]}
+                  allowDecimals={false}
                   tick={{
                     fontSize: 10,
                     fill: "hsl(var(--muted-foreground))",
@@ -698,13 +697,13 @@ export function AnalyticsView({
                   width={42}
                 />
                 <Tooltip
-                  content={<TurnoverTooltip />}
+                  content={<ApplicationsReceivedTooltip />}
                   cursor={{ stroke: "hsl(var(--border))" }}
                 />
                 <Line
                   type="monotone"
-                  dataKey="turnover_rate"
-                  name="Turnover rate"
+                  dataKey="applications_received"
+                  name="Applications received"
                   stroke={chartColor}
                   strokeWidth={3}
                   dot={false}

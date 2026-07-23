@@ -561,8 +561,11 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(analyticsModel, /monthly_activity/);
     assert.match(analyticsModel, /monthly_outcomes/);
     assert.match(analyticsModel, /cohort_scope/);
-    assert.match(analytics, /Employees Turnover/);
-    assert.match(analytics, /turnover_rate/);
+    assert.match(analyticsModel, /applications_received_trend/);
+    assert.match(analytics, /Applications Received per Month/);
+    assert.match(analytics, /dataKey="applications_received"/);
+    assert.match(analytics, /ApplicationsReceivedTooltip/);
+    assert.doesNotMatch(analytics, /Employees Turnover|TurnoverTooltip/);
     assert.match(analytics, /Funnel Overview/);
     assert.match(analytics, /Applications/);
     assert.match(analytics, /Responded/);

@@ -818,6 +818,59 @@ def _turnover_rows(
     ).fetchall()
 
 
+def _applications_received_rows(
+    conn: Any,
+    *,
+    base_where: str,
+    base_params: list[Any],
+    date_to: str,
+) -> list[Any]:
+    """Return filtered application volume for the trailing twelve months."""
+
+    return conn.execute(
+        f"""
+        WITH bounds AS (
+          SELECT
+            (
+              date_trunc('month', %s::date)
+              - interval '11 months'
+            )::date AS date_from,
+            %s::date AS date_to
+        ), months AS (
+          SELECT bucket::date AS month_start
+          FROM bounds,
+               generate_series(
+                 bounds.date_from,
+                 date_trunc('month', bounds.date_to)::date,
+                 interval '1 month'
+               ) bucket
+        ), filtered_candidates AS (
+          SELECT candidate.id, candidate.application_date
+          FROM msi_v2.teacher_candidates candidate
+          CROSS JOIN bounds
+          WHERE {base_where}
+            AND candidate.application_date
+                BETWEEN bounds.date_from AND bounds.date_to
+        ), monthly_applications AS (
+          SELECT
+            months.month_start,
+            COUNT(DISTINCT candidate.id) AS applications_received
+          FROM months
+          LEFT JOIN filtered_candidates candidate
+            ON date_trunc('month', candidate.application_date)::date
+               = months.month_start
+          GROUP BY months.month_start
+        )
+        SELECT
+          month_start::text AS bucket,
+          applications_received
+        FROM monthly_applications
+        ORDER BY month_start
+        """,
+        tuple([date_to, date_to, *base_params]),
+    ).fetchall()
+
+
 def dashboard_rows(
     conn: Any,
     *,
@@ -853,6 +906,10 @@ def dashboard_rows(
     cohort_scope_where, cohort_scope_params = _candidate_filters(
         date_from=date_from,
         date_to=date_to,
+        include_trash=True,
+        **filter_values,
+    )
+    applications_where, applications_params = _candidate_filters(
         include_trash=True,
         **filter_values,
     )
@@ -931,6 +988,12 @@ def dashboard_rows(
         conn,
         base_where=event_base_where,
         base_params=event_base_params,
+        date_to=date_to,
+    )
+    applications_received_trend = _applications_received_rows(
+        conn,
+        base_where=applications_where,
+        base_params=applications_params,
         date_to=date_to,
     )
 
@@ -1253,6 +1316,7 @@ def dashboard_rows(
         "cohort_scope": cohort_scope,
         "outcome_reasons": outcome_reasons,
         "turnover": turnover,
+        "applications_received_trend": applications_received_trend,
         "journey": journey,
         "outcomes": outcomes,
         "activity_trend": trend,

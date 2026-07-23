@@ -232,6 +232,16 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
                 "turnover_rate": 10,
             }
         ],
+        "applications_received_trend": [
+            {
+                "bucket": "2026-06-01",
+                "applications_received": 7,
+            },
+            {
+                "bucket": "2026-07-01",
+                "applications_received": 10,
+            },
+        ],
         "live_summary": {
             "active_candidates": 304,
             "sla_overdue_now": 294,
@@ -341,6 +351,20 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
             "turnover_rate": 10.0,
         }
     ]
+    assert result["applications_received_trend"] == {
+        "from": "2026-06-01",
+        "to": "2026-07-01",
+        "monthly": [
+            {
+                "bucket": "2026-06-01",
+                "applications_received": 7,
+            },
+            {
+                "bucket": "2026-07-01",
+                "applications_received": 10,
+            },
+        ],
+    }
     assert result["outcome_reason_breakdown"]["rejected"] == {
         "total": 3,
         "items": [
@@ -620,6 +644,23 @@ def test_analytics_repository_queries_bind_every_placeholder():
     )
     assert "interval '11 months'" in turnover_query
     assert "average_headcount" in turnover_query
+    applications_query = next(
+        query
+        for query in executed_queries
+        if "), monthly_applications AS (" in query
+    )
+    assert "interval '11 months'" in applications_query
+    assert "COUNT(DISTINCT candidate.id) AS applications_received" in applications_query
+    assert "candidate.is_application_received = true" in applications_query
+    assert "candidate.status <> 'trash_bin'" not in applications_query
+    for filter_column in (
+        "candidate.source_option_id",
+        "candidate.subsource_option_id",
+        "candidate.position_option_id",
+        "candidate.subject_id",
+        "responsible_history.responsible_account_id",
+    ):
+        assert filter_column in applications_query
     all_queries = "\n".join(executed_queries)
     assert "msi_v2.academy_teachers" in all_queries
     assert "msi_v2.teachers" in all_queries

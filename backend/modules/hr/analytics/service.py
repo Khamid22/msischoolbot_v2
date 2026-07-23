@@ -412,6 +412,18 @@ def dashboard(
         }
         for row in (_dict(item) for item in rows.get("turnover") or [])
     ]
+    applications_received_series = [
+        {
+            "bucket": str(row.get("bucket") or ""),
+            "applications_received": int(
+                row.get("applications_received") or 0
+            ),
+        }
+        for row in (
+            _dict(item)
+            for item in rows.get("applications_received_trend") or []
+        )
+    ]
     stage_time = [_dict(row) for row in rows["time_in_stage"]]
     journey: list[dict[str, Any]] = []
     previous_count: int | None = None
@@ -517,6 +529,19 @@ def dashboard(
             "from": turnover_series[0]["bucket"] if turnover_series else "",
             "to": turnover_series[-1]["bucket"] if turnover_series else "",
             "monthly": turnover_series,
+        },
+        "applications_received_trend": {
+            "from": (
+                applications_received_series[0]["bucket"]
+                if applications_received_series
+                else ""
+            ),
+            "to": (
+                applications_received_series[-1]["bucket"]
+                if applications_received_series
+                else ""
+            ),
+            "monthly": applications_received_series,
         },
         "outcome_reason_breakdown": outcome_reason_breakdown,
         "summary_cards": {
