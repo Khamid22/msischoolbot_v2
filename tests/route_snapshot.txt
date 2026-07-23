@@ -171,6 +171,11 @@
 /ceo/recruitment/settings | GET
 /ceo/recruitment/tasks | GET
 /customer-support | GET
+/customer-support/dashboard | GET
+/customer-support/parents | GET
+/customer-support/payments | GET
+/customer-support/students | GET
+/customer-support/tickets | GET
 /dashboard/{student_id} | GET
 /dashboard/{student_id}/aap-lessons | GET
 /dashboard/{student_id}/ar-lessons | GET

@@ -192,19 +192,77 @@ def test_migration_adds_versions_and_auditable_void_metadata_without_deleting_da
     assert "DELETE FROM" not in upgrade
 
 
-def test_frontend_contract_is_search_first_responsive_and_never_asks_for_internal_student_ids():
-    source = Path("frontend/src/workspaces/customer_support/pages/Home.tsx").read_text()
+def test_frontend_contract_is_split_search_first_and_strongly_typed():
+    entry = Path("frontend/src/workspaces/customer_support/pages/Home.tsx").read_text()
+    workspace = Path("frontend/src/features/customer-support/CustomerSupportWorkspace.tsx").read_text()
+    layout = Path("frontend/src/features/customer-support/shared/SupportPageLayout.tsx").read_text()
+    records_hook = Path("frontend/src/features/customer-support/shared/useSupportRecords.ts").read_text()
+    students = Path("frontend/src/features/customer-support/students/StudentsPage.tsx").read_text()
+    parents = Path("frontend/src/features/customer-support/parents/ParentsPage.tsx").read_text()
+    link_dialog = Path("frontend/src/features/customer-support/parents/LinkStudentDialog.tsx").read_text()
+    model = Path("frontend/src/features/customer-support/model.ts").read_text()
     api = Path("frontend/src/features/customer-support/api.ts").read_text()
-    assert "Customer Records" in source
-    assert "debouncedQuery" in source and "URLSearchParams" in source
-    assert "lg:grid-cols-[minmax(20rem,0.72fr)_minmax(0,1.55fr)]" in source
-    assert "motion-reduce:transition-none" in source
-    assert "Search records" in source and "Name, code, phone, Telegram" in source
-    assert "Student record ID" not in source
-    assert "LinkChildModal" in source
-    assert "RoleWorkspaceShell" in source
-    assert 'desktopSidebarMode="collapsible"' in source
-    assert 'mobileNavigationMode="drawer"' in source
-    assert "/payments/${dialog.targetId}/void" in source
+    assert len(entry.splitlines()) < 10
+    nav_positions = [
+        workspace.index('key: "dashboard"'),
+        workspace.index('key: "payments"'),
+        workspace.index('key: "parents"'),
+        workspace.index('key: "students"'),
+        workspace.index('key: "tickets"'),
+    ]
+    assert nav_positions == sorted(nav_positions)
+    assert 'desktopSidebarMode="collapsible"' in workspace
+    assert 'mobileNavigationMode="drawer"' in workspace
+    assert "lg:grid-cols-[minmax(20rem,0.72fr)_minmax(0,1.55fr)]" in layout
+    assert "debouncedQuery" in records_hook and "URLSearchParams" in records_hook
+    assert "AbortController" in records_hook and "275" in records_hook
+    assert 'params.set("recordId"' in records_hook
+    assert 'params.set("recordType"' not in records_hook
+    assert "Student record ID" not in students
+    assert "LinkStudentDialog" in parents and 'status: "active"' in link_dialog
+    assert "/payments/${payment.id}/void" in students
+    for type_name in (
+        "SupportSchool",
+        "SupportRecordSummary",
+        "StudentProfile",
+        "ParentProfile",
+        "StudentEnrollment",
+        "ParentStudentLink",
+        "StudentParentLink",
+        "PaymentRecord",
+        "PaymentTotals",
+        "SupportAuditEvent",
+        "StudentDetail",
+        "ParentDetail",
+        "SupportContext",
+    ):
+        assert f"type {type_name}" in model
     assert 'method: "DELETE"' in api  # unlinking a family link only
-    assert "password_hash" not in source
+    assert "password_hash" not in "\n".join((students, parents, model))
+
+
+@pytest.mark.parametrize(
+    ("path", "view", "title"),
+    [
+        ("/customer-support/dashboard", "dashboard", "Customer Support Dashboard"),
+        ("/customer-support/payments", "payments", "Payments Workspace"),
+        ("/customer-support/parents", "parents", "Parents"),
+        ("/customer-support/students", "students", "Students"),
+        ("/customer-support/tickets", "tickets", "Support Tickets"),
+    ],
+)
+def test_customer_support_page_routes_render_the_requested_view(client, path, view, title):
+    client.cookies.set("session", _session("customer_support"))
+    response = client.get(path)
+    assert response.status_code == 200
+    assert 'data-react-page="customer-support-home"' in response.text
+    assert title in response.text
+    assert f'"view":"{view}"' in response.text
+
+
+@pytest.mark.parametrize("path", ["/customer-support", "/support"])
+def test_customer_support_legacy_roots_redirect_to_dashboard(client, path):
+    client.cookies.set("session", _session("customer_support"))
+    response = client.get(path)
+    assert response.status_code == 308
+    assert response.headers["location"] == "/customer-support/dashboard"

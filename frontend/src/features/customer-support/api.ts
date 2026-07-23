@@ -1,73 +1,33 @@
 import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders, XHR_HEADERS } from "@/shared/lib/api";
+import type { SupportApiErrorDetails, SupportErrorCode } from "@/features/customer-support/model";
 
-export type SupportRecordKind = "student" | "parent";
+export * from "@/features/customer-support/model";
 
-export type SupportRecordSummary = {
-  kind: SupportRecordKind;
-  id: number;
-  display_name: string;
-  secondary: string;
-  phone?: string;
-  telegram_username?: string;
-  status: string;
-  school_id?: number;
-  school_name: string;
-  version: number;
-  outstanding: number;
-  linked_count: number;
-};
+export class SupportApiError extends Error {
+  code: SupportErrorCode;
+  details?: SupportApiErrorDetails;
+  status?: number;
 
-export type SupportContext = {
-  schools: Array<{ id: number; school_key: string; school_name: string }>;
-  allSchools: boolean;
-  recordTypes: string[];
-  statuses: string[];
-  languages: string[];
-  permissions: Record<string, boolean>;
-};
-
-export type SearchPayload = {
-  items: SupportRecordSummary[];
-  nextCursor?: string | null;
-  hasMore: boolean;
-};
-
-export type StudentDetail = {
-  kind: "student";
-  profile: Record<string, unknown>;
-  academic: Array<Record<string, unknown>>;
-  parents: Array<Record<string, unknown>>;
-  payments: PaymentPayload;
-  activity: Array<Record<string, unknown>>;
-};
-
-export type ParentDetail = {
-  kind: "parent";
-  profile: Record<string, unknown>;
-  children: Array<Record<string, unknown>>;
-  hiddenChildCount: number;
-  activity: Array<Record<string, unknown>>;
-};
-
-export type SupportDetail = StudentDetail | ParentDetail;
-
-export type PaymentPayload = {
-  items: Array<Record<string, unknown>>;
-  totals: Record<string, number>;
-  currency: string;
-};
-
-type ApiError = Error & { code?: string; details?: unknown; status?: number };
+  constructor(message: string, options: { code?: SupportErrorCode; details?: SupportApiErrorDetails; status?: number } = {}) {
+    super(message);
+    this.name = "SupportApiError";
+    this.code = options.code || "customer_support_error";
+    this.details = options.details;
+    this.status = options.status;
+  }
+}
 
 async function parseResponse<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => ({}));
   if (!apiSucceeded(response, payload)) {
-    const error = new Error(apiErrorMessage(payload, "The request could not be completed.")) as ApiError;
     const envelope = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
-    error.code = String(envelope.code || "");
-    error.details = envelope.details;
-    error.status = response.status;
-    throw error;
+    throw new SupportApiError(apiErrorMessage(payload, "The request could not be completed."), {
+      code: String(envelope.code || "customer_support_error"),
+      details: envelope.details && typeof envelope.details === "object"
+        ? envelope.details as SupportApiErrorDetails
+        : undefined,
+      status: response.status,
+    });
   }
   return apiData<T>(payload);
 }

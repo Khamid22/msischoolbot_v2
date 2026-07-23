@@ -33,12 +33,12 @@ ROLE_WORKSPACES = [
     ),
     (
         "customer_support",
-        "/customer-support",
+        "/customer-support/dashboard",
         "customer-support-home",
         "Customer Support Dashboard",
         "Customer Support",
-        "Parents",
-        "4",
+        "Monitor Customer Support operations.",
+        "dashboard",
     ),
 ]
 
@@ -62,7 +62,6 @@ def _set_session(client, data):
 def _patch_workspace_cards(monkeypatch):
     import backend.workspaces.academic_director.page as academic_director_routes
     import backend.workspaces.ceo.page as ceo_page
-    import backend.workspaces.customer_support.page as customer_support_page
 
     monkeypatch.setattr(
         ceo_page,
@@ -82,16 +81,6 @@ def _patch_workspace_cards(monkeypatch):
             {"label": "Teachers", "value": "3"},
             {"label": "Subjects", "value": "6"},
             {"label": "Students", "value": "177"},
-        ],
-    )
-    monkeypatch.setattr(
-        customer_support_page,
-        "customer_support_workspace_cards",
-        lambda: [
-            {"label": "Parents", "value": "4"},
-            {"label": "Students", "value": "177"},
-            {"label": "Pending Parents/Invites", "value": "3 / 5"},
-            {"label": "Support/Payments", "value": "Placeholder"},
         ],
     )
 

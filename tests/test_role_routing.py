@@ -39,7 +39,6 @@ def _patch_workspace_cards(monkeypatch):
     import backend.workspaces.academic_director.page as academic_director_routes
     import backend.workspaces.head_of_departments.page as head_of_department_routes
     import backend.workspaces.ceo.page as ceo_page
-    import backend.workspaces.customer_support.page as customer_support_page
 
     monkeypatch.setattr(
         ceo_page,
@@ -50,11 +49,6 @@ def _patch_workspace_cards(monkeypatch):
         academic_director_routes,
         "academic_director_workspace_cards",
         lambda: [{"label": "Groups", "value": "8"}],
-    )
-    monkeypatch.setattr(
-        customer_support_page,
-        "customer_support_workspace_cards",
-        lambda: [{"label": "Parents", "value": "4"}],
     )
     monkeypatch.setattr(
         head_of_department_routes,
@@ -101,7 +95,7 @@ def test_customer_support_permission_alias():
     ("role", "path", "page"),
     [
         ("ceo", "/ceo", "ceo-home"),
-        ("customer_support", "/customer-support", "customer-support-home"),
+        ("customer_support", "/customer-support/dashboard", "customer-support-home"),
         ("academic_director", "/academic-director", "academic-director-home"),
         ("head_of_department", "/head-of-departments", "head-of-departments-home"),
         ("parent", "/parent", "parent-home"),
