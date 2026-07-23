@@ -554,6 +554,18 @@ export type HrAnalyticsDashboard = {
     rejected: number;
     candidate_withdrew: number;
   };
+  total_overview: {
+    applications_received: number;
+    rejected: number;
+    processed: number;
+    job_interviews: number;
+    tests_and_demos: number;
+    teacher_academy: number;
+  };
+  total_outcomes: {
+    rejected: number;
+    candidate_withdrew: number;
+  };
   cohort_scope: {
     applications_received: number;
     included_candidates: number;
@@ -580,7 +592,22 @@ export type HrAnalyticsDashboard = {
       applications_received: number;
     }>;
   };
+  monthly_pipeline: Array<{
+    stage: string;
+    stage_label: string;
+    color_token: PipelineStageColorToken;
+    candidates: number;
+  }>;
   outcome_reason_breakdown: Record<"rejected" | "candidate_withdrew", {
+    total: number;
+    items: Array<{
+      value: string;
+      label: string;
+      candidates: number;
+      percentage: number;
+    }>;
+  }>;
+  total_outcome_reason_breakdown: Record<"rejected" | "candidate_withdrew", {
     total: number;
     items: Array<{
       value: string;

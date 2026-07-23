@@ -22,13 +22,13 @@ function formatCount(value: number) {
 function ReasonDistribution({
   breakdown,
 }: {
-  breakdown: HrAnalyticsDashboard["outcome_reason_breakdown"][OutcomeTab];
+  breakdown: HrAnalyticsDashboard["total_outcome_reason_breakdown"][OutcomeTab];
 }) {
   if (!breakdown.total) {
     return (
       <div className="flex min-h-36 items-center justify-center p-4">
         <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-          No outcomes were recorded for this month and filter selection.
+          No outcomes were recorded for this filter selection.
         </p>
       </div>
     );
@@ -97,16 +97,14 @@ function ReasonDistribution({
   );
 }
 
-export function MonthlyOutcomes({
-  selectedPeriod,
+export function CandidateOutcomes({
   outcomes,
   breakdown,
   selected,
   onSelect,
 }: {
-  selectedPeriod: string;
-  outcomes: HrAnalyticsDashboard["monthly_outcomes"];
-  breakdown: HrAnalyticsDashboard["outcome_reason_breakdown"];
+  outcomes: HrAnalyticsDashboard["total_outcomes"];
+  breakdown: HrAnalyticsDashboard["total_outcome_reason_breakdown"];
   selected: OutcomeTab;
   onSelect: (outcome: OutcomeTab) => void;
 }) {
@@ -132,18 +130,18 @@ export function MonthlyOutcomes({
   return (
     <section
       className="overflow-hidden rounded-xl border border-border bg-card shadow-sm"
-      aria-labelledby="monthly-outcomes-title"
+      aria-labelledby="candidate-outcomes-title"
     >
       <header className="border-b border-border/70 px-4 py-3">
         <h2
-          id="monthly-outcomes-title"
+          id="candidate-outcomes-title"
           className="text-sm font-bold text-foreground"
         >
-          Monthly Outcomes · {selectedPeriod}
+          Candidate Outcomes · All time
         </h2>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Outcomes are distinct final candidate outcomes recorded during the
-          selected month.
+          Outcomes are distinct current final candidate outcomes across all
+          time.
         </p>
       </header>
 

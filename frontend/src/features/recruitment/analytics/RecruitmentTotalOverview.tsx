@@ -1,4 +1,5 @@
 import {
+  Ban,
   BookOpenCheck,
   BriefcaseBusiness,
   GraduationCap,
@@ -9,46 +10,53 @@ import {
 
 import type { HrAnalyticsDashboard } from "@/features/recruitment/model";
 
-type ActivityMetric = {
-  key: keyof HrAnalyticsDashboard["monthly_activity"];
+type TotalMetric = {
+  key: keyof HrAnalyticsDashboard["total_overview"];
   label: string;
   icon: LucideIcon;
   className: string;
   iconClassName: string;
 };
 
-const activityMetrics: ActivityMetric[] = [
+const totalMetrics: TotalMetric[] = [
   {
     key: "applications_received",
-    label: "Applications Received",
+    label: "Application Received",
     icon: UsersRound,
     className: "border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/55",
     iconClassName: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
   },
   {
-    key: "entered_process",
-    label: "Entered Process",
+    key: "rejected",
+    label: "Rejected",
+    icon: Ban,
+    className: "border-rose-200 bg-rose-50/70 dark:border-rose-800 dark:bg-rose-950/25",
+    iconClassName: "bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-200",
+  },
+  {
+    key: "processed",
+    label: "Processed",
     icon: ListChecks,
     className: "border-blue-200 bg-blue-50/70 dark:border-blue-800 dark:bg-blue-950/25",
     iconClassName: "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-200",
   },
   {
-    key: "interviews_conducted",
-    label: "Interviews Conducted",
+    key: "job_interviews",
+    label: "Job Interview",
     icon: BriefcaseBusiness,
     className: "border-emerald-200 bg-emerald-50/70 dark:border-emerald-800 dark:bg-emerald-950/25",
     iconClassName: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200",
   },
   {
-    key: "tests_and_demos_conducted",
-    label: "Tests & Demos Conducted",
+    key: "tests_and_demos",
+    label: "Test & Demo",
     icon: BookOpenCheck,
     className: "border-orange-200 bg-orange-50/70 dark:border-orange-800 dark:bg-orange-950/25",
     iconClassName: "bg-orange-100 text-orange-700 dark:bg-orange-900/60 dark:text-orange-200",
   },
   {
-    key: "academy_admissions",
-    label: "Academy Admissions",
+    key: "teacher_academy",
+    label: "Teacher Academy",
     icon: GraduationCap,
     className: "border-amber-200 bg-amber-50/70 dark:border-amber-800 dark:bg-amber-950/25",
     iconClassName: "bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-200",
@@ -59,32 +67,30 @@ function formatCount(value: number) {
   return new Intl.NumberFormat("en").format(Number(value) || 0);
 }
 
-export function MonthlyActivity({
-  selectedPeriod,
-  activity,
+export function RecruitmentTotalOverview({
+  totals,
 }: {
-  selectedPeriod: string;
-  activity: HrAnalyticsDashboard["monthly_activity"];
+  totals: HrAnalyticsDashboard["total_overview"];
 }) {
   return (
     <section
       className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4"
-      aria-labelledby="monthly-activity-title"
+      aria-labelledby="recruitment-total-overview-title"
     >
       <header>
         <h2
-          id="monthly-activity-title"
+          id="recruitment-total-overview-title"
           className="text-sm font-bold text-foreground"
         >
-          Monthly Activity · {selectedPeriod}
+          Total Overview
         </h2>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Event-based metrics are non-exclusive. One candidate may appear in
-          multiple metrics.
+          All-time distinct candidate totals. Month selection applies only to
+          the pipeline overview below.
         </p>
       </header>
-      <dl className="mt-3 grid grid-cols-1 gap-2 min-[430px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
-        {activityMetrics.map((metric) => {
+      <dl className="mt-3 grid grid-cols-1 gap-2 min-[430px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+        {totalMetrics.map((metric) => {
           const Icon = metric.icon;
           return (
             <div
@@ -101,7 +107,7 @@ export function MonthlyActivity({
                 <span>{metric.label}</span>
               </dt>
               <dd className="mt-2 text-2xl font-bold text-foreground tabular-nums">
-                {formatCount(activity[metric.key])}
+                {formatCount(totals[metric.key])}
               </dd>
             </div>
           );

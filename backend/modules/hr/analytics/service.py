@@ -261,6 +261,41 @@ def _ensure_semantic_consistency(
         )
 
 
+def _outcome_reason_breakdown(rows: list[Any]) -> dict[str, dict[str, Any]]:
+    breakdown: dict[str, dict[str, Any]] = {
+        "rejected": {"total": 0, "items": []},
+        "candidate_withdrew": {"total": 0, "items": []},
+    }
+    normalized_rows = [_dict(row) for row in rows]
+    for outcome in breakdown:
+        matching = [
+            row
+            for row in normalized_rows
+            if str(row.get("outcome") or "") == outcome
+        ]
+        total = sum(int(row.get("candidates") or 0) for row in matching)
+        breakdown[outcome] = {
+            "total": total,
+            "items": [
+                {
+                    "value": str(row.get("value") or "unspecified"),
+                    "label": str(row.get("label") or "Unspecified"),
+                    "candidates": int(row.get("candidates") or 0),
+                    "percentage": (
+                        round(
+                            int(row.get("candidates") or 0) / total * 100,
+                            1,
+                        )
+                        if total
+                        else 0
+                    ),
+                }
+                for row in matching
+            ],
+        }
+    return breakdown
+
+
 def options(user: CurrentUser) -> dict[str, Any]:
     _ensure_access(user)
     with connect_auth_db() as conn:
@@ -323,6 +358,7 @@ def dashboard(
             conn,
             date_from=start.isoformat(),
             date_to=end.isoformat(),
+            as_of_date=today.isoformat(),
             comparison_from=comparison_start.isoformat(),
             comparison_to=comparison_end.isoformat(),
             bucket=bucket,
@@ -353,6 +389,26 @@ def dashboard(
             "teacher_academy",
         )
     }
+    total_stage_totals_row = _dict(rows.get("total_stage_totals"))
+    total_stage_totals = {
+        key: int(total_stage_totals_row.get(key) or 0)
+        for key in (
+            "application_received",
+            "rejected",
+            "in_process",
+            "job_interview",
+            "test_and_demo",
+            "teacher_academy",
+        )
+    }
+    total_overview = {
+        "applications_received": total_stage_totals["application_received"],
+        "rejected": total_stage_totals["rejected"],
+        "processed": total_stage_totals["in_process"],
+        "job_interviews": total_stage_totals["job_interview"],
+        "tests_and_demos": total_stage_totals["test_and_demo"],
+        "teacher_academy": total_stage_totals["teacher_academy"],
+    }
     cohort_scope_row = _dict(rows.get("cohort_scope"))
     cohort_scope = {
         key: int(cohort_scope_row.get(key) or 0)
@@ -369,38 +425,43 @@ def dashboard(
         "tests_and_demos_conducted": monthly_stage_totals["test_and_demo"],
         "academy_admissions": monthly_stage_totals["teacher_academy"],
     }
-    outcome_reason_breakdown = {
-        "rejected": {"total": 0, "items": []},
-        "candidate_withdrew": {"total": 0, "items": []},
-    }
-    reason_rows = [_dict(row) for row in rows.get("outcome_reasons") or []]
-    for outcome in outcome_reason_breakdown:
-        matching = [
-            row for row in reason_rows if str(row.get("outcome") or "") == outcome
-        ]
-        total = sum(int(row.get("candidates") or 0) for row in matching)
-        outcome_reason_breakdown[outcome] = {
-            "total": total,
-            "items": [
-                {
-                    "value": str(row.get("value") or "unspecified"),
-                    "label": str(row.get("label") or "Unspecified"),
-                    "candidates": int(row.get("candidates") or 0),
-                    "percentage": (
-                        round(int(row.get("candidates") or 0) / total * 100, 1)
-                        if total
-                        else 0
-                    ),
-                }
-                for row in matching
-            ],
-        }
+    outcome_reason_breakdown = _outcome_reason_breakdown(
+        rows.get("outcome_reasons") or []
+    )
+    total_outcome_reason_breakdown = _outcome_reason_breakdown(
+        rows.get("total_outcome_reasons") or []
+    )
     monthly_outcomes = {
         "rejected": monthly_stage_totals["rejected"],
         "candidate_withdrew": int(
             outcome_reason_breakdown["candidate_withdrew"]["total"] or 0
         ),
     }
+    total_outcomes = {
+        "rejected": total_overview["rejected"],
+        "candidate_withdrew": int(
+            total_outcome_reason_breakdown["candidate_withdrew"]["total"] or 0
+        ),
+    }
+    if (
+        total_outcomes["rejected"]
+        != int(total_outcome_reason_breakdown["rejected"]["total"] or 0)
+    ):
+        raise HrAnalyticsError(
+            "All-time rejected outcome reasons do not match the rejected total.",
+            status_code=500,
+        )
+    monthly_pipeline = [
+        {
+            "stage": str(row.get("stage") or ""),
+            "stage_label": str(row.get("stage_label") or row.get("stage") or ""),
+            "color_token": str(row.get("color_token") or "neutral"),
+            "candidates": int(row.get("candidates") or 0),
+        }
+        for row in (
+            _dict(item) for item in rows.get("pipeline_column_counts") or []
+        )
+    ]
     turnover_series = [
         {
             "bucket": str(row.get("bucket") or ""),
@@ -522,8 +583,11 @@ def dashboard(
         },
         "monthly_activity": monthly_activity,
         "monthly_outcomes": monthly_outcomes,
+        "total_overview": total_overview,
+        "total_outcomes": total_outcomes,
         "cohort_scope": cohort_scope,
         "monthly_stage_totals": monthly_stage_totals,
+        "monthly_pipeline": monthly_pipeline,
         "turnover": {
             "population": "recruited_active_teachers",
             "from": turnover_series[0]["bucket"] if turnover_series else "",
@@ -544,6 +608,7 @@ def dashboard(
             "monthly": applications_received_series,
         },
         "outcome_reason_breakdown": outcome_reason_breakdown,
+        "total_outcome_reason_breakdown": total_outcome_reason_breakdown,
         "summary_cards": {
             key: {
                 **_comparison_metric(events.get(key), comparison_events.get(key)),

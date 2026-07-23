@@ -637,6 +637,44 @@ def _cohort_scope(
     ).fetchone()
 
 
+def _pipeline_column_count_rows(
+    conn: Any,
+    *,
+    where_sql: str,
+    params: list[Any],
+) -> list[Any]:
+    """Count the selected month's candidates in their current pipeline column."""
+
+    return conn.execute(
+        f"""
+        WITH filtered_candidates AS (
+          SELECT candidate.id, candidate.status
+          FROM msi_v2.teacher_candidates candidate
+          WHERE {where_sql}
+        )
+        SELECT
+          stage.stage_key AS stage,
+          stage.label AS stage_label,
+          stage.color_token,
+          stage.sort_order,
+          COUNT(DISTINCT candidate.id) AS candidates
+        FROM msi_v2.teacher_recruitment_pipeline_stages stage
+        LEFT JOIN filtered_candidates candidate
+          ON candidate.status = stage.stage_key
+        WHERE stage.is_pipeline = true
+          AND stage.is_active = true
+        GROUP BY
+          stage.stage_key,
+          stage.label,
+          stage.color_token,
+          stage.sort_order,
+          stage.id
+        ORDER BY stage.sort_order, stage.id
+        """,
+        tuple(params),
+    ).fetchall()
+
+
 def _outcome_reason_rows(
     conn: Any,
     *,
@@ -876,6 +914,7 @@ def dashboard_rows(
     *,
     date_from: str,
     date_to: str,
+    as_of_date: str,
     comparison_from: str,
     comparison_to: str,
     bucket: str,
@@ -972,10 +1011,22 @@ def dashboard_rows(
         date_from=date_from,
         date_to=date_to,
     )
+    total_stage_totals = _monthly_stage_totals(
+        conn,
+        base_where=event_base_where,
+        base_params=event_base_params,
+        date_from="1900-01-01",
+        date_to="2999-12-31",
+    )
     cohort_scope = _cohort_scope(
         conn,
         where_sql=cohort_scope_where,
         params=cohort_scope_params,
+    )
+    pipeline_column_counts = _pipeline_column_count_rows(
+        conn,
+        where_sql=where_sql,
+        params=params,
     )
     outcome_reasons = _outcome_reason_rows(
         conn,
@@ -983,6 +1034,13 @@ def dashboard_rows(
         base_params=event_base_params,
         date_from=date_from,
         date_to=date_to,
+    )
+    total_outcome_reasons = _outcome_reason_rows(
+        conn,
+        base_where=event_base_where,
+        base_params=event_base_params,
+        date_from="1900-01-01",
+        date_to="2999-12-31",
     )
     turnover = _turnover_rows(
         conn,
@@ -994,7 +1052,7 @@ def dashboard_rows(
         conn,
         base_where=applications_where,
         base_params=applications_params,
-        date_to=date_to,
+        date_to=as_of_date,
     )
 
     facts_cte = _candidate_facts_cte(where_sql=where_sql)
@@ -1313,8 +1371,11 @@ def dashboard_rows(
         "comparison_event_summary": comparison_event_summary,
         "total_event_summary": total_event_summary,
         "monthly_stage_totals": monthly_stage_totals,
+        "total_stage_totals": total_stage_totals,
         "cohort_scope": cohort_scope,
+        "pipeline_column_counts": pipeline_column_counts,
         "outcome_reasons": outcome_reasons,
+        "total_outcome_reasons": total_outcome_reasons,
         "turnover": turnover,
         "applications_received_trend": applications_received_trend,
         "journey": journey,

@@ -197,11 +197,51 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
             "test_and_demo": 5,
             "teacher_academy": 1,
         },
+        "total_stage_totals": {
+            "application_received": 20,
+            "rejected": 4,
+            "in_process": 15,
+            "job_interview": 12,
+            "test_and_demo": 8,
+            "teacher_academy": 9,
+        },
         "cohort_scope": {
             "applications_received": 10,
             "included_candidates": 9,
             "excluded_trash_candidates": 1,
         },
+        "pipeline_column_counts": [
+            {
+                "stage": "new_candidate",
+                "stage_label": "Application Received",
+                "color_token": "neutral",
+                "candidates": 4,
+            },
+            {
+                "stage": "responded",
+                "stage_label": "In Process",
+                "color_token": "blue",
+                "candidates": 3,
+            },
+            {
+                "stage": "job_interview",
+                "stage_label": "Job Interview",
+                "color_token": "green",
+                "candidates": 2,
+            },
+            {
+                "stage": "test_and_demo",
+                "stage_label": "Test & Demo",
+                "color_token": "orange",
+                "candidates": 1,
+            },
+            {
+                "stage": "under_review",
+                "stage_label": "Final Decision",
+                "color_token": "violet",
+                "candidates": 0,
+            },
+        ],
         "outcome_reasons": [
             {
                 "outcome": "rejected",
@@ -220,6 +260,26 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
                 "value": "personal_reasons",
                 "label": "Personal Reasons",
                 "candidates": 1,
+            },
+        ],
+        "total_outcome_reasons": [
+            {
+                "outcome": "rejected",
+                "value": "low_english_level",
+                "label": "Low English Level",
+                "candidates": 3,
+            },
+            {
+                "outcome": "rejected",
+                "value": "poor_soft_skills",
+                "label": "Poor Soft Skills",
+                "candidates": 1,
+            },
+            {
+                "outcome": "candidate_withdrew",
+                "value": "personal_reasons",
+                "label": "Personal Reasons",
+                "candidates": 2,
             },
         ],
         "turnover": [
@@ -340,6 +400,50 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
         "included_candidates": 9,
         "excluded_trash_candidates": 1,
     }
+    assert result["total_overview"] == {
+        "applications_received": 20,
+        "rejected": 4,
+        "processed": 15,
+        "job_interviews": 12,
+        "tests_and_demos": 8,
+        "teacher_academy": 9,
+    }
+    assert result["total_outcomes"] == {
+        "rejected": 4,
+        "candidate_withdrew": 2,
+    }
+    assert result["monthly_pipeline"] == [
+        {
+            "stage": "new_candidate",
+            "stage_label": "Application Received",
+            "color_token": "neutral",
+            "candidates": 4,
+        },
+        {
+            "stage": "responded",
+            "stage_label": "In Process",
+            "color_token": "blue",
+            "candidates": 3,
+        },
+        {
+            "stage": "job_interview",
+            "stage_label": "Job Interview",
+            "color_token": "green",
+            "candidates": 2,
+        },
+        {
+            "stage": "test_and_demo",
+            "stage_label": "Test & Demo",
+            "color_token": "orange",
+            "candidates": 1,
+        },
+        {
+            "stage": "under_review",
+            "stage_label": "Final Decision",
+            "color_token": "violet",
+            "candidates": 0,
+        },
+    ]
     assert result["turnover"]["population"] == "recruited_active_teachers"
     assert result["turnover"]["monthly"] == [
         {
@@ -382,6 +486,10 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
             },
         ],
     }
+    assert result["total_outcome_reason_breakdown"]["rejected"]["total"] == 4
+    assert result["total_outcome_reason_breakdown"]["candidate_withdrew"][
+        "total"
+    ] == 2
     assert result["outcomes"] == [
         {"outcome": "teacher_academy", "candidates": 1},
         {"outcome": "active_teacher", "candidates": 2},
@@ -546,6 +654,7 @@ def test_analytics_rejects_rejection_reason_total_mismatch():
 
 def test_analytics_repository_queries_bind_every_placeholder():
     executed_queries = []
+    executed_calls = []
 
     class Cursor:
         def fetchone(self):
@@ -558,12 +667,14 @@ def test_analytics_repository_queries_bind_every_placeholder():
         def execute(self, query, params=()):
             assert query.count("%s") == len(params), query
             executed_queries.append(query)
+            executed_calls.append((query, tuple(params)))
             return Cursor()
 
     result = analytics_repository.dashboard_rows(
         Connection(),
         date_from="2026-07-01",
         date_to="2026-07-31",
+        as_of_date="2026-07-17",
         comparison_from="2026-06-01",
         comparison_to="2026-06-30",
         bucket="day",
@@ -576,7 +687,9 @@ def test_analytics_repository_queries_bind_every_placeholder():
     )
     assert result["journey"] == []
     assert result["recent_activity"] == []
-    trend_query = next(query for query in executed_queries if "WITH filtered_candidates AS" in query)
+    trend_query = next(
+        query for query in executed_queries if "), first_shortlist AS (" in query
+    )
     assert "GROUP BY 1, 2" in trend_query
     assert "GROUP BY date_trunc" not in trend_query
     trend_candidates = trend_query.split("), first_shortlist", 1)[0]
@@ -613,6 +726,24 @@ def test_analytics_repository_queries_bind_every_placeholder():
     assert "interview.voided_at IS NULL" in monthly_totals_query
     assert "decision.voided_at IS NULL" in monthly_totals_query
     assert "history.stage = 'responded'" in monthly_totals_query
+    stage_total_calls = [
+        params
+        for query, params in executed_calls
+        if "test_demo_participants AS" in query
+    ]
+    assert any(params[:2] == ("2026-07-01", "2026-07-31") for params in stage_total_calls)
+    assert any(params[:2] == ("1900-01-01", "2999-12-31") for params in stage_total_calls)
+    pipeline_columns_query = next(
+        query
+        for query in executed_queries
+        if "COUNT(DISTINCT candidate.id) AS candidates" in query
+        and "stage.is_pipeline = true" in query
+    )
+    assert "candidate.status = stage.stage_key" in pipeline_columns_query
+    assert "stage.is_active = true" in pipeline_columns_query
+    assert "candidate.application_date BETWEEN" in pipeline_columns_query
+    assert "candidate.is_application_received = true" in pipeline_columns_query
+    assert "GROUP BY" in pipeline_columns_query
     cohort_scope_query = next(
         query
         for query in executed_queries
@@ -653,6 +784,12 @@ def test_analytics_repository_queries_bind_every_placeholder():
     assert "COUNT(DISTINCT candidate.id) AS applications_received" in applications_query
     assert "candidate.is_application_received = true" in applications_query
     assert "candidate.status <> 'trash_bin'" not in applications_query
+    applications_params = next(
+        params
+        for query, params in executed_calls
+        if "), monthly_applications AS (" in query
+    )
+    assert applications_params[:2] == ("2026-07-17", "2026-07-17")
     for filter_column in (
         "candidate.source_option_id",
         "candidate.subsource_option_id",

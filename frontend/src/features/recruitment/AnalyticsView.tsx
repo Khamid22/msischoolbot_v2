@@ -19,12 +19,12 @@ import {
 } from "recharts";
 
 import { recruitmentRequest } from "@/features/recruitment/api";
-import { MonthlyActivity } from "@/features/recruitment/analytics/MonthlyActivity";
 import {
-  MonthlyOutcomes,
+  CandidateOutcomes,
   type OutcomeTab,
-} from "@/features/recruitment/analytics/MonthlyOutcomes";
-import { RecruitmentFunnel } from "@/features/recruitment/analytics/RecruitmentFunnel";
+} from "@/features/recruitment/analytics/CandidateOutcomes";
+import { MonthlyPipelineOverview } from "@/features/recruitment/analytics/MonthlyPipelineOverview";
+import { RecruitmentTotalOverview } from "@/features/recruitment/analytics/RecruitmentTotalOverview";
 import {
   type HrAnalyticsDashboard,
   type RecruitmentOptions,
@@ -500,48 +500,6 @@ export function AnalyticsView({
     return value;
   };
 
-  const journeyCounts = new Map(
-    data.journey.map((item) => [item.stage, item.candidates]),
-  );
-  const funnelDefinitions = [
-    {
-      key: "new_candidate",
-      label: "Applications",
-      value:
-        journeyCounts.get("new_candidate") ??
-        data.cohort_scope.included_candidates,
-    },
-    {
-      key: "responded",
-      label: "Responded",
-      value: journeyCounts.get("responded") || 0,
-    },
-    {
-      key: "job_interview",
-      label: "Reached Job Interview",
-      value: journeyCounts.get("job_interview") || 0,
-    },
-    {
-      key: "test_and_demo",
-      label: "Reached Test & Demo",
-      value: journeyCounts.get("test_and_demo") || 0,
-    },
-    {
-      key: "under_review",
-      label: "Reached Final Review",
-      value: journeyCounts.get("under_review") || 0,
-    },
-  ];
-  const funnel = funnelDefinitions.map((item, index) => {
-    const previous = index ? funnelDefinitions[index - 1].value : null;
-    return {
-      ...item,
-      conversion:
-        previous && previous > 0
-          ? Math.round((item.value / previous) * 1000) / 10
-          : null,
-    };
-  });
   const applicationsMaximum = Math.max(
     5,
     Math.ceil(
@@ -564,40 +522,13 @@ export function AnalyticsView({
     <div className="min-w-0 space-y-3">
       <section className="rounded-xl border border-border bg-card p-2 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div
-            className="inline-flex min-h-11 items-center overflow-hidden rounded-lg border border-border"
-            role="group"
-            aria-label="Analytics month"
-          >
-            <button
-              type="button"
-              className="flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/35 motion-reduce:transition-none"
-              onClick={() => selectMonth(shiftMonth(selectedMonth, -1))}
-              aria-label="Previous month"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <label className="relative flex h-11 min-w-40 cursor-pointer items-center justify-center border-x border-border px-4 text-xs font-semibold">
-              <span>{selectedPeriod}</span>
-              <span className="sr-only">Select month and year</span>
-              <input
-                type="month"
-                value={selectedMonth}
-                max={currentMonth}
-                onChange={(event) => selectMonth(event.target.value)}
-                className="absolute inset-0 cursor-pointer opacity-0"
-                aria-label="Select analytics month and year"
-              />
-            </label>
-            <button
-              type="button"
-              disabled={selectedMonth >= currentMonth}
-              className="flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/35 disabled:cursor-not-allowed disabled:opacity-35 motion-reduce:transition-none"
-              onClick={() => selectMonth(shiftMonth(selectedMonth, 1))}
-              aria-label="Next month"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
+          <div className="min-w-0 px-1">
+            <h1 className="text-sm font-bold text-foreground">
+              Recruitment Analytics
+            </h1>
+            <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+              All-time overview with filters applied across the dashboard.
+            </p>
           </div>
           <button
             type="button"
@@ -613,30 +544,27 @@ export function AnalyticsView({
             ) : null}
           </button>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border/70 pt-2">
-          <p className="mr-auto text-xs font-semibold text-foreground">
-            Reporting period · {selectedPeriod}
-          </p>
-          {filterNames
-            .filter(([key]) => filters[key])
-            .map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() =>
-                  replaceFilters({
-                    ...filters,
-                    [key]: "",
-                    ...(key === "source" ? { subsource: "" } : {}),
-                  })
-                }
-                className="inline-flex min-h-9 items-center rounded-full border border-border bg-muted/50 px-2.5 text-[0.6875rem] font-semibold transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 motion-reduce:transition-none"
-              >
-                {label}: {optionLabel(key, filters[key])}
-                <XCircle className="ml-1.5 h-3.5 w-3.5" />
-              </button>
-            ))}
-          {activeFilterCount ? (
+        {activeFilterCount ? (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border/70 pt-2">
+            {filterNames
+              .filter(([key]) => filters[key])
+              .map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() =>
+                    replaceFilters({
+                      ...filters,
+                      [key]: "",
+                      ...(key === "source" ? { subsource: "" } : {}),
+                    })
+                  }
+                  className="inline-flex min-h-9 items-center rounded-full border border-border bg-muted/50 px-2.5 text-[0.6875rem] font-semibold transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 motion-reduce:transition-none"
+                >
+                  {label}: {optionLabel(key, filters[key])}
+                  <XCircle className="ml-1.5 h-3.5 w-3.5" />
+                </button>
+              ))}
             <button
               type="button"
               onClick={clearFilters}
@@ -644,14 +572,11 @@ export function AnalyticsView({
             >
               Clear all
             </button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </section>
 
-      <MonthlyActivity
-        selectedPeriod={selectedPeriod}
-        activity={data.monthly_activity}
-      />
+      <RecruitmentTotalOverview totals={data.total_overview} />
 
       <div className="grid gap-3 xl:grid-cols-12">
         <Panel
@@ -716,18 +641,56 @@ export function AnalyticsView({
         </Panel>
 
         <Panel
-          title="Funnel Overview"
-          description={`Application cohort · ${selectedPeriod}`}
+          title="Pipeline Overview"
+          description={`Applicants from ${selectedPeriod} · current columns`}
           className="xl:col-span-5"
+          action={
+            <div
+              className="inline-flex min-h-10 items-center overflow-hidden rounded-lg border border-border"
+              role="group"
+              aria-label="Pipeline application month"
+            >
+              <button
+                type="button"
+                className="flex h-10 w-10 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/35 motion-reduce:transition-none"
+                onClick={() => selectMonth(shiftMonth(selectedMonth, -1))}
+                aria-label="Previous pipeline month"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <label className="relative flex h-10 min-w-32 cursor-pointer items-center justify-center border-x border-border px-3 text-xs font-semibold">
+                <span>{selectedPeriod}</span>
+                <span className="sr-only">
+                  Select pipeline application month
+                </span>
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  max={currentMonth}
+                  onChange={(event) => selectMonth(event.target.value)}
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  aria-label="Select pipeline application month"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={selectedMonth >= currentMonth}
+                className="flex h-10 w-10 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/35 disabled:cursor-not-allowed disabled:opacity-35 motion-reduce:transition-none"
+                onClick={() => selectMonth(shiftMonth(selectedMonth, 1))}
+                aria-label="Next pipeline month"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          }
         >
-          <RecruitmentFunnel stages={funnel} scope={data.cohort_scope} />
+          <MonthlyPipelineOverview stages={data.monthly_pipeline} />
         </Panel>
       </div>
 
-      <MonthlyOutcomes
-        selectedPeriod={selectedPeriod}
-        outcomes={data.monthly_outcomes}
-        breakdown={data.outcome_reason_breakdown}
+      <CandidateOutcomes
+        outcomes={data.total_outcomes}
+        breakdown={data.total_outcome_reason_breakdown}
         selected={outcomeTab}
         onSelect={selectOutcome}
       />
