@@ -544,31 +544,34 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(workspace, /key: "analytics", label: "Analytics"/);
     assert.match(workspace, /<AnalyticsView/);
     assert.match(analytics, /\/api\/v1\/hr\/analytics/);
-    assert.match(analytics, /Applications/);
+    assert.match(analytics, /Application Received/);
+    assert.match(analytics, /Rejected/);
+    assert.match(analytics, /In Process/);
+    assert.match(analytics, /Job Interview/);
+    assert.match(analytics, /Test & Demo/);
     assert.match(analytics, /Final Decision/);
     assert.match(analytics, /Teacher Academy/);
-    assert.match(analytics, /Active Teachers/);
-    assert.match(analytics, /Job Interviews/);
-    assert.match(analytics, /Demo Lessons/);
-    assert.match(analytics, /Subject Tests/);
-    assert.match(analytics, /academy_total/);
-    assert.match(analytics, /Total \{numberValue/);
-    assert.match(analytics, /Current active pipeline/);
-    assert.match(analytics, /SLA overdue now/);
+    assert.match(analytics, /monthly_stage_totals/);
+    assert.match(analytics, /min-w-\[68rem\]/);
+    assert.match(analytics, /overflow-x-auto/);
+    assert.match(analytics, /Employees Turnover/);
+    assert.match(analytics, /turnover_rate/);
+    assert.match(analytics, /Funnel Overview/);
+    assert.match(analytics, /New Applications/);
+    assert.match(analytics, /Shortlisted/);
+    assert.match(analytics, /Candidate Outcomes/);
+    assert.match(analytics, /Rejections/);
+    assert.match(analytics, /Candidate Withdraw/);
+    assert.match(analytics, /outcome_reason_breakdown/);
+    assert.match(analytics, /analytics_outcome/);
     assert.match(analytics, /type="month"/);
     assert.match(analytics, /disabled=\{selectedMonth >= currentMonth\}/);
-    assert.match(analytics, /Live snapshot/);
-    assert.match(analytics, /Recruitment journey/);
-    assert.match(analytics, /Applicant sources/);
-    assert.match(analytics, /Applications by position/);
-    assert.match(analytics, /Stage time and SLA/);
-    assert.match(analytics, /Source quality/);
-    assert.match(analytics, /Recent candidates/);
-    assert.match(analytics, /Recent activity/);
     assert.match(analytics, /<Drawer/);
-    assert.match(analytics, /roleIsHr/);
     assert.match(analytics, /motion-reduce/);
-    assert.doesNotMatch(analytics, /Current Vacanc|Recruitment cost|Salary budget/);
+    assert.doesNotMatch(
+      analytics,
+      /Live snapshot|Applicant sources|Applications by position|Stage time and SLA|Source quality|Recent candidates|Recent activity|Job Interviews|Demo Lessons|Subject Tests|Current Vacanc|Recruitment cost|Salary budget/,
+    );
   });
 
   test("uses a dedicated HR-only Trash Bin that cannot expose active candidates", () => {

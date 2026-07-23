@@ -279,6 +279,55 @@ def dashboard(
     comparison_events = _dict(rows["comparison_event_summary"])
     all_time_events = _dict(rows["total_event_summary"])
     live = _dict(rows["live_summary"])
+    monthly_stage_totals_row = _dict(rows.get("monthly_stage_totals"))
+    monthly_stage_totals = {
+        key: int(monthly_stage_totals_row.get(key) or 0)
+        for key in (
+            "application_received",
+            "rejected",
+            "in_process",
+            "job_interview",
+            "test_and_demo",
+            "teacher_academy",
+        )
+    }
+    outcome_reason_breakdown = {
+        "rejected": {"total": 0, "items": []},
+        "candidate_withdrew": {"total": 0, "items": []},
+    }
+    reason_rows = [_dict(row) for row in rows.get("outcome_reasons") or []]
+    for outcome in outcome_reason_breakdown:
+        matching = [
+            row for row in reason_rows if str(row.get("outcome") or "") == outcome
+        ]
+        total = sum(int(row.get("candidates") or 0) for row in matching)
+        outcome_reason_breakdown[outcome] = {
+            "total": total,
+            "items": [
+                {
+                    "value": str(row.get("value") or "unspecified"),
+                    "label": str(row.get("label") or "Unspecified"),
+                    "candidates": int(row.get("candidates") or 0),
+                    "percentage": (
+                        round(int(row.get("candidates") or 0) / total * 100, 1)
+                        if total
+                        else 0
+                    ),
+                }
+                for row in matching
+            ],
+        }
+    turnover_series = [
+        {
+            "bucket": str(row.get("bucket") or ""),
+            "departures": int(row.get("departures") or 0),
+            "starting_headcount": int(row.get("starting_headcount") or 0),
+            "ending_headcount": int(row.get("ending_headcount") or 0),
+            "average_headcount": float(row.get("average_headcount") or 0),
+            "turnover_rate": float(row.get("turnover_rate") or 0),
+        }
+        for row in (_dict(item) for item in rows.get("turnover") or [])
+    ]
     stage_time = [_dict(row) for row in rows["time_in_stage"]]
     journey: list[dict[str, Any]] = []
     previous_count: int | None = None
@@ -368,6 +417,14 @@ def dashboard(
             "subject_id": subject_id,
             "responsible_account_id": responsible_account_id,
         },
+        "monthly_stage_totals": monthly_stage_totals,
+        "turnover": {
+            "population": "recruited_active_teachers",
+            "from": turnover_series[0]["bucket"] if turnover_series else "",
+            "to": turnover_series[-1]["bucket"] if turnover_series else "",
+            "monthly": turnover_series,
+        },
+        "outcome_reason_breakdown": outcome_reason_breakdown,
         "summary_cards": {
             key: {
                 **_comparison_metric(events.get(key), comparison_events.get(key)),

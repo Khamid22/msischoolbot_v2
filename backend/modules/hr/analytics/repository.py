@@ -504,6 +504,295 @@ def _event_summary(
     ).fetchone()
 
 
+def _monthly_stage_totals(
+    conn: Any,
+    *,
+    base_where: str,
+    base_params: list[Any],
+    date_from: str,
+    date_to: str,
+) -> Any:
+    """Count distinct monthly activity, independently of application cohort."""
+
+    return conn.execute(
+        f"""
+        WITH bounds AS (
+          SELECT %s::date AS date_from, %s::date AS date_to
+        ), base_candidates AS (
+          SELECT candidate.id, candidate.application_date, candidate.status
+          FROM msi_v2.teacher_candidates candidate
+          WHERE candidate.is_application_received = true
+            AND {base_where}
+        ), latest_decision AS (
+          SELECT DISTINCT ON (decision.candidate_id)
+                 decision.candidate_id, decision.decision, decision.created_at
+          FROM msi_v2.teacher_candidate_final_decisions decision
+          JOIN base_candidates candidate ON candidate.id = decision.candidate_id
+          WHERE decision.voided_at IS NULL
+          ORDER BY decision.candidate_id, decision.created_at DESC, decision.id DESC
+        ), test_demo_participants AS (
+          SELECT demo.candidate_id,
+                 COALESCE(demo.demo_at, demo.created_at) AS occurred_at
+          FROM msi_v2.teacher_candidate_demo_lessons demo
+          JOIN base_candidates candidate ON candidate.id = demo.candidate_id
+          WHERE demo.voided_at IS NULL
+            AND length(btrim(demo.result)) > 0
+          UNION ALL
+          SELECT test.candidate_id,
+                 COALESCE(test.test_at, test.created_at)
+          FROM msi_v2.teacher_candidate_subject_tests test
+          JOIN base_candidates candidate ON candidate.id = test.candidate_id
+          WHERE test.voided_at IS NULL
+            AND test.result <> 'not_completed'
+            AND length(btrim(test.result)) > 0
+        )
+        SELECT
+          (
+            SELECT COUNT(DISTINCT candidate.id)
+            FROM base_candidates candidate
+            CROSS JOIN bounds
+            WHERE candidate.application_date
+                  BETWEEN bounds.date_from AND bounds.date_to
+          ) AS application_received,
+          (
+            SELECT COUNT(DISTINCT decision.candidate_id)
+            FROM latest_decision decision
+            JOIN base_candidates candidate ON candidate.id = decision.candidate_id
+            CROSS JOIN bounds
+            WHERE candidate.status = 'rejected'
+              AND decision.decision = 'rejected'
+              AND (decision.created_at AT TIME ZONE 'Asia/Tashkent')::date
+                  BETWEEN bounds.date_from AND bounds.date_to
+          ) AS rejected,
+          (
+            SELECT COUNT(DISTINCT history.candidate_id)
+            FROM msi_v2.teacher_candidate_stage_history history
+            JOIN base_candidates candidate ON candidate.id = history.candidate_id
+            CROSS JOIN bounds
+            WHERE history.stage = 'responded'
+              AND (history.entered_at AT TIME ZONE 'Asia/Tashkent')::date
+                  BETWEEN bounds.date_from AND bounds.date_to
+          ) AS in_process,
+          (
+            SELECT COUNT(DISTINCT interview.candidate_id)
+            FROM msi_v2.teacher_candidate_interviews interview
+            JOIN base_candidates candidate ON candidate.id = interview.candidate_id
+            CROSS JOIN bounds
+            WHERE interview.voided_at IS NULL
+              AND interview.result IN ('passed', 'failed')
+              AND (
+                COALESCE(interview.interview_at, interview.created_at)
+                AT TIME ZONE 'Asia/Tashkent'
+              )::date BETWEEN bounds.date_from AND bounds.date_to
+          ) AS job_interview,
+          (
+            SELECT COUNT(DISTINCT participant.candidate_id)
+            FROM test_demo_participants participant
+            CROSS JOIN bounds
+            WHERE (
+                participant.occurred_at AT TIME ZONE 'Asia/Tashkent'
+              )::date BETWEEN bounds.date_from AND bounds.date_to
+          ) AS test_and_demo,
+          (
+            SELECT COUNT(DISTINCT academy.recruitment_candidate_id)
+            FROM msi_v2.academy_teachers academy
+            JOIN base_candidates candidate
+              ON candidate.id = academy.recruitment_candidate_id
+            CROSS JOIN bounds
+            WHERE (
+                COALESCE(
+                  academy.academy_start_date::timestamp
+                    AT TIME ZONE 'Asia/Tashkent',
+                  academy.created_at
+                ) AT TIME ZONE 'Asia/Tashkent'
+              )::date BETWEEN bounds.date_from AND bounds.date_to
+          ) AS teacher_academy
+        """,
+        tuple([date_from, date_to, *base_params]),
+    ).fetchone()
+
+
+def _outcome_reason_rows(
+    conn: Any,
+    *,
+    base_where: str,
+    base_params: list[Any],
+    date_from: str,
+    date_to: str,
+) -> list[Any]:
+    return conn.execute(
+        f"""
+        WITH bounds AS (
+          SELECT %s::date AS date_from, %s::date AS date_to
+        ), base_candidates AS (
+          SELECT candidate.id, candidate.status
+          FROM msi_v2.teacher_candidates candidate
+          WHERE candidate.is_application_received = true
+            AND {base_where}
+        ), latest_decision AS (
+          SELECT DISTINCT ON (decision.candidate_id)
+                 decision.candidate_id, decision.decision,
+                 decision.rejection_reason, decision.withdrawal_reason,
+                 decision.created_at
+          FROM msi_v2.teacher_candidate_final_decisions decision
+          JOIN base_candidates candidate ON candidate.id = decision.candidate_id
+          WHERE decision.voided_at IS NULL
+          ORDER BY decision.candidate_id, decision.created_at DESC, decision.id DESC
+        ), classified AS (
+          SELECT
+            decision.candidate_id,
+            decision.decision AS outcome,
+            CASE decision.decision
+              WHEN 'rejected' THEN NULLIF(btrim(decision.rejection_reason), '')
+              WHEN 'candidate_withdrew'
+                THEN NULLIF(btrim(decision.withdrawal_reason), '')
+            END AS reason_value
+          FROM latest_decision decision
+          JOIN base_candidates candidate ON candidate.id = decision.candidate_id
+          CROSS JOIN bounds
+          WHERE decision.decision IN ('rejected', 'candidate_withdrew')
+            AND candidate.status = decision.decision
+            AND (decision.created_at AT TIME ZONE 'Asia/Tashkent')::date
+                BETWEEN bounds.date_from AND bounds.date_to
+        )
+        SELECT
+          classified.outcome,
+          COALESCE(classified.reason_value, 'unspecified') AS value,
+          COALESCE(
+            setting.label,
+            CASE
+              WHEN classified.reason_value IS NULL THEN 'Unspecified'
+              ELSE initcap(replace(classified.reason_value, '_', ' '))
+            END
+          ) AS label,
+          COUNT(DISTINCT classified.candidate_id) AS candidates,
+          COALESCE(setting.sort_order, 2147483647) AS sort_order
+        FROM classified
+        LEFT JOIN msi_v2.teacher_recruitment_settings setting
+          ON setting.category = CASE classified.outcome
+               WHEN 'rejected' THEN 'rejection_reason'
+               ELSE 'withdrawal_reason'
+             END
+         AND setting.value = classified.reason_value
+        GROUP BY
+          classified.outcome,
+          classified.reason_value,
+          setting.label,
+          setting.sort_order
+        ORDER BY classified.outcome, candidates DESC, sort_order, label
+        """,
+        tuple([date_from, date_to, *base_params]),
+    ).fetchall()
+
+
+def _turnover_rows(
+    conn: Any,
+    *,
+    base_where: str,
+    base_params: list[Any],
+    date_to: str,
+) -> list[Any]:
+    return conn.execute(
+        f"""
+        WITH bounds AS (
+          SELECT
+            (
+              date_trunc('month', %s::date)
+              - interval '11 months'
+            )::date AS date_from,
+            %s::date AS date_to
+        ), months AS (
+          SELECT bucket::date AS month_start
+          FROM bounds,
+               generate_series(
+                 bounds.date_from,
+                 date_trunc('month', bounds.date_to)::date,
+                 interval '1 month'
+               ) bucket
+        ), eligible_teachers AS (
+          SELECT teacher.id
+          FROM msi_v2.teachers teacher
+          JOIN msi_v2.teacher_candidates candidate
+            ON candidate.id = teacher.recruitment_candidate_id
+          WHERE teacher.recruitment_candidate_id IS NOT NULL
+            AND {base_where}
+        ), employment_events AS (
+          SELECT event.teacher_id, event.event_type,
+                 (event.occurred_at AT TIME ZONE 'Asia/Tashkent')::date
+                   AS occurred_date
+          FROM msi_v2.teacher_employment_events event
+          JOIN eligible_teachers teacher ON teacher.id = event.teacher_id
+        ), monthly_counts AS (
+          SELECT
+            months.month_start,
+            LEAST(
+              (months.month_start + interval '1 month - 1 day')::date,
+              bounds.date_to
+            ) AS effective_month_end,
+            GREATEST(
+              COUNT(*) FILTER (
+                WHERE event.event_type = 'activated'
+                  AND event.occurred_date < months.month_start
+              )
+              - COUNT(*) FILTER (
+                WHERE event.event_type = 'deactivated'
+                  AND event.occurred_date < months.month_start
+              ),
+              0
+            ) AS starting_headcount,
+            GREATEST(
+              COUNT(*) FILTER (
+                WHERE event.event_type = 'activated'
+                  AND event.occurred_date <= LEAST(
+                    (months.month_start + interval '1 month - 1 day')::date,
+                    bounds.date_to
+                  )
+              )
+              - COUNT(*) FILTER (
+                WHERE event.event_type = 'deactivated'
+                  AND event.occurred_date <= LEAST(
+                    (months.month_start + interval '1 month - 1 day')::date,
+                    bounds.date_to
+                  )
+              ),
+              0
+            ) AS ending_headcount,
+            COUNT(*) FILTER (
+              WHERE event.event_type = 'deactivated'
+                AND event.occurred_date BETWEEN months.month_start AND LEAST(
+                  (months.month_start + interval '1 month - 1 day')::date,
+                  bounds.date_to
+                )
+            ) AS departures
+          FROM months
+          CROSS JOIN bounds
+          LEFT JOIN employment_events event ON true
+          GROUP BY months.month_start, bounds.date_to
+        )
+        SELECT
+          month_start::text AS bucket,
+          departures,
+          starting_headcount,
+          ending_headcount,
+          ROUND(
+            (starting_headcount + ending_headcount)::numeric / 2.0,
+            1
+          ) AS average_headcount,
+          CASE
+            WHEN (starting_headcount + ending_headcount) > 0 THEN ROUND(
+              100.0 * departures
+              / ((starting_headcount + ending_headcount)::numeric / 2.0),
+              1
+            )
+            ELSE 0
+          END AS turnover_rate
+        FROM monthly_counts
+        ORDER BY month_start
+        """,
+        tuple([date_to, date_to, *base_params]),
+    ).fetchall()
+
+
 def dashboard_rows(
     conn: Any,
     *,
@@ -587,6 +876,26 @@ def dashboard_rows(
         base_params=event_base_params,
         date_from="1900-01-01",
         date_to="2999-12-31",
+    )
+    monthly_stage_totals = _monthly_stage_totals(
+        conn,
+        base_where=event_base_where,
+        base_params=event_base_params,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    outcome_reasons = _outcome_reason_rows(
+        conn,
+        base_where=event_base_where,
+        base_params=event_base_params,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    turnover = _turnover_rows(
+        conn,
+        base_where=event_base_where,
+        base_params=event_base_params,
+        date_to=date_to,
     )
 
     facts_cte = _candidate_facts_cte(where_sql=where_sql)
@@ -901,6 +1210,9 @@ def dashboard_rows(
         "event_summary": event_summary,
         "comparison_event_summary": comparison_event_summary,
         "total_event_summary": total_event_summary,
+        "monthly_stage_totals": monthly_stage_totals,
+        "outcome_reasons": outcome_reasons,
+        "turnover": turnover,
         "journey": journey,
         "outcomes": outcomes,
         "activity_trend": trend,

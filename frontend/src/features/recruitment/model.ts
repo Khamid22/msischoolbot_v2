@@ -539,6 +539,32 @@ export type HrAnalyticsDashboard = {
     subject_id?: number | null;
     responsible_account_id?: number | null;
   };
+  monthly_stage_totals: Record<
+    "application_received" | "rejected" | "in_process" | "job_interview" | "test_and_demo" | "teacher_academy",
+    number
+  >;
+  turnover: {
+    population: "recruited_active_teachers";
+    from: string;
+    to: string;
+    monthly: Array<{
+      bucket: string;
+      departures: number;
+      starting_headcount: number;
+      ending_headcount: number;
+      average_headcount: number;
+      turnover_rate: number;
+    }>;
+  };
+  outcome_reason_breakdown: Record<"rejected" | "candidate_withdrew", {
+    total: number;
+    items: Array<{
+      value: string;
+      label: string;
+      candidates: number;
+      percentage: number;
+    }>;
+  }>;
   summary_cards: Record<"applications" | "final_decision" | "teacher_academy" | "active_teachers" | "rejected", {
     value: number;
     total: number;

@@ -189,6 +189,44 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
             "rejected": 4,
             "withdrawn": 2,
         },
+        "monthly_stage_totals": {
+            "application_received": 10,
+            "rejected": 3,
+            "in_process": 8,
+            "job_interview": 6,
+            "test_and_demo": 5,
+            "teacher_academy": 1,
+        },
+        "outcome_reasons": [
+            {
+                "outcome": "rejected",
+                "value": "low_english_level",
+                "label": "Low English Level",
+                "candidates": 2,
+            },
+            {
+                "outcome": "rejected",
+                "value": "poor_soft_skills",
+                "label": "Poor Soft Skills",
+                "candidates": 1,
+            },
+            {
+                "outcome": "candidate_withdrew",
+                "value": "personal_reasons",
+                "label": "Personal Reasons",
+                "candidates": 1,
+            },
+        ],
+        "turnover": [
+            {
+                "bucket": "2026-07-01",
+                "departures": 1,
+                "starting_headcount": 9,
+                "ending_headcount": 11,
+                "average_headcount": 10,
+                "turnover_rate": 10,
+            }
+        ],
         "live_summary": {
             "active_candidates": 304,
             "sla_overdue_now": 294,
@@ -260,6 +298,42 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
     assert result["secondary_kpis"]["active_candidates"] == 304
     assert result["secondary_kpis"]["sla_overdue_now"] == 294
     assert result["secondary_kpis"]["cohort_sla_breaches"] == 2
+    assert result["monthly_stage_totals"] == {
+        "application_received": 10,
+        "rejected": 3,
+        "in_process": 8,
+        "job_interview": 6,
+        "test_and_demo": 5,
+        "teacher_academy": 1,
+    }
+    assert result["turnover"]["population"] == "recruited_active_teachers"
+    assert result["turnover"]["monthly"] == [
+        {
+            "bucket": "2026-07-01",
+            "departures": 1,
+            "starting_headcount": 9,
+            "ending_headcount": 11,
+            "average_headcount": 10.0,
+            "turnover_rate": 10.0,
+        }
+    ]
+    assert result["outcome_reason_breakdown"]["rejected"] == {
+        "total": 3,
+        "items": [
+            {
+                "value": "low_english_level",
+                "label": "Low English Level",
+                "candidates": 2,
+                "percentage": 66.7,
+            },
+            {
+                "value": "poor_soft_skills",
+                "label": "Poor Soft Skills",
+                "candidates": 1,
+                "percentage": 33.3,
+            },
+        ],
+    }
     assert result["outcomes"] == [
         {"outcome": "teacher_academy", "candidates": 1},
         {"outcome": "active_teacher", "candidates": 2},
@@ -353,13 +427,31 @@ def test_analytics_repository_queries_bind_every_placeholder():
     assert "candidate.application_date BETWEEN" not in activity_query
     assert "candidate.status <> 'trash_bin'" not in activity_query
     event_queries = [
-        query for query in executed_queries if "WITH bounds AS" in query
+        query for query in executed_queries if "ranked_attempts AS" in query
     ]
     assert len(event_queries) == 3
     for query in event_queries:
         base_candidates = query.split("), latest_closure", 1)[0]
         assert "candidate.application_date BETWEEN" not in base_candidates
         assert "candidate.status <> 'trash_bin'" not in base_candidates
+    monthly_totals_query = next(
+        query for query in executed_queries if "test_demo_participants AS" in query
+    )
+    assert "COUNT(DISTINCT participant.candidate_id)" in monthly_totals_query
+    assert "history.stage = 'responded'" in monthly_totals_query
+    outcome_reason_query = next(
+        query
+        for query in executed_queries
+        if "COALESCE(classified.reason_value, 'unspecified')" in query
+    )
+    assert "decision.voided_at IS NULL" in outcome_reason_query
+    turnover_query = next(
+        query
+        for query in executed_queries
+        if "FROM msi_v2.teacher_employment_events event" in query
+    )
+    assert "interval '11 months'" in turnover_query
+    assert "average_headcount" in turnover_query
     all_queries = "\n".join(executed_queries)
     assert "msi_v2.academy_teachers" in all_queries
     assert "msi_v2.teachers" in all_queries
@@ -376,6 +468,22 @@ def test_migration_contains_append_only_history_and_snapshotted_sla():
     assert "sla_target_days" in source and "sla_due_at" in source
     assert "teacher_candidate_subject_test_topics" in source
     assert "teacher_candidate_demo_criteria" in source
+
+
+def test_teacher_employment_event_migration_backfills_and_tracks_transitions():
+    source = Path("database/alembic/versions/0042_teacher_employment_events.py").read_text()
+    assert 'revision = "0042_teacher_employment_events"' in source
+    assert 'down_revision = "0041_consolidate_reasons"' in source
+    assert "teacher_employment_events" in source
+    assert "capture_teacher_employment_event" in source
+    assert "trg_capture_teacher_employment_event" in source
+    assert "'activated'" in source and "'deactivated'" in source
+    assert "'historical_backfill'" in source
+    assert "teacher.status <> 'active'" in source
+    assert "teacher.status <> 'active'\n          AND teacher.activated_at IS NOT NULL" not in source
+    upgrade = source.split("def downgrade", 1)[0]
+    assert "DELETE FROM msi_v2.teachers" not in upgrade
+    assert "DELETE FROM msi_v2.teacher_candidates" not in upgrade
 
 
 def test_on_hold_removal_migration_restores_candidates_and_tightens_stage_constraint():
