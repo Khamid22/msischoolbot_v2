@@ -9,7 +9,7 @@ test("Teacher Academy uses its own responsive cabinet instead of an Admin previe
   assert.doesNotMatch(teacherHome, /Default password|password equals login/i);
   assert.match(teacherHome, /Teacher Academy navigation/);
   assert.match(teacherHome, /fixed inset-x-0 bottom-0/);
-  assert.match(teacherHome, /sticky top-0 hidden h-dvh w-56/);
+  assert.match(teacherHome, /sticky top-0 hidden h-dvh w-\[var\(--workspace-sidebar-width\)\]/);
   assert.match(teacherHome, /overflow-x-hidden/);
   assert.match(teacherHome, /var\(--app-bottom-inset\)/);
 });

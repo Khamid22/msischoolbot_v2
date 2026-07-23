@@ -49,7 +49,7 @@ export function Topbar({
       className="fixed inset-x-0 top-0 z-40 border-b border-foreground/5 bg-surface shadow-card"
       style={{ paddingTop: headerPadTop, paddingLeft: headerPadLeft, paddingRight: headerPadRight }}
     >
-      <div className="mx-auto flex min-h-[4.75rem] w-full max-w-4xl items-center justify-between gap-2.5 px-3 py-3 sm:min-h-[5rem] sm:px-4 md:px-6 lg:max-w-5xl">
+      <div className="mx-auto flex min-h-[4.75rem] w-full max-w-[var(--workspace-content-max-width)] items-center justify-between gap-2.5 px-3 py-3 sm:min-h-[5rem] sm:px-4 md:px-6">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {backUrl && (
             <a
@@ -113,7 +113,7 @@ export function TelegramLayout({ children, topbar }: TelegramLayoutProps) {
           WebkitOverflowScrolling: "touch",
         }}
       >
-        <div className="mx-auto w-full max-w-none 2xl:max-w-[108rem]">
+        <div className="mx-auto w-full max-w-[var(--workspace-content-max-width)]">
           {children}
         </div>
       </main>

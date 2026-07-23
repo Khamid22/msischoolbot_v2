@@ -22,6 +22,7 @@
     --workspace-sidebar-collapsible-width: 14rem;
     --workspace-sidebar-compact-width: 4.5rem;
     --workspace-gutter-desktop: 2rem;
+    --workspace-content-max-width: 100rem;
     --surface-radius: 0.875rem;
 
     --font-display: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
@@ -99,6 +100,21 @@
     --tg-visual-viewport-height: 100dvh;
     --tg-visual-viewport-offset-top: 0px;
     --tg-visual-viewport-bottom-offset: 0px;
+  }
+}
+
+@layer components {
+  @media (min-width: 1024px) {
+    .workspace-main-auto-sidebar {
+      margin-left: var(--workspace-sidebar-compact-width);
+    }
+  }
+
+  @media (min-width: 1024px) and (hover: none),
+    (min-width: 1024px) and (pointer: coarse) {
+    .workspace-main-auto-sidebar {
+      margin-left: var(--workspace-sidebar-collapsible-width);
+    }
   }
 }
 

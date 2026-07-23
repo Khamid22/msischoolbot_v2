@@ -251,7 +251,7 @@ export default function ParentHome(props: Record<string, unknown>) {
 
   return (
     <TelegramLayout topbar={topbar}>
-      <div className="mx-auto w-full max-w-5xl py-4">
+      <div className="mx-auto w-full max-w-[var(--workspace-content-max-width)] py-4">
         {workspaceCards.length ? (
           <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {workspaceCards.map((card) => (

@@ -14,6 +14,7 @@ from backend.core.access import CurrentUser
 from backend.modules.hr.analytics import repository as analytics_repository
 from backend.modules.hr.analytics import service as analytics_service
 from backend.modules.hr.recruitment import service
+from backend.modules.hr.recruitment.constants import DEMO_CRITERIA
 from backend.modules.hr.recruitment.schemas import DemoLessonWrite, InterviewWrite, SubjectTestWrite
 
 
@@ -60,7 +61,15 @@ def test_structured_evaluation_contracts_validate_scores():
     assert interview.cefr_level == "C1"
     subject_test = SubjectTestWrite.model_validate({"result": "passed", "paper": "Math 2", "topic_scores": [{"topic": "Algebra", "score": 18, "maximum_score": 20}]})
     assert subject_test.topic_scores[0].topic == "Algebra"
-    demo = DemoLessonWrite.model_validate({"result": "passed", "criteria_scores": [{"criterion": "Clarity", "score": 8}]})
+    demo = DemoLessonWrite.model_validate(
+        {
+            "result": "passed",
+            "criteria_scores": [
+                {"criterion": criterion, "score": 8}
+                for criterion in DEMO_CRITERIA
+            ],
+        }
+    )
     assert demo.criteria_scores[0].maximum_score == 10
 
 

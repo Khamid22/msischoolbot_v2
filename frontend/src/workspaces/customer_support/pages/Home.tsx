@@ -848,9 +848,7 @@ export default function CustomerSupportWorkspace({
       workspaceLabel="Customer Support"
       mobileNavigationMode="drawer"
       desktopSidebarMode="collapsible"
-      desktopSidebarInitialState="adaptive"
-      desktopSidebarStorageKey="msi:customer-support:sidebar:v1"
-      maxWidthClass="max-w-[100rem]"
+      maxWidthClass="max-w-[var(--workspace-content-max-width)]"
       sectionClassName="gap-0"
     >
       <div className="flex min-w-0 flex-col gap-4 overflow-x-hidden">

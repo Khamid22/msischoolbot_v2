@@ -6,6 +6,11 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
+from backend.modules.hr.recruitment.constants import (
+    DEMO_CRITERIA,
+    DEMO_FAILURE_REJECTION_REASONS,
+)
+
 
 def _blank_to_none(value: Any) -> Any:
     return None if isinstance(value, str) and not value.strip() else value
@@ -26,6 +31,8 @@ class CandidateCreate(StrictModel):
     phone: str = Field(default="", max_length=80)
     email: str = Field(default="", max_length=254)
     telegram_username: str = Field(default="", max_length=120)
+    age: OptionalInt = Field(default=None, ge=14, le=100)
+    address: str = Field(default="", max_length=1000)
     applied_position: str = Field(default="", max_length=200)
     position_option_id: OptionalInt = Field(default=None, ge=1)
     subject_id: OptionalInt = Field(default=None, ge=1)
@@ -161,7 +168,9 @@ class TopicScore(StructuredScore):
 
 class DemoCriterionScore(StructuredScore):
     criterion: str = Field(min_length=1, max_length=200)
-    maximum_score: Decimal = Field(default=Decimal("10"), gt=0)
+    maximum_score: Decimal = Field(
+        default=Decimal("10"), ge=Decimal("10"), le=Decimal("10")
+    )
 
 
 class SubjectTestWrite(StrictModel):
@@ -189,9 +198,29 @@ class DemoLessonWrite(StrictModel):
     strengths: str = Field(default="", max_length=5000)
     areas_for_improvement: str = Field(default="", max_length=5000)
     score: OptionalDecimal = Field(default=None, ge=0, le=10)
-    criteria_scores: list[DemoCriterionScore] = Field(default_factory=list, max_length=50)
-    result: str = Field(min_length=1, max_length=80)
+    criteria_scores: list[DemoCriterionScore] = Field(min_length=5, max_length=5)
+    result: str = Field(pattern="^(passed|failed)$")
     recommendation: str = Field(default="", max_length=5000)
+    rejection_reason: str = Field(default="", max_length=120)
+    reason_detail: str = Field(default="", max_length=5000)
+
+    @model_validator(mode="after")
+    def validate_demo_fields(self):
+        criteria = [item.criterion for item in self.criteria_scores]
+        if len(set(criteria)) != len(criteria):
+            raise ValueError("Demo lesson criteria cannot be duplicated.")
+        if set(criteria) != set(DEMO_CRITERIA):
+            raise ValueError(
+                "Demo lesson scores are required for English fluency, lesson structure, "
+                "board skills, student engagement, and confidence & delivery."
+            )
+        if self.rejection_reason and self.rejection_reason not in DEMO_FAILURE_REJECTION_REASONS:
+            raise ValueError("Select a valid demo lesson rejection reason.")
+        if self.result == "passed" and (self.rejection_reason or self.reason_detail):
+            raise ValueError("Passing demo lessons cannot include a rejection reason.")
+        if self.rejection_reason == "other" and not self.reason_detail:
+            raise ValueError("Explain the reason when Other is selected.")
+        return self
 
 
 class TaskWrite(StrictModel):

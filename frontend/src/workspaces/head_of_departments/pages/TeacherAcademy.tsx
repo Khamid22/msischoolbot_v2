@@ -51,7 +51,7 @@ export default function HeadOfDepartmentTeacherAcademyPage(props: HeadOfDepartme
       csrfToken={props.csrfToken}
       active="academy"
       sectionClassName="gap-2"
-      maxWidthClass="max-w-[100rem]"
+      maxWidthClass="max-w-[var(--workspace-content-max-width)]"
     >
       <Suspense
         fallback={

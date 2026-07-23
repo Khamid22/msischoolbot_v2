@@ -70,6 +70,18 @@ INTERVIEW_RESULTS = frozenset(
 )
 SUBJECT_TEST_RESULTS = frozenset({"passed", "failed", "retake_required", "not_completed"})
 DEMO_RESULTS = frozenset({"passed", "failed", "additional_demo"})
+DEMO_CRITERIA = (
+    "English fluency",
+    "Lesson structure",
+    "Board skills",
+    "Student engagement",
+    "Confidence & delivery",
+)
+DEMO_FAILURE_REJECTION_REASONS = {
+    "insufficient_subject_knowledge": "Insufficient subject knowledge",
+    "insufficient_experience": "Insufficient experience",
+    "other": "Other",
+}
 TASK_STATUSES = frozenset({"pending", "completed", "cancelled"})
 APPOINTMENT_TYPES = frozenset({"job_interview", "demo_lesson"})
 APPOINTMENT_STATUSES = frozenset(
@@ -97,6 +109,8 @@ __all__ = [
     "APPOINTMENT_TYPES",
     "ALL_STAGES",
     "ALTERNATIVE_STAGES",
+    "DEMO_CRITERIA",
+    "DEMO_FAILURE_REJECTION_REASONS",
     "DEMO_RESULTS",
     "DOCUMENT_TYPES",
     "DEMO_EVALUATOR_ROLES",

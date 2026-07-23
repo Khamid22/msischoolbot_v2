@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronDown, KeyRound, Menu, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, Menu, X } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { isTelegramMiniApp } from "@/shared/lib/telegram";
 import { RoleMobileNav } from "@/shared/ui/RoleMobileNav";
@@ -11,7 +11,6 @@ import { useBodyScrollLock } from "@/shared/ui/useBodyScrollLock";
 
 export type MobileNavigationMode = "auto" | "bottom" | "drawer";
 export type DesktopSidebarMode = "fixed" | "collapsible";
-export type DesktopSidebarInitialState = "expanded" | "collapsed" | "adaptive";
 
 export interface RoleWorkspaceShellProps<Key extends string = string> {
   authLogin?: string;
@@ -35,31 +34,9 @@ export interface RoleWorkspaceShellProps<Key extends string = string> {
   sectionClassName?: string;
   mobileNavigationMode?: MobileNavigationMode;
   desktopSidebarMode?: DesktopSidebarMode;
-  desktopSidebarInitialState?: DesktopSidebarInitialState;
-  desktopSidebarStorageKey?: string;
   workspaceBackLink?: WorkspaceBackLink;
   profileHref?: string;
   children: ReactNode;
-}
-
-function storedSidebarPreference(storageKey?: string) {
-  if (!storageKey || typeof window === "undefined") return null;
-  try {
-    const value = window.localStorage.getItem(storageKey);
-    if (value === "collapsed") return true;
-    if (value === "expanded") return false;
-  } catch {
-    return null;
-  }
-  return null;
-}
-
-function initialSidebarCollapsed(initialState: DesktopSidebarInitialState, storageKey?: string) {
-  const stored = storedSidebarPreference(storageKey);
-  if (stored !== null) return stored;
-  if (initialState === "collapsed") return true;
-  if (initialState === "expanded") return false;
-  return typeof window !== "undefined" ? window.innerWidth < 1280 : false;
 }
 
 /**
@@ -71,7 +48,6 @@ function initialSidebarCollapsed(initialState: DesktopSidebarInitialState, stora
  */
 export function RoleWorkspaceShell<Key extends string = string>({
   authLogin,
-  csrfToken,
   active,
   homeHref,
   navItems,
@@ -82,13 +58,10 @@ export function RoleWorkspaceShell<Key extends string = string>({
   mobileNavLabel,
   initialsFallback,
   brandLabel,
-  logoutAction,
-  maxWidthClass = "max-w-7xl",
+  maxWidthClass = "max-w-[var(--workspace-content-max-width)]",
   sectionClassName = "gap-5",
   mobileNavigationMode = "auto",
   desktopSidebarMode = "fixed",
-  desktopSidebarInitialState = "expanded",
-  desktopSidebarStorageKey,
   workspaceBackLink,
   profileHref,
   children,
@@ -98,12 +71,6 @@ export function RoleWorkspaceShell<Key extends string = string>({
   const activeDrawerGroupKey = navItems.find((item) => item.key === active && item.children?.length)?.key ?? null;
   const [openDrawerGroupKey, setOpenDrawerGroupKey] = useState<Key | null>(activeDrawerGroupKey);
   const desktopSidebarCollapsible = desktopSidebarMode === "collapsible";
-  const [desktopSidebarPreferenceSet, setDesktopSidebarPreferenceSet] = useState(
-    () => storedSidebarPreference(desktopSidebarStorageKey) !== null,
-  );
-  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(
-    () => desktopSidebarCollapsible && initialSidebarCollapsed(desktopSidebarInitialState, desktopSidebarStorageKey),
-  );
   const shouldUseBottomNav = useMemo(() => {
     if (mobileNavigationMode === "bottom") return true;
     if (mobileNavigationMode === "drawer") return false;
@@ -111,7 +78,6 @@ export function RoleWorkspaceShell<Key extends string = string>({
   }, [mobileNavigationMode]);
   const shouldUseDrawer = !shouldUseBottomNav;
   const login = authLogin || roleLabel;
-  const resolvedLogoutAction = logoutAction || routes.logout;
 
   useBodyScrollLock(drawerOpen);
 
@@ -136,40 +102,14 @@ export function RoleWorkspaceShell<Key extends string = string>({
     setOpenDrawerGroupKey(activeDrawerGroupKey);
   }, [activeDrawerGroupKey]);
 
-  useEffect(() => {
-    if (!desktopSidebarCollapsible || desktopSidebarInitialState !== "adaptive" || desktopSidebarPreferenceSet) return;
-    const applyAdaptiveState = () => setDesktopSidebarCollapsed(window.innerWidth < 1280);
-    applyAdaptiveState();
-    window.addEventListener("resize", applyAdaptiveState);
-    return () => window.removeEventListener("resize", applyAdaptiveState);
-  }, [desktopSidebarCollapsible, desktopSidebarInitialState, desktopSidebarPreferenceSet]);
-
-  const toggleDesktopSidebar = () => {
-    setDesktopSidebarCollapsed((current) => {
-      const next = !current;
-      if (desktopSidebarStorageKey) {
-        try {
-          window.localStorage.setItem(desktopSidebarStorageKey, next ? "collapsed" : "expanded");
-        } catch {
-          // Storage can be unavailable in strict/private browser contexts.
-        }
-      }
-      return next;
-    });
-    setDesktopSidebarPreferenceSet(true);
-  };
-
   const desktopMarginClass = desktopSidebarCollapsible
-    ? desktopSidebarCollapsed
-      ? "lg:ml-[var(--workspace-sidebar-compact-width)]"
-      : "lg:ml-[var(--workspace-sidebar-collapsible-width)]"
+    ? "workspace-main-auto-sidebar"
     : "lg:ml-[var(--workspace-sidebar-width)]";
 
   return (
     <div className="min-h-[var(--tg-viewport-height)] bg-background text-foreground">
       <RoleSidebar
         authLogin={authLogin}
-        csrfToken={csrfToken}
         active={active}
         homeHref={homeHref}
         navItems={navItems}
@@ -178,10 +118,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
         sectionLabel={sectionLabel}
         initialsFallback={initialsFallback}
         brandLabel={brandLabel}
-        logoutAction={logoutAction}
         collapsible={desktopSidebarCollapsible}
-        collapsed={desktopSidebarCollapsed}
-        onToggleCollapsed={toggleDesktopSidebar}
         workspaceBackLink={workspaceBackLink}
         profileHref={profileHref}
       />
@@ -362,8 +299,8 @@ export function RoleWorkspaceShell<Key extends string = string>({
             </div>
 
             <div className="border-t border-white/10 p-3">
-              <div className="flex items-center gap-2.5 rounded-lg px-2 py-2">
-                <a href={profileHref || routes.accountSecurity} onClick={() => setDrawerOpen(false)} className="flex min-h-9 min-w-0 flex-1 items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40">
+              <div className="rounded-lg px-2 py-2">
+                <a href={profileHref || routes.accountSecurity} onClick={() => setDrawerOpen(false)} className="flex min-h-11 min-w-0 items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-slate-900">
                     {initialsFromLogin(login, initialsFallback || "MS")}
                   </div>
@@ -372,23 +309,6 @@ export function RoleWorkspaceShell<Key extends string = string>({
                     <span className="block truncate text-xs text-slate-400">{roleLabel}</span>
                   </div>
                 </a>
-                <a
-                  href={routes.accountSecurity}
-                  onClick={() => setDrawerOpen(false)}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                  aria-label="Account security"
-                >
-                  <KeyRound className="h-4 w-4" />
-                </a>
-                <form action={resolvedLogoutAction} method="post" className="shrink-0">
-                  <input type="hidden" name="csrf_token" value={csrfToken || ""} />
-                  <button
-                    type="submit"
-                    className="min-h-11 rounded-lg border border-white/10 px-3 py-2 text-xs font-black text-slate-300 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                  >
-                    Logout
-                  </button>
-                </form>
               </div>
             </div>
           </aside>

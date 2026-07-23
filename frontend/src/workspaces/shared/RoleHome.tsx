@@ -255,7 +255,7 @@ export function RoleHome({
 
   return (
     <main className="min-h-[var(--tg-viewport-height)] bg-background px-4 py-5 text-foreground sm:px-6 lg:px-8">
-      <section className="mx-auto flex max-w-6xl flex-col gap-5">
+      <section className="mx-auto flex w-full max-w-[var(--workspace-content-max-width)] flex-col gap-5">
         <PageHeader
           title={title}
           subtitle={description}

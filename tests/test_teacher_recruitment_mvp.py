@@ -15,6 +15,7 @@ from backend.core.access import CurrentUser
 from backend.modules.hr.recruitment import repository, service
 from backend.modules.hr.recruitment.constants import (
     ALL_STAGES,
+    DEMO_CRITERIA,
     PRIMARY_STAGES,
     REJECTION_REASONS,
 )
@@ -234,10 +235,19 @@ def test_teacher_handoff_service_normalizes_canonical_records_and_fails_closed(
 
 def test_minimal_candidate_and_blank_optional_values_validate():
     candidate = CandidateCreate.model_validate(
-        {"full_name": "  Ada Teacher  ", "application_date": ""}
+        {
+            "full_name": "  Ada Teacher  ",
+            "application_date": "",
+            "telegram_username": "  @ada_teacher  ",
+            "age": 28,
+            "address": "  14 Academy Street  ",
+        }
     )
     assert candidate.full_name == "Ada Teacher"
     assert candidate.application_date is None
+    assert candidate.telegram_username == "@ada_teacher"
+    assert candidate.age == 28
+    assert candidate.address == "14 Academy Street"
     assert (
         CandidateCreate.model_validate(
             {"full_name": "Ada", "position_option_id": 3}
@@ -260,9 +270,58 @@ def test_minimal_candidate_and_blank_optional_values_validate():
 
 
 def test_demo_score_is_restricted_to_zero_through_ten():
-    assert DemoLessonWrite.model_validate({"result": "passed", "score": 10}).score == 10
+    criteria = [
+        {"criterion": criterion, "score": 10, "maximum_score": 10}
+        for criterion in DEMO_CRITERIA
+    ]
+    assert (
+        DemoLessonWrite.model_validate(
+            {"result": "passed", "criteria_scores": criteria}
+        ).criteria_scores[0].score
+        == 10
+    )
     with pytest.raises(ValidationError):
-        DemoLessonWrite.model_validate({"result": "passed", "score": 10.01})
+        DemoLessonWrite.model_validate(
+            {
+                "result": "passed",
+                "criteria_scores": [
+                    *criteria[:-1],
+                    {
+                        "criterion": DEMO_CRITERIA[-1],
+                        "score": 10.01,
+                        "maximum_score": 10,
+                    },
+                ],
+            }
+        )
+
+
+def test_demo_requires_all_five_criteria_and_other_rejection_explanation():
+    criteria = [
+        {"criterion": criterion, "score": 8}
+        for criterion in DEMO_CRITERIA
+    ]
+    demo = DemoLessonWrite.model_validate(
+        {
+            "result": "failed",
+            "criteria_scores": criteria,
+            "rejection_reason": "insufficient_experience",
+        }
+    )
+    assert [item.criterion for item in demo.criteria_scores] == list(DEMO_CRITERIA)
+
+    with pytest.raises(ValidationError, match="at least 5 items"):
+        DemoLessonWrite.model_validate(
+            {"result": "passed", "criteria_scores": criteria[:-1]}
+        )
+    with pytest.raises(ValidationError, match="Explain the reason"):
+        DemoLessonWrite.model_validate(
+            {
+                "result": "failed",
+                "criteria_scores": criteria,
+                "rejection_reason": "other",
+            }
+        )
 
 
 def test_overdue_task_status_is_derived_and_not_stored():
@@ -518,6 +577,8 @@ def test_candidate_creation_anchors_new_stage_sla_to_application_date():
         in sql
     )
     assert params[7] == "2026-07-17"
+    assert params[10] is None
+    assert params[11] == ""
 
 
 def test_hr_recovers_closed_candidate_to_recorded_pipeline_stage(monkeypatch):

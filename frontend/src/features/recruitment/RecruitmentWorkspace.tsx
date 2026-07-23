@@ -109,11 +109,14 @@ function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolea
         <ModalBody className="grid content-start gap-2 md:grid-cols-2 lg:grid-cols-3">
           {create.error ? <div role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive md:col-span-2 lg:col-span-3">{queryError(create.error)}</div> : null}
           <label className="text-xs font-semibold lg:col-span-2">Full name<input autoFocus required name="full_name" className={`${fieldClass} mt-1`} /></label>
+          <label className="text-xs font-semibold">Age <span className="font-normal text-muted-foreground">(optional)</span><input name="age" type="number" min={14} max={100} inputMode="numeric" className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Phone<input name="phone" type="tel" className={`${fieldClass} mt-1`} /></label>
+          <label className="text-xs font-semibold">Telegram <span className="font-normal text-muted-foreground">(optional)</span><input name="telegram_username" maxLength={120} placeholder="@username" className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Email<input name="email" type="email" autoComplete="email" className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Applied position<select name="position_option_id" className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.option_categories.position?.map((position) => <option key={position.id} value={position.id}>{position.label}</option>)}</select></label>
           <label className="text-xs font-semibold">Subject<select name="subject_id" className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
           <label className="text-xs font-semibold">Application date<input name="application_date" type="date" defaultValue={new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date())} className={`${fieldClass} mt-1`} /></label>
+          <label className="text-xs font-semibold md:col-span-2 lg:col-span-3">Address <span className="font-normal text-muted-foreground">(optional)</span><textarea name="address" maxLength={1000} autoComplete="street-address" rows={2} className={`${fieldClass} mt-1 min-h-16 resize-y`} /></label>
           <label className="text-xs font-semibold">Source<select name="source_option_id" value={sourceId} onChange={(event) => { setSourceId(event.target.value); setSubsourceId(""); }} className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.sources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}</select></label>
           <label className="text-xs font-semibold">Subsource<select name="subsource_option_id" value={subsourceId} onChange={(event) => setSubsourceId(event.target.value)} disabled={!sourceId} required={Boolean(sourceId && options?.subsources.some((item) => String(item.parent_id || "") === sourceId))} className={`${fieldClass} mt-1 disabled:cursor-not-allowed disabled:opacity-60`}><option value="">{sourceId ? "Select subsource" : "Select a source first"}</option>{options?.subsources.filter((item) => String(item.parent_id || "") === sourceId).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
           <label className="text-xs font-semibold">CV <span className="font-normal text-muted-foreground">(optional)</span><input name="candidate_cv" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" disabled={!options?.document_upload_enabled} className={`${fieldClass} mt-1 cursor-pointer px-2 py-1.5 text-xs file:mr-2 file:rounded-md file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:font-semibold file:text-primary disabled:cursor-not-allowed disabled:opacity-60`} /><span className="mt-1 block text-[0.625rem] font-normal text-muted-foreground">{options?.document_upload_enabled ? "PDF, DOC, DOCX, JPG or PNG · max 20 MB" : "Document storage is unavailable. Add the CV later."}</span></label>
@@ -208,7 +211,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
         csrfToken={csrfToken}
         active="recruitment"
         recruitmentView={academicRecruitmentView}
-        maxWidthClass="max-w-[100rem]"
+        maxWidthClass="max-w-[var(--workspace-content-max-width)]"
         sectionClassName={view === "pipeline" ? "gap-2" : "gap-2"}
       >
         {content}
@@ -223,7 +226,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
         csrfToken={csrfToken}
         active="recruitment"
         recruitmentView={academicRecruitmentView}
-        maxWidthClass="max-w-[100rem]"
+        maxWidthClass="max-w-[var(--workspace-content-max-width)]"
         sectionClassName={view === "pipeline" ? "gap-2" : "gap-2"}
       >
         {content}
@@ -243,11 +246,9 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       workspaceLabel="Teacher Recruitment"
       mobileNavigationMode="drawer"
       desktopSidebarMode="collapsible"
-      desktopSidebarInitialState="adaptive"
-      desktopSidebarStorageKey="msi:recruitment:sidebar:v1"
       workspaceBackLink={workspaceBackLink}
       profileHref={`${basePath}/profile`}
-      maxWidthClass="max-w-[100rem]"
+      maxWidthClass="max-w-[var(--workspace-content-max-width)]"
       sectionClassName={view === "pipeline" ? "gap-2" : "gap-2"}
     >
       {content}

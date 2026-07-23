@@ -10,6 +10,7 @@ import pytest
 
 from backend.core.access import CurrentUser
 from backend.modules.hr.recruitment import notifications, repository, service
+from backend.modules.hr.recruitment.constants import DEMO_CRITERIA
 from backend.modules.hr.recruitment.schemas import AppointmentCreate
 
 
@@ -24,6 +25,13 @@ def _user(role: str = "hr_manager") -> CurrentUser:
         account_id=41,
         staff_id=51,
     )
+
+
+def _demo_criteria(score: int | float = 8):
+    return [
+        {"criterion": criterion, "score": score, "maximum_score": 10}
+        for criterion in DEMO_CRITERIA
+    ]
 
 
 class _Connection:
@@ -949,7 +957,7 @@ def test_recording_demo_from_appointment_links_and_completes_atomically(monkeypa
             "appointment_id": 92,
             "demo_at": None,
             "result": "passed",
-            "score": 9,
+            "criteria_scores": _demo_criteria(9),
             "topic": "Quadratic equations",
         },
     )
@@ -957,6 +965,10 @@ def test_recording_demo_from_appointment_links_and_completes_atomically(monkeypa
     assert conn.commits == 1
     assert saved_values[0]["appointment_id"] == 92
     assert saved_values[0]["demo_at"] == "2099-07-16T05:00:00+00:00"
+    assert saved_values[0]["score"] == 9
+    assert [item["criterion"] for item in saved_values[0]["criteria_scores"]] == list(
+        DEMO_CRITERIA
+    )
     assert completed[0]["appointment_id"] == 92
     assert [event for event, _detail in events] == [
         "candidate.appointment_completed",
@@ -1134,10 +1146,11 @@ def test_failed_interview_records_hr_supplied_rejection_reason(monkeypatch):
     assert decisions[0]["values"]["rejection_reason"] == "failed_job_interview"
 
 
-def test_passed_assigned_demo_remains_in_test_and_demo(monkeypatch):
+def test_manual_pass_with_a_low_demo_average_remains_in_test_and_demo(monkeypatch):
     conn = _DatabaseConnection()
     stage_updates = []
     events = []
+    saved_values = []
     appointment = {
         "id": 92,
         "candidate_id": 7,
@@ -1154,7 +1167,11 @@ def test_passed_assigned_demo_remains_in_test_and_demo(monkeypatch):
     monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
     monkeypatch.setattr(repository, "lock_candidate_decision_row", lambda *_args, **_kwargs: {"id": 7, "status": "test_and_demo", "version": 4})
     monkeypatch.setattr(repository, "get_appointment_row", lambda *_args, **_kwargs: appointment)
-    monkeypatch.setattr(repository, "insert_demo", lambda *_args, **_kwargs: 109)
+    monkeypatch.setattr(
+        repository,
+        "insert_demo",
+        lambda *_args, **kwargs: saved_values.append(kwargs["values"]) or 109,
+    )
     monkeypatch.setattr(repository, "complete_appointment", lambda *_args, **_kwargs: {"id": 92, "version": 2})
     monkeypatch.setattr(repository, "update_candidate_stage", lambda *_args, **kwargs: stage_updates.append(kwargs) or {"id": 7})
     monkeypatch.setattr(repository, "touch_candidate", lambda *_args, **_kwargs: None)
@@ -1167,14 +1184,133 @@ def test_passed_assigned_demo_remains_in_test_and_demo(monkeypatch):
     result = service.add_demo(
         _user("academic_director"),
         7,
-        {"appointment_id": 92, "result": "passed", "score": 9, "topic": "Quadratic equations"},
+        {
+            "appointment_id": 92,
+            "result": "passed",
+            "criteria_scores": _demo_criteria(1),
+            "topic": "Quadratic equations",
+        },
     )
 
     assert result["status"] == "test_and_demo"
+    assert saved_values[0]["score"] == 1
     assert stage_updates == []
     assert "candidate.demo_lesson_recorded" in events
     assert "candidate.appointment_completed" in events
     assert "candidate.stage_changed" not in events
+    assert conn.commits == 1
+
+
+def test_failed_demo_rejects_with_the_selected_recruitment_reason(monkeypatch):
+    conn = _DatabaseConnection()
+    saved_values = []
+    stage_changes = []
+    decisions = []
+    events = []
+    appointment = {
+        "id": 92,
+        "candidate_id": 7,
+        "appointment_type": "demo_lesson",
+        "status": "in_progress",
+        "starts_at": "2099-07-16T05:00:00+00:00",
+        "responsible_account_id": 41,
+        "responsible_role": "academic_director",
+        "candidate_name": "Candidate Seven",
+        "topic": "Quadratic equations",
+        "version": 1,
+    }
+
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(
+        repository,
+        "lock_candidate_decision_row",
+        lambda *_args, **_kwargs: {
+            "id": 7,
+            "status": "test_and_demo",
+            "version": 4,
+        },
+    )
+    monkeypatch.setattr(
+        repository,
+        "get_appointment_row",
+        lambda *_args, **_kwargs: appointment,
+    )
+    monkeypatch.setattr(
+        repository,
+        "insert_demo",
+        lambda *_args, **kwargs: saved_values.append(kwargs["values"]) or 109,
+    )
+    monkeypatch.setattr(
+        repository,
+        "complete_appointment",
+        lambda *_args, **_kwargs: {"id": 92, "version": 2},
+    )
+    monkeypatch.setattr(
+        repository, "cancel_scheduled_appointments", lambda *_args, **_kwargs: []
+    )
+    monkeypatch.setattr(
+        repository, "revoke_open_approvals", lambda *_args, **_kwargs: []
+    )
+    monkeypatch.setattr(
+        repository,
+        "update_candidate_stage",
+        lambda *_args, **kwargs: stage_changes.append(kwargs) or {"id": 7},
+    )
+    monkeypatch.setattr(
+        repository,
+        "insert_final_decision",
+        lambda *_args, **kwargs: decisions.append(kwargs) or 300,
+    )
+    monkeypatch.setattr(
+        repository,
+        "insert_audit",
+        lambda *_args, **kwargs: events.append(
+            (kwargs["event_type"], kwargs["detail"])
+        ),
+    )
+    monkeypatch.setattr(
+        service, "_sync_system_next_actions", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        notifications, "cancel_demo_reminders", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        notifications, "enqueue_demo_event", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        service,
+        "get_candidate",
+        lambda *_args, **_kwargs: {"id": 7, "status": "rejected"},
+    )
+
+    result = service.add_demo(
+        _user("academic_director"),
+        7,
+        {
+            "appointment_id": 92,
+            "result": "failed",
+            "criteria_scores": _demo_criteria(6),
+            "rejection_reason": "insufficient_experience",
+            "reason_detail": "",
+        },
+    )
+
+    assert result["status"] == "rejected"
+    assert saved_values[0]["score"] == 6
+    assert stage_changes[0]["stage"] == "rejected"
+    assert stage_changes[0]["comment"] == "Insufficient experience"
+    assert decisions[0]["values"]["rejection_reason"] == "insufficient_experience"
+    assert decisions[0]["values"]["reason_detail"].startswith(
+        "Insufficient experience; evaluation #109"
+    )
+    assert (
+        "candidate.stage_changed",
+        {
+            "from": "test_and_demo",
+            "to": "rejected",
+            "reason": "Insufficient experience",
+        },
+    ) in events
     assert conn.commits == 1
 
 

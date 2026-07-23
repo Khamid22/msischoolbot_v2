@@ -142,12 +142,13 @@ def insert_candidate(
                 full_name, phone, email, telegram_username, applied_position,
                 position_option_id, subject_id,
                 application_date, source_option_id, subsource_option_id,
+                age, address,
                 source, source_detail, status, stage_changed_at,
                 is_application_received, profile_origin,
                 version, updated_by_account_id, created_at, updated_at
             )
             VALUES (
-                %s, %s, %s, %s, %s, %s, %s, NULLIF(%s, '')::date, %s, %s, '', '',
+                %s, %s, %s, %s, %s, %s, %s, NULLIF(%s, '')::date, %s, %s, %s, %s, '', '',
                 'new_candidate', %s::timestamptz, true, 'application', 1, %s,
                 %s::timestamptz, %s::timestamptz
             )
@@ -194,6 +195,8 @@ def insert_candidate(
             values.get("application_date", ""),
             values.get("source_option_id"),
             values.get("subsource_option_id"),
+            values.get("age"),
+            values.get("address", ""),
             now,
             actor_account_id,
             now,

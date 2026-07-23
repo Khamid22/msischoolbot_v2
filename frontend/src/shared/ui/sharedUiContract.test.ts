@@ -31,11 +31,29 @@ describe("uiLayers z-scale", () => {
 describe("RoleWorkspaceShell", () => {
   const src = source("RoleWorkspaceShell.tsx");
   const telegramSrc = readFileSync(new URL("../lib/telegram.ts", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../../index.css", import.meta.url), "utf8");
 
   it("renders sidebar, mobile nav, and a content slot", () => {
     assert.match(src, /<RoleSidebar/);
     assert.match(src, /<RoleMobileNav/);
     assert.match(src, /\{children\}/);
+  });
+
+  it("uses the Teacher Academy desktop canvas ratio as the global workspace default", () => {
+    assert.match(css, /--workspace-content-max-width:\s*100rem/);
+    assert.match(src, /maxWidthClass = "max-w-\[var\(--workspace-content-max-width\)\]"/);
+  });
+
+  it("keeps automatic sidebars responsive on wide touch devices", () => {
+    assert.match(src, /workspace-main-auto-sidebar/);
+    assert.match(css, /\(hover: none\)/);
+    assert.match(css, /\(pointer: coarse\)/);
+    assert.match(css, /--workspace-sidebar-collapsible-width/);
+  });
+
+  it("keeps duplicate account and logout actions out of the mobile drawer", () => {
+    assert.doesNotMatch(src, /<KeyRound/);
+    assert.doesNotMatch(src, /resolvedLogoutAction/);
   });
 
   it("reserves bottom padding so the fixed mobile nav never overlaps content", () => {
@@ -81,9 +99,10 @@ describe("RoleWorkspaceShell", () => {
 describe("RoleSidebar", () => {
   const src = source("RoleSidebar.tsx");
 
-  it("marks the active link and labels the logout icon button", () => {
+  it("marks the active link and keeps account actions out of the desktop footer", () => {
     assert.match(src, /aria-current=\{isActive \? "page" : undefined\}/);
-    assert.match(src, /aria-label="Logout"/);
+    assert.doesNotMatch(src, /<KeyRound/);
+    assert.doesNotMatch(src, /<LogOut/);
   });
 
   it("toggles accessible nested workspace links with reduced-motion-safe animation", () => {
@@ -105,9 +124,15 @@ describe("RoleSidebar", () => {
     assert.match(src, /hidden \$\{widthClass\} .*lg:flex/);
   });
 
-  it("supports an accessible opt-in collapsed state", () => {
+  it("supports an accessible automatic hover and focus collapsed state", () => {
     assert.match(src, /collapsible\?: boolean/);
-    assert.match(src, /aria-label=\{compact \? "Expand recruitment sidebar" : "Collapse recruitment sidebar"\}/);
+    assert.match(src, /onPointerEnter/);
+    assert.match(src, /onPointerLeave/);
+    assert.match(src, /onFocusCapture/);
+    assert.match(src, /onBlurCapture/);
+    assert.match(src, /\(hover: hover\) and \(pointer: fine\)/);
+    assert.match(src, /SIDEBAR_COLLAPSE_DELAY_MS/);
+    assert.doesNotMatch(src, /PanelLeftOpen|PanelLeftClose/);
     assert.match(src, /data-sidebar-collapsed/);
     assert.match(src, /workspaceBackLink/);
   });

@@ -23,7 +23,8 @@ def test_role_workspace_shell_supports_telegram_bottom_nav_and_website_drawer():
     assert '"Escape"' in source
     assert "onClick={() => setDrawerOpen(false)}" in source
     assert "lg:hidden" in source
-    assert "lg:ml-64" in source
+    assert "workspace-main-auto-sidebar" in source
+    assert "lg:ml-[var(--workspace-sidebar-width)]" in source
     assert "fixed inset-x-0 bottom-0" in mobile_nav
     assert "var(--app-bottom-inset)" in mobile_nav
     assert "export function isTelegramMiniApp" in telegram

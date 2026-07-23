@@ -1,10 +1,11 @@
-import { ArrowLeft, ChevronDown, KeyRound, LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowLeft, ChevronDown } from "lucide-react";
+import { useEffect, useRef, useState, type FocusEvent } from "react";
 import { routes } from "@/shared/lib/routes";
 import { uiLayers } from "@/shared/ui/layers";
 import type { RoleNavItem } from "@/shared/ui/roleNav";
 
 export type WorkspaceBackLink = { href: string; label: string };
+const SIDEBAR_COLLAPSE_DELAY_MS = 140;
 
 export function initialsFromLogin(login: string, fallback: string) {
   const cleaned = login.trim();
@@ -15,7 +16,6 @@ export function initialsFromLogin(login: string, fallback: string) {
 
 export interface RoleSidebarProps<Key extends string = string> {
   authLogin?: string;
-  csrfToken?: string;
   active: Key;
   homeHref: string;
   navItems: ReadonlyArray<RoleNavItem<Key>>;
@@ -24,18 +24,14 @@ export interface RoleSidebarProps<Key extends string = string> {
   sectionLabel: string;
   initialsFallback?: string;
   brandLabel?: string;
-  logoutAction?: string;
   collapsible?: boolean;
-  collapsed?: boolean;
-  onToggleCollapsed?: () => void;
   workspaceBackLink?: WorkspaceBackLink;
   profileHref?: string;
 }
 
-/** Shared desktop role navigation with an opt-in compact mode. */
+/** Shared desktop role navigation with an opt-in hover/focus compact mode. */
 export function RoleSidebar<Key extends string = string>({
   authLogin,
-  csrfToken,
   active,
   homeHref,
   navItems,
@@ -44,15 +40,19 @@ export function RoleSidebar<Key extends string = string>({
   sectionLabel,
   initialsFallback = "MS",
   brandLabel = "MSI School",
-  logoutAction = routes.logout,
   collapsible = false,
-  collapsed = false,
-  onToggleCollapsed,
   workspaceBackLink,
   profileHref,
 }: RoleSidebarProps<Key>) {
   const login = authLogin || roleLabel;
-  const compact = collapsible && collapsed;
+  const [hoverCapable, setHoverCapable] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  });
+  const [pointerInside, setPointerInside] = useState(false);
+  const [focusInside, setFocusInside] = useState(false);
+  const collapseTimerRef = useRef<number | null>(null);
+  const compact = collapsible && hoverCapable && !pointerInside && !focusInside;
   const widthClass = collapsible
     ? compact
       ? "w-[var(--workspace-sidebar-compact-width)]"
@@ -66,13 +66,59 @@ export function RoleSidebar<Key extends string = string>({
     setOpenGroupKey(activeGroupKey);
   }, [activeGroupKey]);
 
+  useEffect(() => {
+    if (!collapsible) return;
+    const hoverMedia = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const updateHoverCapability = () => setHoverCapable(hoverMedia.matches);
+    updateHoverCapability();
+    hoverMedia.addEventListener("change", updateHoverCapability);
+    return () => hoverMedia.removeEventListener("change", updateHoverCapability);
+  }, [collapsible]);
+
+  useEffect(() => () => {
+    if (collapseTimerRef.current !== null) {
+      window.clearTimeout(collapseTimerRef.current);
+    }
+  }, []);
+
+  const cancelScheduledCollapse = () => {
+    if (collapseTimerRef.current === null) return;
+    window.clearTimeout(collapseTimerRef.current);
+    collapseTimerRef.current = null;
+  };
+
+  const handlePointerEnter = () => {
+    cancelScheduledCollapse();
+    setPointerInside(true);
+  };
+
+  const handlePointerLeave = () => {
+    cancelScheduledCollapse();
+    collapseTimerRef.current = window.setTimeout(() => {
+      setPointerInside(false);
+      collapseTimerRef.current = null;
+    }, SIDEBAR_COLLAPSE_DELAY_MS);
+  };
+
+  const handleBlurCapture = (event: FocusEvent<HTMLElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setFocusInside(false);
+    }
+  };
+
   return (
     <aside
-      className={`fixed inset-y-0 left-0 ${uiLayers.sidebar} hidden ${widthClass} flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 lg:flex motion-reduce:transition-none`}
+      className={`fixed inset-y-0 left-0 ${uiLayers.sidebar} hidden ${widthClass} flex-col overflow-x-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width,box-shadow] duration-200 ease-out lg:flex motion-reduce:transition-none ${
+        collapsible && !compact ? "shadow-2xl" : ""
+      }`}
       data-sidebar-collapsed={compact ? "true" : "false"}
+      onPointerEnter={collapsible ? handlePointerEnter : undefined}
+      onPointerLeave={collapsible ? handlePointerLeave : undefined}
+      onFocusCapture={collapsible ? () => setFocusInside(true) : undefined}
+      onBlurCapture={collapsible ? handleBlurCapture : undefined}
     >
       <div className="border-b border-white/10 px-2 py-3">
-        <div className={`flex items-center gap-2 ${compact ? "flex-col" : "justify-between"}`}>
+        <div className="flex items-center gap-2">
           <a
             href={homeHref}
             title={compact ? `${brandLabel} · ${roleLabel}` : undefined}
@@ -89,18 +135,6 @@ export function RoleSidebar<Key extends string = string>({
               </div>
             ) : null}
           </a>
-          {collapsible ? (
-            <button
-              type="button"
-              onClick={onToggleCollapsed}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-              aria-label={compact ? "Expand recruitment sidebar" : "Collapse recruitment sidebar"}
-              aria-expanded={!compact}
-              title={compact ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              {compact ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-            </button>
-          ) : null}
         </div>
       </div>
 
@@ -204,7 +238,7 @@ export function RoleSidebar<Key extends string = string>({
       </div>
 
       <div className="border-t border-white/10 p-2">
-        <div className={`flex rounded-lg ${compact ? "flex-col items-center gap-1 py-1" : "items-center gap-2 px-1 py-2"}`}>
+        <div className={`flex rounded-lg ${compact ? "items-center justify-center py-1" : "items-center px-1 py-2"}`}>
           <a
             href={profileHref || routes.accountSecurity}
             className={`flex min-h-11 min-w-0 items-center rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${compact ? "h-11 w-11 justify-center" : "flex-1 gap-2"}`}
@@ -221,25 +255,6 @@ export function RoleSidebar<Key extends string = string>({
               </div>
             ) : null}
           </a>
-          <a
-            href={routes.accountSecurity}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-            aria-label="Account security"
-            title="Account security"
-          >
-            <KeyRound className="h-4 w-4" />
-          </a>
-          <form action={logoutAction} method="post" className="shrink-0">
-            <input type="hidden" name="csrf_token" value={csrfToken || ""} />
-            <button
-              type="submit"
-              className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-              aria-label="Logout"
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </form>
         </div>
       </div>
     </aside>

@@ -11,6 +11,8 @@ from backend.core.access import CurrentUser
 from backend.modules.hr.recruitment import repository
 from backend.modules.hr.recruitment import notifications as recruitment_notifications
 from backend.modules.hr.recruitment.constants import (
+    DEMO_CRITERIA,
+    DEMO_FAILURE_REJECTION_REASONS,
     DEMO_RESULTS,
     INTERVIEW_RESULTS,
 )
@@ -137,6 +139,50 @@ def add_demo(
     )
 
 
+def _validated_demo_criteria(
+    values: dict[str, Any],
+) -> tuple[list[dict[str, Any]], Decimal]:
+    raw_scores = list(values.get("criteria_scores") or [])
+    score_by_criterion: dict[str, Decimal] = {}
+    for item in raw_scores:
+        criterion = _text(item.get("criterion"))
+        if criterion not in DEMO_CRITERIA:
+            raise RecruitmentError(
+                f"Unknown demo lesson criterion: {criterion or 'blank'}."
+            )
+        if criterion in score_by_criterion:
+            raise RecruitmentError(f"Demo lesson criterion is duplicated: {criterion}.")
+        try:
+            score = Decimal(str(item.get("score")))
+            maximum = Decimal(str(item.get("maximum_score", 10)))
+        except Exception as exc:
+            raise RecruitmentError(f"Enter a valid score for {criterion}.") from exc
+        if maximum != Decimal("10") or score < 0 or score > 10:
+            raise RecruitmentError(f"{criterion} must be scored from 0 to 10.")
+        score_by_criterion[criterion] = score
+
+    missing = [
+        criterion for criterion in DEMO_CRITERIA if criterion not in score_by_criterion
+    ]
+    if missing:
+        raise RecruitmentError(
+            f"Complete all five demo lesson scores. Missing: {', '.join(missing)}."
+        )
+    normalized = [
+        {
+            "criterion": criterion,
+            "score": score_by_criterion[criterion],
+            "maximum_score": Decimal("10"),
+        }
+        for criterion in DEMO_CRITERIA
+    ]
+    average = (
+        sum((item["score"] for item in normalized), Decimal("0"))
+        / Decimal(len(normalized))
+    ).quantize(Decimal("0.01"))
+    return normalized, average
+
+
 def _add_record(
     user: CurrentUser,
     candidate_id: int,
@@ -226,6 +272,25 @@ def _add_record(
                         "Only the assigned demo evaluator can submit this result.",
                         status_code=403,
                     )
+        candidate_stage = _text(candidate.get("status"))
+        if evaluation_type == "demo":
+            criteria_scores, average_score = _validated_demo_criteria(values)
+            values["criteria_scores"] = criteria_scores
+            values["score"] = average_score
+            if (
+                _text(values.get("result")) == "failed"
+                and candidate_stage != "teacher_academy"
+            ):
+                rejection_reason = _text(values.get("rejection_reason"))
+                if rejection_reason not in DEMO_FAILURE_REJECTION_REASONS:
+                    raise RecruitmentError(
+                        "Select Insufficient subject knowledge, "
+                        "Insufficient experience, or Other."
+                    )
+                if rejection_reason == "other" and not _text(
+                    values.get("reason_detail")
+                ):
+                    raise RecruitmentError("Explain the reason when Other is selected.")
         record_id = inserter(
             conn,
             candidate_id=int(candidate_id),
@@ -279,7 +344,6 @@ def _add_record(
                 now=now,
             )
         result = _text(values.get("result"))
-        candidate_stage = _text(candidate.get("status"))
         supplemental_academy_evaluation = candidate_stage == "teacher_academy"
         if database_backed:
             repository.insert_audit(
@@ -308,11 +372,14 @@ def _add_record(
                     "A finalized candidate cannot receive another rejecting evaluation.",
                     status_code=409,
                 )
-            rejection_reason, rejection_label = {
-                "interview": ("failed_job_interview", "Failed job interview"),
-                "subject_test": ("failed_subject_test", "Failed subject test"),
-                "demo": ("failed_demo_lesson", "Failed demo lesson"),
-            }[evaluation_type]
+            if evaluation_type == "demo":
+                rejection_reason = _text(values.get("rejection_reason"))
+                rejection_label = DEMO_FAILURE_REJECTION_REASONS[rejection_reason]
+            else:
+                rejection_reason, rejection_label = {
+                    "interview": ("failed_job_interview", "Failed job interview"),
+                    "subject_test": ("failed_subject_test", "Failed subject test"),
+                }[evaluation_type]
             evaluator_account_id = (
                 int(
                     values.get("interviewer_account_id")

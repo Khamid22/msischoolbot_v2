@@ -340,10 +340,24 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(demoSession, /scheduled date and time will be overwritten/);
     assert.match(demoSession, />\s*Cancel\s*</);
     assert.match(demoSession, />[\s\S]*Proceed\s*</);
-    assert.match(demoSession, /complete\.mutate\("passed"\)/);
-    assert.match(demoSession, /complete\.mutate\("failed"\)/);
+    assert.match(demoSession, /complete\.mutate\(\{ result: "passed" \}\)/);
+    assert.match(demoSession, /result: "failed"/);
     assert.match(demoSession, /Evaluator notes/);
-    assert.doesNotMatch(demoSession, /Score \(0–10\)|Criterion result|Academic recommendation/);
+    for (const criterion of [
+      "English fluency",
+      "Lesson structure",
+      "Board skills",
+      "Student engagement",
+      "Confidence & delivery",
+    ]) {
+      assert.match(demoSession, new RegExp(criterion));
+    }
+    assert.match(demoSession, /Average score:/);
+    assert.match(demoSession, /The final Pass or Fail\s+decision remains manual/);
+    assert.match(demoSession, /insufficient_subject_knowledge/);
+    assert.match(demoSession, /insufficient_experience/);
+    assert.match(demoSession, /rejectionReason === "other"/);
+    assert.match(demoSession, /reasonDetail\.trim\(\)/);
     assert.match(
       profile,
       /scheduledAppointments\.find\([\s\S]*appointment_type === "demo_lesson"/,
@@ -387,9 +401,10 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(list, /replaceUrlParams\(\{ page, \.\.\.filters \}/);
   });
 
-  test("opts Recruitment into adaptive collapsible navigation without a Profile nav item", () => {
+  test("opts Recruitment into automatic hover/focus navigation without a Profile nav item", () => {
     assert.match(workspace, /desktopSidebarMode="collapsible"/);
-    assert.match(workspace, /desktopSidebarInitialState="adaptive"/);
+    assert.doesNotMatch(workspace, /desktopSidebarInitialState=/);
+    assert.doesNotMatch(workspace, /desktopSidebarStorageKey=/);
     assert.match(workspace, /<AcademicDirectorPageShell/);
     assert.match(workspace, /<HeadOfDepartmentPageShell/);
     assert.match(workspace, /recruitmentView=\{academicRecruitmentView\}/);
@@ -400,6 +415,9 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(workspace, /title="Add candidate" size="lg" mobileMode="sheet"/);
     assert.doesNotMatch(workspace, /title="Add candidate"[^>]*mobileMode="fullscreen"/);
     assert.match(workspace, /name="candidate_cv" type="file"/);
+    assert.match(workspace, /name="telegram_username"/);
+    assert.match(workspace, /name="age" type="number" min=\{14\} max=\{100\}/);
+    assert.match(workspace, /name="address"/);
     assert.match(workspace, /documentData\.append\("document_type", "cv"\)/);
     assert.match(workspace, /Candidate and CV added/);
     assert.match(workspace, /CV must be 20 MB or smaller/);

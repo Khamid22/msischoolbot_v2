@@ -238,7 +238,7 @@ export default function TeacherHome({ authLogin = "", academyTeacher = null, csr
 
   return (
     <div className="min-h-[var(--tg-viewport-height)] overflow-x-hidden bg-muted/35 text-foreground md:flex">
-      <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
+      <aside className="sticky top-0 hidden h-dvh w-[var(--workspace-sidebar-width)] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
         <div className="flex items-center gap-3 border-b border-sidebar-border px-4 py-5">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground"><GraduationCap className="h-5 w-5" /></span>
           <div className="min-w-0">
@@ -267,7 +267,7 @@ export default function TeacherHome({ authLogin = "", academyTeacher = null, csr
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-7xl px-3 py-4 pb-[calc(var(--app-bottom-inset)+5.5rem)] sm:px-5 md:px-7 md:py-6 md:pb-8">
+        <main className="mx-auto w-full max-w-[var(--workspace-content-max-width)] px-3 py-4 pb-[calc(var(--app-bottom-inset)+5.5rem)] sm:px-5 md:px-[var(--workspace-gutter-desktop)] md:py-6 md:pb-8">
           {activeTab === "overview" && (
             <div className="space-y-4">
               <section className="overflow-hidden rounded-xl border border-primary/15 bg-surface shadow-card">
