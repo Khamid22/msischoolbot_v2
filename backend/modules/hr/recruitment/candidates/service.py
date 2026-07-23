@@ -28,7 +28,6 @@ from backend.modules.hr.recruitment.constants import (
 )
 from backend.modules.hr.recruitment.errors import RecruitmentError
 from backend.modules.hr.recruitment.projections import (
-    appointment_payload as _appointment_payload,
     candidate_progress as _candidate_progress,
     candidate_summary as _candidate_summary,
     derived_evaluation_states as _derived_evaluation_states,
@@ -52,6 +51,7 @@ class CandidateDependencies:
     notify_cancelled_appointments: Callable[..., None]
     academic_visible_id: Callable[..., int | None]
     visible_subject_ids: Callable[..., set[int] | None]
+    appointment_payload_for_user: Callable[..., dict[str, Any]]
     setting_value: Callable[..., str]
 
 

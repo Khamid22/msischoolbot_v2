@@ -816,6 +816,26 @@ def test_schedule_service_routes_semantic_statuses_to_the_derived_filter(monkeyp
     assert captured["display_status"] == "passed,overdue,not_conducted"
 
 
+@pytest.mark.parametrize("role", ["academic_director", "head_of_department"])
+def test_academic_schedule_is_restricted_to_demo_lessons(monkeypatch, role):
+    conn = _Connection()
+    captured = {}
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(
+        repository,
+        "list_appointment_rows",
+        lambda *_args, **kwargs: captured.update(kwargs) or ([], 0),
+    )
+
+    result = service.list_appointments(
+        _user(role),
+        appointment_type="job_interview",
+    )
+
+    assert result["items"] == []
+    assert captured["appointment_type"] == "demo_lesson"
+
+
 @pytest.mark.parametrize(
     ("role", "account_id", "appointment_type", "responsible_id", "status", "can_start", "can_resume"),
     [

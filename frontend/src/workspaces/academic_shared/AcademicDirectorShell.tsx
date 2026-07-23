@@ -74,27 +74,20 @@ export const headOfDepartmentDesktopNavItems: ReadonlyArray<RoleNavItem<HeadOfDe
 export const headOfDepartmentMobileNavItems: ReadonlyArray<RoleNavItem<HeadOfDepartmentNavKey>> =
   withIcons(headOfDepartmentMobileNavConfig, headOfDepartmentNavIcons);
 
-export type AcademicRecruitmentView = "decisions" | "candidates" | "schedule" | "candidate";
+export type AcademicRecruitmentView = "candidates" | "schedule" | "candidate";
 
 function academicDirectorRecruitmentChildren(view?: AcademicRecruitmentView) {
   return [
     {
-      key: "recruitment-decisions",
-      label: "Decisions",
-      href: `${routes.academicDirectorRecruitment}/decisions`,
-      icon: ShieldCheck,
-      active: view === "decisions",
-    },
-    {
       key: "recruitment-candidates",
-      label: "Assigned Candidates",
+      label: "Candidates",
       href: `${routes.academicDirectorRecruitment}/candidates`,
       icon: UsersRound,
       active: view === "candidates" || view === "candidate",
     },
     {
       key: "recruitment-schedule",
-      label: "Demo Schedule",
+      label: "Schedule",
       href: `${routes.academicDirectorRecruitment}/schedule`,
       icon: CalendarDays,
       active: view === "schedule",
@@ -106,14 +99,14 @@ function headOfDepartmentRecruitmentChildren(view?: AcademicRecruitmentView) {
   return [
     {
       key: "recruitment-candidates",
-      label: "Assigned Candidates",
+      label: "Candidates",
       href: `${routes.headOfDepartmentRecruitment}/candidates`,
       icon: UsersRound,
       active: view === "candidates" || view === "candidate",
     },
     {
       key: "recruitment-schedule",
-      label: "Demo Schedule",
+      label: "Schedule",
       href: `${routes.headOfDepartmentRecruitment}/schedule`,
       icon: CalendarDays,
       active: view === "schedule",

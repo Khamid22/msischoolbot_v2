@@ -36,11 +36,12 @@ import {
   jsonBody,
   recruitmentRequest,
 } from "@/features/recruitment/api";
-import type {
-  RecruitmentAppointment,
-  RecruitmentCandidate,
-  RecruitmentOptions,
-  RecruitmentRole,
+import {
+  isDemoEvaluatorRole,
+  type RecruitmentAppointment,
+  type RecruitmentCandidate,
+  type RecruitmentOptions,
+  type RecruitmentRole,
 } from "@/features/recruitment/model";
 import {
   RECRUITMENT_API,
@@ -488,6 +489,8 @@ export function ScheduleView({
   onAnnouncement: (message: string, tone?: FloatingToastTone) => void;
 }) {
   const queryClient = useQueryClient();
+  const academicSchedule =
+    role === "academic_director" || role === "head_of_department";
   const initial = useMemo(() => new URLSearchParams(window.location.search), []);
   const initialHistoryStatus = initial.get("status") || "";
   const [mode, setMode] = useState<ScheduleMode>(
@@ -500,7 +503,9 @@ export function ScheduleView({
     () => schoolDateKeyFromValue(initial.get("date")) || schoolDateKey(),
   );
   const [filters, setFilters] = useState<ScheduleFilters>({
-    appointmentType: initial.get("appointment_type") || "",
+    appointmentType: academicSchedule
+      ? ""
+      : initial.get("appointment_type") || "",
     staffId: initial.get("responsible_account_id") || "",
     historyStatus: historyStatuses.has(initialHistoryStatus as HistoryStatus)
       ? (initialHistoryStatus as HistoryStatus)
@@ -531,15 +536,18 @@ export function ScheduleView({
     section === "queue"
       ? queueStatusFilter
       : filters.historyStatus || historyStatusFilter;
+  const queryFilters = academicSchedule
+    ? { ...filters, appointmentType: "demo_lesson" }
+    : filters;
   const mainQuery = buildAppointmentQuery({
     start: bounds.start,
     end: rangeEnd,
     status: selectedStatus,
-    filters,
+    filters: queryFilters,
   });
   const overdueQuery = buildAppointmentQuery({
     status: "overdue",
-    filters,
+    filters: queryFilters,
   });
 
   const appointments = useQuery({
@@ -616,14 +624,14 @@ export function ScheduleView({
       mode: mode === "day" ? "" : mode,
       schedule_section: section === "queue" ? "" : section,
       date: anchor === schoolDateKey() ? "" : anchor,
-      appointment_type: filters.appointmentType,
+      appointment_type: academicSchedule ? "" : filters.appointmentType,
       status:
         section === "history" && filters.historyStatus
           ? filters.historyStatus
           : "",
       responsible_account_id: filters.staffId,
     });
-  }, [anchor, filters, mode, section]);
+  }, [academicSchedule, anchor, filters, mode, section]);
   useEffect(() => {
     if (appointments.data) restoreRecruitmentReturn("schedule");
   }, [appointments.data]);
@@ -691,7 +699,7 @@ export function ScheduleView({
   const staffName = (id: string) =>
     options?.staff.find((person) => String(person.id) === id)?.name || "Staff";
   const activeFilters = [
-    filters.appointmentType
+    !academicSchedule && filters.appointmentType
       ? {
           key: "appointmentType" as const,
           label:
@@ -1073,23 +1081,25 @@ export function ScheduleView({
         }
       >
         <div className="grid gap-4">
-          <label className="text-xs font-semibold">
-            Appointment type
-            <select
-              className={`${fieldClass} mt-1 !min-h-11`}
-              value={draftFilters.appointmentType}
-              onChange={(event) =>
-                setDraftFilters((current) => ({
-                  ...current,
-                  appointmentType: event.target.value,
-                }))
-              }
-            >
-              <option value="">All types</option>
-              <option value="job_interview">Job Interviews</option>
-              <option value="demo_lesson">Demo Lessons</option>
-            </select>
-          </label>
+          {!academicSchedule ? (
+            <label className="text-xs font-semibold">
+              Appointment type
+              <select
+                className={`${fieldClass} mt-1 !min-h-11`}
+                value={draftFilters.appointmentType}
+                onChange={(event) =>
+                  setDraftFilters((current) => ({
+                    ...current,
+                    appointmentType: event.target.value,
+                  }))
+                }
+              >
+                <option value="">All types</option>
+                <option value="job_interview">Job Interviews</option>
+                <option value="demo_lesson">Demo Lessons</option>
+              </select>
+            </label>
+          ) : null}
           <label className="text-xs font-semibold">
             Responsible staff
             <select
@@ -1103,11 +1113,16 @@ export function ScheduleView({
               }
             >
               <option value="">All staff</option>
-              {options?.staff.map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.name}
-                </option>
-              ))}
+              {options?.staff
+                .filter(
+                  (person) =>
+                    !academicSchedule || isDemoEvaluatorRole(person.role),
+                )
+                .map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.name}
+                  </option>
+                ))}
             </select>
           </label>
           {section === "history" ? (

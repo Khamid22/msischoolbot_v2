@@ -478,6 +478,11 @@ def list_appointments(
 ) -> dict[str, Any]:
     if appointment_type and appointment_type not in APPOINTMENT_TYPES:
         raise RecruitmentError("Unknown appointment type.")
+    effective_appointment_type = (
+        "demo_lesson"
+        if user.role in {"academic_director", "head_of_department"}
+        else appointment_type
+    )
     appointment_statuses = [
         _text(item) for item in _text(status).split(",") if _text(item)
     ]
@@ -513,7 +518,7 @@ def list_appointments(
             visible_subject_ids=dependencies.visible_subject_ids(user, conn),
             starts_from=normalized_from,
             starts_to=normalized_to,
-            appointment_type=appointment_type,
+            appointment_type=effective_appointment_type,
             status=",".join(raw_statuses),
             display_status=",".join(display_statuses),
             responsible_account_id=responsible_account_id,

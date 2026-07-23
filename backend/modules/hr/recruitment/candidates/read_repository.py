@@ -87,14 +87,37 @@ _CANDIDATE_COLUMNS = """
     latest_interview.interview_at::text AS latest_interview_at,
     COALESCE(latest_subject_test.result, '') AS latest_subject_test_result,
     latest_subject_test.test_at::text AS latest_subject_test_at,
+    latest_subject_test.evaluator_account_id AS latest_subject_test_evaluator_account_id,
+    COALESCE(
+        latest_subject_test_evaluator.full_name,
+        latest_subject_test_evaluator.login,
+        ''
+    ) AS latest_subject_test_evaluator_name,
     COALESCE(latest_demo.result, '') AS latest_demo_result,
     latest_demo.demo_at::text AS latest_demo_at,
+    latest_demo.evaluator_account_id AS latest_demo_evaluator_account_id,
+    COALESCE(latest_demo_evaluator.full_name, latest_demo_evaluator.login, '')
+        AS latest_demo_evaluator_name,
     COALESCE(
         NULLIF(latest_demo.recommendation, ''),
         NULLIF(latest_demo.overview, ''),
         NULLIF(latest_demo.strengths, ''),
         ''
     ) AS latest_demo_note,
+    academic_demo_appointment.id AS academic_demo_appointment_id,
+    academic_demo_appointment.starts_at::text AS academic_demo_starts_at,
+    academic_demo_appointment.status AS academic_demo_status,
+    academic_demo_appointment.responsible_account_id AS academic_demo_responsible_account_id,
+    COALESCE(
+        academic_demo_responsible.full_name,
+        academic_demo_responsible.login,
+        ''
+    ) AS academic_demo_responsible_name,
+    actionable_approval.id AS actionable_approval_id,
+    actionable_approval.requested_outcome AS actionable_requested_outcome,
+    actionable_approval.status AS actionable_approval_status,
+    actionable_approval.request_note AS actionable_request_note,
+    actionable_approval.created_at::text AS actionable_requested_at,
     task.id AS next_task_id,
     COALESCE(task.title, '') AS next_action,
     task.due_at::text AS next_action_at,
@@ -194,15 +217,18 @@ def _candidate_joins() -> str:
             LIMIT 1
         ) latest_interview ON true
         LEFT JOIN LATERAL (
-            SELECT subject_test.result, subject_test.test_at
+            SELECT subject_test.id, subject_test.result, subject_test.test_at,
+                   subject_test.evaluator_account_id
             FROM msi_v2.teacher_candidate_subject_tests subject_test
             WHERE subject_test.candidate_id = candidate.id
               AND subject_test.voided_at IS NULL
             ORDER BY subject_test.test_at DESC NULLS LAST, subject_test.id DESC
             LIMIT 1
         ) latest_subject_test ON true
+        LEFT JOIN msi_v2.accounts latest_subject_test_evaluator
+          ON latest_subject_test_evaluator.id = latest_subject_test.evaluator_account_id
         LEFT JOIN LATERAL (
-            SELECT demo.result, demo.demo_at,
+            SELECT demo.id, demo.result, demo.demo_at, demo.evaluator_account_id,
                    demo.recommendation, demo.overview, demo.strengths
             FROM msi_v2.teacher_candidate_demo_lessons demo
             WHERE demo.candidate_id = candidate.id
@@ -210,6 +236,35 @@ def _candidate_joins() -> str:
             ORDER BY demo.demo_at DESC NULLS LAST, demo.id DESC
             LIMIT 1
         ) latest_demo ON true
+        LEFT JOIN msi_v2.accounts latest_demo_evaluator
+          ON latest_demo_evaluator.id = latest_demo.evaluator_account_id
+        LEFT JOIN LATERAL (
+            SELECT demo_appointment.id, demo_appointment.starts_at,
+                   demo_appointment.status, demo_appointment.responsible_account_id
+            FROM msi_v2.teacher_candidate_appointments demo_appointment
+            WHERE demo_appointment.candidate_id = candidate.id
+              AND demo_appointment.appointment_type = 'demo_lesson'
+              AND demo_appointment.status IN ('scheduled', 'in_progress')
+            ORDER BY
+                CASE WHEN demo_appointment.status = 'in_progress' THEN 0 ELSE 1 END,
+                demo_appointment.starts_at DESC,
+                demo_appointment.id DESC
+            LIMIT 1
+        ) academic_demo_appointment ON true
+        LEFT JOIN msi_v2.accounts academic_demo_responsible
+          ON academic_demo_responsible.id = academic_demo_appointment.responsible_account_id
+        LEFT JOIN LATERAL (
+            SELECT approval.id, approval.requested_outcome, approval.status,
+                   approval.request_note, approval.created_at
+            FROM msi_v2.teacher_candidate_hire_approvals approval
+            WHERE approval.candidate_id = candidate.id
+              AND approval.status IN ('requested', 'approved')
+            ORDER BY
+                CASE WHEN approval.status = 'requested' THEN 0 ELSE 1 END,
+                approval.created_at DESC,
+                approval.id DESC
+            LIMIT 1
+        ) actionable_approval ON true
         LEFT JOIN LATERAL (
             SELECT t.id, t.title, t.due_at
             FROM msi_v2.teacher_candidate_tasks t
@@ -259,6 +314,68 @@ def _candidate_joins() -> str:
         LEFT JOIN msi_v2.teachers teacher
           ON teacher.recruitment_candidate_id = candidate.id
     """
+
+
+_ACADEMIC_CANDIDATE_GROUPS = {"new", "successful", "rejected"}
+_ACADEMIC_SUCCESSFUL_CONDITION = """
+    candidate.status NOT IN ('rejected', 'candidate_withdrew', 'trash_bin')
+    AND COALESCE(latest_demo.result, '') = 'passed'
+    AND COALESCE(latest_subject_test.result, '') = 'passed'
+"""
+_ACADEMIC_REJECTED_CONDITION = """
+    candidate.status = 'rejected'
+    AND COALESCE(decision.decision, '') = 'rejected'
+    AND COALESCE(decision.source_evaluation_type, '') IN ('demo', 'subject_test')
+"""
+_ACADEMIC_NEW_CONDITION = f"""
+    candidate.status NOT IN ('rejected', 'candidate_withdrew', 'trash_bin')
+    AND NOT ({_ACADEMIC_SUCCESSFUL_CONDITION})
+    AND NOT ({_ACADEMIC_REJECTED_CONDITION})
+    AND (
+        academic_demo_appointment.id IS NOT NULL
+        OR (
+            COALESCE(latest_demo.result, '') = 'passed'
+            AND latest_subject_test.id IS NULL
+        )
+    )
+"""
+
+
+def _academic_candidate_group_condition(candidate_group: str) -> str:
+    return {
+        "new": _ACADEMIC_NEW_CONDITION,
+        "successful": _ACADEMIC_SUCCESSFUL_CONDITION,
+        "rejected": _ACADEMIC_REJECTED_CONDITION,
+    }[candidate_group]
+
+
+def _academic_candidate_relevant_expression(candidate_group: str) -> str:
+    return {
+        "new": "COALESCE(academic_demo_appointment.starts_at, latest_demo.demo_at)",
+        "successful": "latest_subject_test.test_at",
+        "rejected": "decision.created_at",
+    }[candidate_group]
+
+
+def _academic_candidate_evaluator_expression(candidate_group: str) -> str:
+    return {
+        "new": (
+            "COALESCE(academic_demo_appointment.responsible_account_id, "
+            "latest_demo.evaluator_account_id)"
+        ),
+        "successful": (
+            "COALESCE(latest_subject_test.evaluator_account_id, "
+            "latest_demo.evaluator_account_id)"
+        ),
+        "rejected": (
+            "CASE "
+            "WHEN decision.source_evaluation_type = 'demo' "
+            "THEN latest_demo.evaluator_account_id "
+            "WHEN decision.source_evaluation_type = 'subject_test' "
+            "THEN latest_subject_test.evaluator_account_id "
+            "END"
+        ),
+    }[candidate_group]
 
 
 def _visibility_clause(
@@ -414,9 +531,14 @@ def list_candidate_rows(
     origin_stage: str = "",
     final_decision: str = "",
     evaluator_account_id: int | None = None,
+    candidate_group: str = "",
+    relevant_from: str = "",
+    relevant_to: str = "",
     limit: int = 25,
     offset: int = 0,
 ) -> tuple[list[Any], int]:
+    if candidate_group and candidate_group not in _ACADEMIC_CANDIDATE_GROUPS:
+        raise ValueError("Unknown academic candidate group.")
     clauses: list[str] = []
     if stage in {"rejected", "candidate_withdrew", "trash_bin"}:
         clauses.append(
@@ -486,15 +608,29 @@ def list_candidate_rows(
         clauses.append("COALESCE(decision.decision, '') = %s")
         params.append(final_decision)
     if evaluator_account_id:
-        clauses.append(
-            """EXISTS (
-                SELECT 1 FROM msi_v2.teacher_candidate_assignments evaluator_filter
-                WHERE evaluator_filter.candidate_id = candidate.id
-                  AND evaluator_filter.assignee_account_id = %s
-                  AND evaluator_filter.status = 'active'
-            )"""
-        )
+        if candidate_group:
+            clauses.append(
+                f"({_academic_candidate_evaluator_expression(candidate_group)}) = %s"
+            )
+        else:
+            clauses.append(
+                """EXISTS (
+                    SELECT 1 FROM msi_v2.teacher_candidate_assignments evaluator_filter
+                    WHERE evaluator_filter.candidate_id = candidate.id
+                      AND evaluator_filter.assignee_account_id = %s
+                      AND evaluator_filter.status = 'active'
+                )"""
+            )
         params.append(evaluator_account_id)
+    if candidate_group:
+        clauses.append(f"({_academic_candidate_group_condition(candidate_group)})")
+        relevant_expression = _academic_candidate_relevant_expression(candidate_group)
+        if relevant_from:
+            clauses.append(f"({relevant_expression})::date >= %s::date")
+            params.append(relevant_from)
+        if relevant_to:
+            clauses.append(f"({relevant_expression})::date <= %s::date")
+            params.append(relevant_to)
 
     where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     base_from = f"""
@@ -506,11 +642,18 @@ def list_candidate_rows(
         f"SELECT count(DISTINCT candidate.id) AS total {base_from}",
         tuple(params) if params else None,
     ).fetchone()
+    if limit <= 0:
+        return [], int(total_row["total"] or 0) if total_row else 0
+    order_sql = (
+        f"({_academic_candidate_relevant_expression(candidate_group)}) DESC NULLS LAST, candidate.id DESC"
+        if candidate_group
+        else "candidate.updated_at DESC, candidate.id DESC"
+    )
     rows = conn.execute(
         f"""
         SELECT {_CANDIDATE_COLUMNS}
         {base_from}
-        ORDER BY candidate.updated_at DESC, candidate.id DESC
+        ORDER BY {order_sql}
         LIMIT %s OFFSET %s
         """,
         tuple([*params, limit, offset]),
@@ -551,28 +694,13 @@ def list_decision_queue_rows(
     rows = conn.execute(
         f"""
         SELECT {_CANDIDATE_COLUMNS},
-               actionable.id AS actionable_approval_id,
-               actionable.requested_outcome AS actionable_requested_outcome,
-               actionable.status AS actionable_approval_status,
-               actionable.request_note AS actionable_request_note,
-               actionable.created_at::text AS actionable_requested_at,
-               CASE WHEN actionable.id IS NULL THEN 'assignment' ELSE 'approval_request' END
+               CASE WHEN actionable_approval.id IS NULL THEN 'assignment' ELSE 'approval_request' END
                    AS access_reason
         FROM msi_v2.teacher_candidates candidate
         {_candidate_joins()}
-        LEFT JOIN LATERAL (
-            SELECT approval.id, approval.requested_outcome, approval.status,
-                   approval.request_note, approval.created_at
-            FROM msi_v2.teacher_candidate_hire_approvals approval
-            WHERE approval.candidate_id = candidate.id
-              AND approval.status IN ('requested', 'approved')
-            ORDER BY CASE WHEN approval.status = 'requested' THEN 0 ELSE 1 END,
-                     approval.created_at DESC, approval.id DESC
-            LIMIT 1
-        ) actionable ON true
         WHERE candidate.status <> 'trash_bin' AND ({visibility})
-        ORDER BY CASE WHEN actionable.id IS NULL THEN 1 ELSE 0 END,
-                 actionable.created_at DESC NULLS LAST,
+        ORDER BY CASE WHEN actionable_approval.id IS NULL THEN 1 ELSE 0 END,
+                 actionable_approval.created_at DESC NULLS LAST,
                  candidate.updated_at DESC,
                  candidate.id DESC
         LIMIT %s OFFSET %s

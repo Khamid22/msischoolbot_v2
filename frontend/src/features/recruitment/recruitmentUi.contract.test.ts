@@ -625,18 +625,35 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.doesNotMatch(pipeline, /boardStages.*teacher_academy/);
   });
 
-  test("opens Academic Director Recruitment on a compact decision queue", () => {
+  test("uses evaluation-group tables as the Academic Recruitment landing view", () => {
+    const candidates = source("AcademicCandidateListView.tsx");
     const decisions = source("DecisionQueueView.tsx");
-    assert.match(workspace, /key: "decisions", label: "Decisions"/);
-    assert.match(workspace, /view === "decisions" \? <DecisionQueueView/);
+    const directorNav = workspace.match(/if \(effectiveRole === "academic_director"\) return \[[\s\S]*?\];/)?.[0] || "";
+    for (const label of ["Candidates", "Schedule"]) {
+      assert.match(directorNav, new RegExp(`label: "${label}"`));
+    }
+    assert.doesNotMatch(directorNav, /Decisions|Pipeline|Analytics|Rejected|Trash Bin|Settings|Tasks/);
+    assert.match(workspace, /<AcademicCandidateListView/);
+    for (const label of ["New Candidates", "Successful Candidates", "Rejected Candidates"]) {
+      assert.match(candidates, new RegExp(label));
+    }
+    for (const column of ["Candidate", "Subject \\/ Position", "Demo", "Subject Test", "Evaluator", "Status", "Relevant Date"]) {
+      assert.match(candidates, new RegExp(column));
+    }
+    assert.match(candidates, /candidate_group/);
+    assert.match(candidates, /setPage\(1\)/);
+    assert.match(candidates, /"evaluations"/);
+    assert.match(candidates, /Approval requested|Review approval/);
+    assert.match(candidates, /Awaiting CEO/);
+    assert.doesNotMatch(candidates, /Finalize approved request/);
+    // The compatibility API consumer remains in source even though the page is no longer linked.
     assert.match(decisions, /\/decision-queue\?page=/);
     assert.match(decisions, /actionable_approval/);
-    assert.match(decisions, /origin=decisions/);
   });
 
   test("limits Head of Department Recruitment to assigned operational work", () => {
     const hodNav = workspace.match(/if \(effectiveRole === "head_of_department"\) return \[[\s\S]*?\];/)?.[0] || "";
-    for (const label of ["Assigned Candidates", "Assigned Schedule"]) assert.match(hodNav, new RegExp(`label: "${label}"`));
+    for (const label of ["Candidates", "Schedule"]) assert.match(hodNav, new RegExp(`label: "${label}"`));
     assert.doesNotMatch(hodNav, /Pipeline|Analytics|Rejected|Trash Bin|Settings|Decisions|Tasks/);
   });
 
@@ -674,6 +691,8 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(schedule, /DemoSessionModal/);
     assert.match(schedule, /item\.can_start/);
     assert.match(schedule, /item\.can_resume/);
+    assert.match(schedule, /academicSchedule/);
+    assert.match(schedule, /appointmentType: "demo_lesson"/);
     assert.match(schedule, /placeholderData: keepPreviousData/);
     assert.doesNotMatch(schedule, /Completed/);
     assert.doesNotMatch(schedule, /overflow-x-auto|min-w-\[84rem\]/);

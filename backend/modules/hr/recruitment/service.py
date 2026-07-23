@@ -42,7 +42,6 @@ from backend.modules.hr.recruitment.evaluations import service as evaluation_ser
 from backend.modules.hr.recruitment.handoffs import service as handoff_service
 from backend.modules.hr.recruitment.policies import visible_account_id
 from backend.modules.hr.recruitment.projections import (
-    appointment_payload as _appointment_payload,
     candidate_progress as _candidate_progress,
     candidate_summary as _candidate_summary,
     derived_evaluation_states as _derived_evaluation_states,
@@ -216,6 +215,7 @@ def _candidate_dependencies() -> candidate_service.CandidateDependencies:
         notify_cancelled_appointments=_notify_cancelled_appointments,
         academic_visible_id=_academic_visible_id,
         visible_subject_ids=_visible_subject_ids,
+        appointment_payload_for_user=appointment_service._appointment_payload_for_user,
         setting_value=_setting_value,
     )
 
@@ -598,6 +598,9 @@ def list_candidates(
     origin_stage: str = "",
     final_decision: str = "",
     evaluator_account_id: int | None = None,
+    candidate_group: str = "",
+    relevant_from: str = "",
+    relevant_to: str = "",
 ) -> dict[str, Any]:
     return candidate_service.list_candidates(
         user,
@@ -615,6 +618,9 @@ def list_candidates(
         origin_stage=origin_stage,
         final_decision=final_decision,
         evaluator_account_id=evaluator_account_id,
+        candidate_group=candidate_group,
+        relevant_from=relevant_from,
+        relevant_to=relevant_to,
         dependencies=_candidate_dependencies(),
     )
 

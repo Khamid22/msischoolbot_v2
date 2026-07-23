@@ -43,6 +43,7 @@ def _register_role_routes(
     include_analytics: bool = False,
     include_teachers: bool = False,
     include_tasks: bool = True,
+    redirect_decisions_to_candidates: bool = False,
 ) -> None:
     router = APIRouter(dependencies=[Depends(require_role(role))])
 
@@ -99,6 +100,18 @@ def _register_role_routes(
         )
         def decisions():
             return _render(role=role, view="decisions", base_path=base_path)
+    elif redirect_decisions_to_candidates:
+
+        @router.get(
+            f"{base_path}/decisions",
+            operation_id=f"{operation_prefix}_recruitment_decisions_redirect",
+        )
+        def decisions_redirect(request: Request):
+            suffix = f"?{request.query_params}" if request.query_params else ""
+            return RedirectResponse(
+                f"{base_path}/candidates{suffix}",
+                status_code=307,
+            )
 
     if include_settings:
 
@@ -171,10 +184,10 @@ def register_recruitment_page_routes(app) -> None:
         role="academic_director",
         base_path="/academic-director/recruitment",
         operation_prefix="academic_director",
-        root_view="decisions",
+        root_view="candidates",
         include_pipeline=False,
-        include_decisions=True,
         include_tasks=False,
+        redirect_decisions_to_candidates=True,
     )
     _register_role_routes(
         app,

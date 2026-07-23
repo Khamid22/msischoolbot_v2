@@ -368,9 +368,21 @@ export type RecruitmentCandidate = {
   latest_interview_at?: string;
   latest_subject_test_result?: string;
   latest_subject_test_at?: string;
+  latest_subject_test_evaluator_account_id?: number | null;
+  latest_subject_test_evaluator_name?: string;
   latest_demo_result?: string;
   latest_demo_at?: string;
+  latest_demo_evaluator_account_id?: number | null;
+  latest_demo_evaluator_name?: string;
   latest_demo_note?: string;
+  academic_demo_appointment_id?: number | null;
+  academic_demo_starts_at?: string;
+  academic_demo_status?: "scheduled" | "in_progress" | "";
+  academic_demo_responsible_account_id?: number | null;
+  academic_demo_responsible_name?: string;
+  candidate_group?: "new" | "successful" | "rejected";
+  relevant_at?: string;
+  evaluation_evaluator_name?: string;
   evaluation_states?: {
     interview: "passed" | "failed" | "missing" | "pending" | string;
     demo: "passed" | "failed" | "missing" | "pending" | string;

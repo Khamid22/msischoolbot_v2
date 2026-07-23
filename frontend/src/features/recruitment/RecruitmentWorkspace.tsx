@@ -1,8 +1,9 @@
-import { Ban, BarChart3, BriefcaseBusiness, CalendarClock, CalendarDays, KanbanSquare, Loader2, LogOut, Plus, Settings2, ShieldCheck, Trash2, UsersRound } from "lucide-react";
+import { Ban, BarChart3, BriefcaseBusiness, CalendarClock, CalendarDays, KanbanSquare, Loader2, LogOut, Plus, Settings2, Trash2, UsersRound } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { CandidateListView } from "@/features/recruitment/CandidateListView";
+import { AcademicCandidateListView } from "@/features/recruitment/AcademicCandidateListView";
 import { AnalyticsView } from "@/features/recruitment/AnalyticsView";
 import { CandidateProfile } from "@/features/recruitment/CandidateProfile";
 import { DecisionQueueView } from "@/features/recruitment/DecisionQueueView";
@@ -137,13 +138,12 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
   const active = view === "candidate" ? (effectiveRole === "hr_manager" ? "pipeline" : "candidates") : view === "profile" ? "profile" : view;
   const navItems = useMemo(() => {
     if (effectiveRole === "academic_director") return [
-        { key: "decisions", label: "Decisions", href: `${basePath}/decisions`, icon: ShieldCheck },
-        { key: "candidates", label: "Candidates", href: `${basePath}/candidates`, icon: UsersRound },
-        { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays, badge: notificationUnread },
-      ];
+      { key: "candidates", label: "Candidates", href: `${basePath}/candidates`, icon: UsersRound },
+      { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays, badge: notificationUnread },
+    ];
     if (effectiveRole === "head_of_department") return [
-      { key: "candidates", label: "Assigned Candidates", href: `${basePath}/candidates`, icon: UsersRound },
-      { key: "schedule", label: "Assigned Schedule", href: `${basePath}/schedule`, icon: CalendarDays, badge: notificationUnread },
+      { key: "candidates", label: "Candidates", href: `${basePath}/candidates`, icon: UsersRound },
+      { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays, badge: notificationUnread },
     ];
     if (effectiveRole === "hr_manager") return [
       { key: "pipeline", label: "Pipeline", href: `${basePath}/pipeline`, icon: KanbanSquare },
@@ -164,11 +164,25 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
     ];
     return items;
   }, [basePath, effectiveRole, notificationUnread]);
-  const title = { pipeline: "Recruitment Pipeline", teachers: "Teachers", analytics: "Recruitment Analytics", decisions: "Hiring Decisions", candidates: "Candidates", schedule: "Interview & Demo Schedule", tasks: "Recruitment Tasks", rejected: "Closed Candidates", settings: "Recruitment Settings", trash: "Trash Bin", candidate: "Candidate Profile", profile: "Profile" }[view];
+  const academicRole = ["academic_director", "head_of_department"].includes(effectiveRole);
+  const title = {
+    pipeline: "Recruitment Pipeline",
+    teachers: "Teachers",
+    analytics: "Recruitment Analytics",
+    decisions: "Hiring Decisions",
+    candidates: "Candidates",
+    schedule: academicRole ? "Schedule" : "Interview & Demo Schedule",
+    tasks: "Recruitment Tasks",
+    rejected: "Closed Candidates",
+    settings: "Recruitment Settings",
+    trash: "Trash Bin",
+    candidate: "Candidate Profile",
+    profile: "Profile",
+  }[view];
   const home = workspaceHome(effectiveRole);
   const workspaceBackLink = effectiveRole === "hr_manager" ? undefined : { href: home, label: `Back to ${roleLabel(effectiveRole)} workspace` };
   const academicRecruitmentView: AcademicRecruitmentView | undefined =
-    view === "decisions" || view === "candidates" || view === "schedule" || view === "candidate"
+    view === "candidates" || view === "schedule" || view === "candidate"
       ? view
       : undefined;
 
@@ -180,7 +194,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
             <p className={`${view === "pipeline" ? "text-[0.625rem] leading-3" : "text-[0.6875rem]"} font-semibold uppercase tracking-[0.14em] text-primary`}>Teacher Recruitment</p>
             <h1 className={`${view === "pipeline" ? "mt-0 text-lg leading-6 sm:text-xl" : "mt-0.5 text-lg sm:text-xl"} font-bold tracking-tight`}>{title}</h1>
             {view === "decisions" ? <p className="mt-0.5 hidden max-w-2xl text-[0.8125rem] text-muted-foreground sm:block">Review assigned evaluations and pending hiring requests.</p> : null}
-            {view === "schedule" ? <p className="mt-0.5 hidden max-w-2xl text-[0.8125rem] text-muted-foreground sm:block">Manage upcoming sessions and review evaluation history in Asia/Tashkent time.</p> : null}
+            {view === "schedule" ? <p className="mt-0.5 hidden max-w-2xl text-[0.8125rem] text-muted-foreground sm:block">{academicRole ? "Review assigned demo lessons and evaluation history in Asia/Tashkent time." : "Manage upcoming sessions and review evaluation history in Asia/Tashkent time."}</p> : null}
             {view === "trash" ? <p className="mt-0.5 hidden max-w-2xl text-[0.8125rem] text-muted-foreground sm:block">Deleted candidates only. Open a profile to restore one.</p> : null}
           </div>
         </header>
@@ -192,7 +206,8 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       {view === "teachers" && effectiveRole === "hr_manager" ? <TeachersView basePath={basePath} onAnnouncement={showToast} /> : null}
       {view === "analytics" && ["hr_manager", "ceo"].includes(effectiveRole) ? <AnalyticsView basePath={basePath} role={effectiveRole} recruitmentOptions={options.data} /> : null}
       {view === "decisions" ? <DecisionQueueView basePath={basePath} /> : null}
-      {view === "candidates" ? <CandidateListView basePath={basePath} /> : null}
+      {view === "candidates" && academicRole ? <AcademicCandidateListView basePath={basePath} role={effectiveRole as "academic_director" | "head_of_department"} /> : null}
+      {view === "candidates" && !academicRole ? <CandidateListView basePath={basePath} /> : null}
       {view === "schedule" ? <ScheduleView basePath={basePath} role={effectiveRole} options={options.data} onAnnouncement={showToast} /> : null}
       {view === "tasks" ? <TasksView basePath={basePath} /> : null}
       {view === "rejected" && effectiveRole === "hr_manager" ? <RejectedCandidatesView basePath={basePath} options={options.data} onAnnouncement={showToast} /> : null}

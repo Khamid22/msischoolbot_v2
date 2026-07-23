@@ -874,6 +874,51 @@ def test_hod_recruitment_is_limited_to_assigned_work_without_pipeline(
     assert client.get("/api/v1/recruitment/pipeline", headers=XHR).status_code == 403
 
 
+def test_academic_director_recruitment_opens_candidates_and_redirects_decisions(
+    client,
+):
+    _set_session(client, "academic_director", account_id=14, staff_id=24)
+
+    root = client.get("/academic-director/recruitment")
+    assert root.status_code == 200
+    assert '"view":"candidates"' in root.text
+
+    decisions = client.get(
+        "/academic-director/recruitment/decisions"
+        "?candidate_group=successful&page=2",
+        follow_redirects=False,
+    )
+    assert decisions.status_code == 307
+    assert decisions.headers["location"] == (
+        "/academic-director/recruitment/candidates"
+        "?candidate_group=successful&page=2"
+    )
+
+
+def test_candidate_group_filters_are_forwarded_by_the_api(client, monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        service,
+        "list_candidates",
+        lambda user, **values: captured.update(values)
+        or {"items": [], "total": 0, "role": user.role},
+    )
+    _set_session(client, "head_of_department", account_id=14, staff_id=24)
+
+    response = client.get(
+        "/api/v1/recruitment/candidates"
+        "?candidate_group=rejected&relevant_from=2026-07-01"
+        "&relevant_to=2026-07-23&evaluator_account_id=14",
+        headers=XHR,
+    )
+
+    assert response.status_code == 200
+    assert captured["candidate_group"] == "rejected"
+    assert captured["relevant_from"] == "2026-07-01"
+    assert captured["relevant_to"] == "2026-07-23"
+    assert captured["evaluator_account_id"] == 14
+
+
 def test_hr_page_renders_new_shared_workspace_without_legacy_pipeline(client):
     _set_session(client, "hr_manager", account_id=10, staff_id=20)
     response = client.get("/hr-manager")

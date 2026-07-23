@@ -201,6 +201,22 @@ def derived_evaluation_states(
 
 def candidate_summary(row: Any) -> dict[str, Any]:
     payload = row_dict(row)
+    approval_id = payload.pop("actionable_approval_id", None)
+    approval_outcome = payload.pop("actionable_requested_outcome", None)
+    approval_status = payload.pop("actionable_approval_status", None)
+    approval_note = payload.pop("actionable_request_note", None)
+    approval_created_at = payload.pop("actionable_requested_at", None)
+    payload["actionable_approval"] = (
+        {
+            "id": approval_id,
+            "requested_outcome": approval_outcome,
+            "status": approval_status,
+            "request_note": approval_note,
+            "created_at": approval_created_at,
+        }
+        if approval_id
+        else None
+    )
     academy_fields = {
         "academy_teacher_id": "id",
         "academy_status": "status",

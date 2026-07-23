@@ -43,9 +43,12 @@ describe("Recruitment stays inside the academic workspace navigation", () => {
   const workspace = pageSource("features/recruitment/RecruitmentWorkspace.tsx");
 
   it("nests the role-scoped Recruitment pages under the academic sidebar", () => {
-    for (const label of ["Decisions", "Assigned Candidates", "Demo Schedule"]) {
+    for (const label of ["Candidates", "Schedule"]) {
       assert.match(shell, new RegExp(label));
     }
+    assert.doesNotMatch(shell, /label: "Decisions"/);
+    assert.doesNotMatch(shell, /label: "Assigned Candidates"/);
+    assert.doesNotMatch(shell, /label: "Demo Schedule"/);
     assert.match(shell, /children: academicDirectorRecruitmentChildren/);
     assert.match(shell, /children: headOfDepartmentRecruitmentChildren/);
   });

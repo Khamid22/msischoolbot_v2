@@ -2158,13 +2158,18 @@ export function CandidateProfile({
     });
   if (permissions?.can_add_academic_evaluation) {
     const scheduledDemo = scheduledAppointments.find(
-      (item) => item.appointment_type === "demo_lesson",
+      (item) =>
+        item.appointment_type === "demo_lesson" &&
+        (item.can_start || item.can_resume),
     );
-    if (scheduledDemo) evaluationItems.push({
-      key: "demo",
-      label: scheduledDemo.status === "in_progress" ? "Resume demo lesson" : "Start demo lesson",
-      onClick: () => setDemoSession(scheduledDemo),
-    });
+    if (scheduledDemo)
+      evaluationItems.push({
+        key: "demo",
+        label: scheduledDemo.can_resume
+          ? "Resume demo lesson"
+          : "Start demo lesson",
+        onClick: () => setDemoSession(scheduledDemo),
+      });
   }
   const hiringItems: ActionMenuItem[] = [];
   if (role !== "hr_manager" && permissions?.can_manage_assignments)
@@ -2831,12 +2836,57 @@ export function CandidateProfile({
               action={canScheduleDemo ? scheduleHeaderButton("demo_lesson") : undefined}
             >
               <div className="mb-3 space-y-2">
-                {scheduledAppointments.filter((item) => item.appointment_type === "demo_lesson").map((appointment) => (
-                  <div key={appointment.id} className="flex items-center gap-1.5">
-                    <button type="button" disabled={!permissions?.can_add_academic_evaluation} onClick={() => setDemoSession(appointment)} className={`flex min-h-14 flex-1 items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-default ${appointment.is_overdue ? "border-amber-300 bg-amber-50 text-amber-900" : "border-blue-300 bg-blue-50 text-blue-900"}`}><span className="min-w-0"><strong className="block break-words text-[0.8125rem]">{appointment.status === "in_progress" ? "Demo lesson in progress" : appointment.is_overdue ? "Demo lesson overdue" : "Scheduled demo lesson"}</strong><span className="mt-0.5 block break-words text-xs">{dateTimeLabel(appointment.starts_at)}{appointment.responsible_name ? ` · ${appointment.responsible_name}` : ""}</span>{appointment.topic ? <span className="mt-0.5 block break-words text-xs">Topic: {appointment.topic}</span> : null}</span>{permissions?.can_add_academic_evaluation ? <span className="text-xs font-semibold">{appointment.status === "in_progress" ? "Resume" : "Start"}</span> : null}</button>
-                    {appointmentActionMenu(appointment)}
-                  </div>
-                ))}
+                {scheduledAppointments
+                  .filter(
+                    (item) => item.appointment_type === "demo_lesson",
+                  )
+                  .map((appointment) => {
+                    const canOpenSession =
+                      Boolean(permissions?.can_add_academic_evaluation) &&
+                      Boolean(appointment.can_start || appointment.can_resume);
+                    return (
+                      <div
+                        key={appointment.id}
+                        className="flex items-center gap-1.5"
+                      >
+                        <button
+                          type="button"
+                          disabled={!canOpenSession}
+                          onClick={() => {
+                            if (canOpenSession) setDemoSession(appointment);
+                          }}
+                          className={`flex min-h-14 flex-1 items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-default ${appointment.is_overdue ? "border-amber-300 bg-amber-50 text-amber-900" : "border-blue-300 bg-blue-50 text-blue-900"}`}
+                        >
+                          <span className="min-w-0">
+                            <strong className="block break-words text-[0.8125rem]">
+                              {appointment.status === "in_progress"
+                                ? "Demo lesson in progress"
+                                : appointment.is_overdue
+                                  ? "Demo lesson overdue"
+                                  : "Scheduled demo lesson"}
+                            </strong>
+                            <span className="mt-0.5 block break-words text-xs">
+                              {dateTimeLabel(appointment.starts_at)}
+                              {appointment.responsible_name
+                                ? ` · ${appointment.responsible_name}`
+                                : ""}
+                            </span>
+                            {appointment.topic ? (
+                              <span className="mt-0.5 block break-words text-xs">
+                                Topic: {appointment.topic}
+                              </span>
+                            ) : null}
+                          </span>
+                          {canOpenSession ? (
+                            <span className="text-xs font-semibold">
+                              {appointment.can_resume ? "Resume" : "Start"}
+                            </span>
+                          ) : null}
+                        </button>
+                        {appointmentActionMenu(appointment)}
+                      </div>
+                    );
+                  })}
               </div>
               {candidate.evaluation_states?.demo === "missing" && !hasScheduledDemo && !(candidate.demo_lessons || []).length ? (
                 <p className="mb-3 flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">
@@ -3024,20 +3074,7 @@ export function CandidateProfile({
                                 }),
                             },
                           ]
-                        : item.status === "approved"
-                          ? [
-                              {
-                                key: "finalize",
-                                label: "Finalize approved request",
-                                onClick: () =>
-                                  setAction({
-                                    kind: "review_approval",
-                                    approval: item,
-                                    status: "approved",
-                                  }),
-                              },
-                            ]
-                          : [];
+                        : [];
                   return (
                     <article
                       key={Number(item.id)}

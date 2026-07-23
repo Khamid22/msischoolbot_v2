@@ -122,6 +122,12 @@ def candidates(
     origin_stage: str = "",
     final_decision: str = "",
     evaluator_account_id: int | None = None,
+    candidate_group: Annotated[
+        str,
+        Query(pattern="^(|new|successful|rejected)$"),
+    ] = "",
+    relevant_from: str = "",
+    relevant_to: str = "",
     user: CurrentUser = Depends(get_current_user),
 ):
     return api_success(
@@ -142,6 +148,9 @@ def candidates(
             origin_stage=origin_stage,
             final_decision=final_decision,
             evaluator_account_id=evaluator_account_id,
+            candidate_group=candidate_group,
+            relevant_from=relevant_from,
+            relevant_to=relevant_to,
         )
     )
 

@@ -15,7 +15,6 @@ from backend.modules.hr.recruitment.constants import (
 )
 from backend.modules.hr.recruitment.errors import RecruitmentError
 from backend.modules.hr.recruitment.projections import (
-    appointment_payload as _appointment_payload,
     candidate_progress as _candidate_progress,
     candidate_summary as _candidate_summary,
     derived_evaluation_states as _derived_evaluation_states,
@@ -32,6 +31,7 @@ class CandidateReadDependencies:
     connect: Callable[..., Any]
     academic_visible_id: Callable[..., int | None]
     visible_subject_ids: Callable[..., set[int] | None]
+    appointment_payload_for_user: Callable[..., dict[str, Any]]
 
 
 def _iso(value: Any) -> str:
@@ -106,6 +106,9 @@ def list_candidates(
     origin_stage: str = "",
     final_decision: str = "",
     evaluator_account_id: int | None = None,
+    candidate_group: str = "",
+    relevant_from: str = "",
+    relevant_to: str = "",
     dependencies: CandidateReadDependencies,
 ) -> dict[str, Any]:
     safe_page = max(1, int(page or 1))
@@ -114,6 +117,19 @@ def list_candidates(
     normalized_origin_stage = _text(origin_stage)
     normalized_closed_from = _text(closed_from)
     normalized_closed_to = _text(closed_to)
+    normalized_candidate_group = _text(candidate_group).lower()
+    normalized_relevant_from = _text(relevant_from)
+    normalized_relevant_to = _text(relevant_to)
+    if normalized_candidate_group and user.role not in {
+        "academic_director",
+        "head_of_department",
+    }:
+        raise RecruitmentError(
+            "Evaluation candidate groups require academic recruitment access.",
+            status_code=403,
+        )
+    if normalized_candidate_group not in {"", "new", "successful", "rejected"}:
+        raise RecruitmentError("Unknown candidate group.")
     try:
         parsed_closed_from = (
             date.fromisoformat(normalized_closed_from)
@@ -123,48 +139,107 @@ def list_candidates(
         parsed_closed_to = (
             date.fromisoformat(normalized_closed_to) if normalized_closed_to else None
         )
+        parsed_relevant_from = (
+            date.fromisoformat(normalized_relevant_from)
+            if normalized_relevant_from
+            else None
+        )
+        parsed_relevant_to = (
+            date.fromisoformat(normalized_relevant_to)
+            if normalized_relevant_to
+            else None
+        )
     except ValueError as exc:
-        raise RecruitmentError("Enter a valid closed-date range.") from exc
+        raise RecruitmentError("Enter valid date filters.") from exc
     if (
         parsed_closed_from
         and parsed_closed_to
         and (parsed_closed_from > parsed_closed_to)
     ):
         raise RecruitmentError("Closed from date cannot be after closed to date.")
+    if (
+        parsed_relevant_from
+        and parsed_relevant_to
+        and parsed_relevant_from > parsed_relevant_to
+    ):
+        raise RecruitmentError("Relevant from date cannot be after relevant to date.")
+    common_query = {
+        "visible_account_id": dependencies.academic_visible_id(user),
+        "visible_subject_ids": None,
+        "include_decision_queue": user.role == "academic_director",
+        "search": _text(search),
+        "position": _text(position),
+        "stage": normalized_stage,
+        "source": _text(source),
+        "subject_id": subject_id,
+        "application_from": _text(application_from),
+        "application_to": _text(application_to),
+        "closed_from": normalized_closed_from,
+        "closed_to": normalized_closed_to,
+        "origin_stage": normalized_origin_stage,
+        "final_decision": _text(final_decision),
+        "evaluator_account_id": evaluator_account_id,
+        "relevant_from": normalized_relevant_from,
+        "relevant_to": normalized_relevant_to,
+    }
     with dependencies.connect() as conn:
         if normalized_stage and normalized_stage not in ALL_STAGES and not repository.pipeline_stage_by_key(conn, normalized_stage):
             raise RecruitmentError("Unknown candidate stage.")
         if normalized_origin_stage and normalized_origin_stage not in ALL_STAGES and not repository.pipeline_stage_by_key(conn, normalized_origin_stage):
             raise RecruitmentError("Unknown origin stage.")
+        common_query["visible_subject_ids"] = dependencies.visible_subject_ids(
+            user, conn
+        )
         rows, total = repository.list_candidate_rows(
             conn,
-            visible_account_id=dependencies.academic_visible_id(user),
-            visible_subject_ids=dependencies.visible_subject_ids(user, conn),
-            include_decision_queue=user.role == "academic_director",
-            search=_text(search),
-            position=_text(position),
-            stage=normalized_stage,
-            source=_text(source),
-            subject_id=subject_id,
-            application_from=_text(application_from),
-            application_to=_text(application_to),
-            closed_from=normalized_closed_from,
-            closed_to=normalized_closed_to,
-            origin_stage=normalized_origin_stage,
-            final_decision=_text(final_decision),
-            evaluator_account_id=evaluator_account_id,
+            **common_query,
+            candidate_group=normalized_candidate_group,
             limit=safe_per_page,
             offset=(safe_page - 1) * safe_per_page,
         )
+        group_counts = (
+            {
+                group: repository.list_candidate_rows(
+                    conn,
+                    **common_query,
+                    candidate_group=group,
+                    limit=0,
+                )[1]
+                for group in ("new", "successful", "rejected")
+            }
+            if normalized_candidate_group
+            else {}
+        )
+    items = []
+    for row in rows:
+        candidate = {**_candidate_summary(row), "permissions": _permissions(user)}
+        if normalized_candidate_group:
+            candidate["candidate_group"] = normalized_candidate_group
+            candidate["relevant_at"] = {
+                "new": candidate.get("academic_demo_starts_at")
+                or candidate.get("latest_demo_at"),
+                "successful": candidate.get("latest_subject_test_at"),
+                "rejected": candidate.get("final_decision_at"),
+            }[normalized_candidate_group]
+            candidate["evaluation_evaluator_name"] = {
+                "new": candidate.get("academic_demo_responsible_name")
+                or candidate.get("latest_demo_evaluator_name"),
+                "successful": candidate.get("latest_subject_test_evaluator_name")
+                or candidate.get("latest_demo_evaluator_name"),
+                "rejected": (
+                    candidate.get("latest_demo_evaluator_name")
+                    if candidate.get("decision_source_evaluation_type") == "demo"
+                    else candidate.get("latest_subject_test_evaluator_name")
+                ),
+            }[normalized_candidate_group]
+        items.append(candidate)
     return {
-        "items": [
-            {**_candidate_summary(row), "permissions": _permissions(user)}
-            for row in rows
-        ],
+        "items": items,
         "page": safe_page,
         "per_page": safe_per_page,
         "total": total,
         "total_pages": max(1, ceil(total / safe_per_page)) if total else 1,
+        "group_counts": group_counts,
     }
 
 
@@ -301,22 +376,6 @@ def list_decision_queue(
     items = []
     for row in rows:
         candidate = _candidate_summary(row)
-        approval_id = candidate.pop("actionable_approval_id", None)
-        requested_outcome = candidate.pop("actionable_requested_outcome", None)
-        approval_status = candidate.pop("actionable_approval_status", None)
-        request_note = candidate.pop("actionable_request_note", None)
-        requested_at = candidate.pop("actionable_requested_at", None)
-        candidate["actionable_approval"] = (
-            {
-                "id": approval_id,
-                "requested_outcome": requested_outcome,
-                "status": approval_status,
-                "request_note": request_note,
-                "created_at": requested_at,
-            }
-            if approval_id
-            else None
-        )
         candidate["permissions"] = _permissions(user)
         items.append(candidate)
     return {
@@ -362,7 +421,10 @@ def get_candidate(
         appointment_rows, _ = repository.list_appointment_rows(
             conn, candidate_id=int(candidate_id), limit=100
         )
-        appointments = [_appointment_payload(item) for item in appointment_rows]
+        appointments = [
+            dependencies.appointment_payload_for_user(user, item)
+            for item in appointment_rows
+        ]
         tasks = [
             _task_payload(task)
             for task in repository.list_task_rows(conn, candidate_id=int(candidate_id))
