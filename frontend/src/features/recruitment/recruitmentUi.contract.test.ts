@@ -627,11 +627,20 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(pipelineComponent, /stages\.map/);
     assert.match(pipelineComponent, /stage\.stage_label/);
     assert.match(pipelineComponent, /stage\.candidates/);
-    assert.match(pipelineComponent, /Each active candidate appears in one column/);
-    assert.match(pipelineComponent, /terminal outcomes are excluded/);
+    assert.match(pipelineComponent, /Each active candidate appears once/);
+    assert.match(pipelineComponent, /terminal outcomes are\s+excluded/);
+    assert.match(pipelineComponent, /<svg/);
+    assert.match(pipelineComponent, /role="img"/);
+    assert.match(pipelineComponent, /<polygon/);
+    assert.match(pipelineComponent, /mx-auto/);
+    assert.match(pipelineComponent, /max-w-\[47\.5rem\]/);
+    assert.match(pipelineComponent, /stroke="hsl\(var\(--card\)\)"/);
+    assert.match(pipelineComponent, /md:block/);
+    assert.match(pipelineComponent, /md:hidden/);
+    assert.match(pipelineComponent, /clipPath/);
     assert.doesNotMatch(
       pipelineComponent,
-      /conversion|from prior|<svg|<polygon|overflow-x-auto/,
+      /Column \{|conversion|from prior|overflow-x-auto/,
     );
   });
 
