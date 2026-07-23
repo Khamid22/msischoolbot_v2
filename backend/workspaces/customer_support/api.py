@@ -73,6 +73,7 @@ def get_records(
     record_type: str = Query(default="all", alias="type"),
     status: str = Query(default="all"),
     school_id: int | None = Query(default=None, alias="schoolId"),
+    exclude_parent_id: int | None = Query(default=None, gt=0, alias="excludeParentId"),
     cursor: str = Query(default="", max_length=500),
     limit: int = Query(default=25, ge=1, le=50),
     user: CurrentUser = Depends(get_current_user),
@@ -84,6 +85,7 @@ def get_records(
         kind=record_type,
         status=status,
         school_id=school_id,
+        exclude_parent_id=exclude_parent_id,
         cursor=cursor,
         limit=limit,
     )

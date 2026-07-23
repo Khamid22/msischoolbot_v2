@@ -5,12 +5,12 @@ import { inputClass, Label, primaryButton, secondaryButton } from "@/features/cu
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 
 export function LinkStudentDialog({
-  excludedIds,
+  parentId,
   saving,
   onClose,
   onLink,
 }: {
-  excludedIds: number[];
+  parentId: number;
   saving: boolean;
   onClose: () => void;
   onLink: (studentId: number) => void;
@@ -20,17 +20,45 @@ export function LinkStudentDialog({
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState("");
-  const excludedKey = excludedIds.join(",");
 
   useEffect(() => {
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       setLoading(true);
       setError("");
-      const params = new URLSearchParams({ type: "student", status: "active", limit: "20" });
+      const params = new URLSearchParams({
+        type: "student",
+        status: "active",
+        limit: "50",
+        excludeParentId: String(parentId),
+      });
       if (query.trim()) params.set("q", query.trim());
-      getSupport<SearchPayload>(`/records?${params}`, controller.signal)
-        .then((payload) => setItems(payload.items.filter((item) => !excludedIds.includes(item.id))))
+      const loadCandidates = async () => {
+        const candidates = new Map<number, SupportRecordSummary>();
+        const seenCursors = new Set<string>();
+        let cursor = "";
+
+        do {
+          if (cursor) params.set("cursor", cursor);
+          else params.delete("cursor");
+          const payload = await getSupport<SearchPayload>(`/records?${params}`, controller.signal);
+          payload.items.forEach((item) => candidates.set(item.id, item));
+          cursor = payload.nextCursor || "";
+          if (cursor && seenCursors.has(cursor)) {
+            throw new Error("Student search returned a repeated cursor.");
+          }
+          if (cursor) seenCursors.add(cursor);
+        } while (cursor);
+
+        return [...candidates.values()];
+      };
+      loadCandidates()
+        .then((candidates) => {
+          setItems(candidates);
+          setSelected((current) => (
+            current && candidates.some((item) => item.id === current) ? current : null
+          ));
+        })
         .catch((requestError) => {
           if ((requestError as Error).name !== "AbortError") {
             setItems([]);
@@ -45,9 +73,7 @@ export function LinkStudentDialog({
       window.clearTimeout(timer);
       controller.abort();
     };
-    // A stable key avoids refetching for a new array containing the same ids.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [excludedKey, query]);
+  }, [parentId, query]);
 
   return (
     <Modal

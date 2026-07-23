@@ -153,6 +153,57 @@ def test_archive_is_blocked_by_active_groups_without_mutating(monkeypatch):
     assert not conn.committed
 
 
+def test_duplicate_parent_child_link_is_rejected_without_version_or_audit_mutation(monkeypatch):
+    class Connection:
+        committed = False
+
+        def commit(self):
+            self.committed = True
+
+    conn = Connection()
+
+    @contextmanager
+    def opened():
+        yield conn
+
+    scope = service.SchoolScope(True, (3,), ({"id": 3},), "")
+    monkeypatch.setattr(service, "_connect", opened)
+    monkeypatch.setattr(service, "load_scope", lambda connection, actor: scope)
+    monkeypatch.setattr(
+        repository,
+        "get_parent_row",
+        lambda connection, parent_id: {"id": parent_id, "version": 4},
+    )
+    monkeypatch.setattr(
+        repository,
+        "get_student_row",
+        lambda connection, student_id: {
+            "id": student_id,
+            "school_id": 3,
+            "full_name": "Student",
+        },
+    )
+    monkeypatch.setattr(
+        repository,
+        "insert_parent_student_link",
+        lambda connection, **kwargs: False,
+    )
+    monkeypatch.setattr(
+        repository,
+        "bump_parent_version",
+        lambda *args, **kwargs: pytest.fail("a duplicate link must not bump the parent version"),
+    )
+
+    with pytest.raises(service.DuplicateLinkError, match="already linked"):
+        service.link_parent_child(
+            service.SupportActor(17, 41, "support"),
+            7,
+            8,
+            expected_version=4,
+        )
+    assert not conn.committed
+
+
 def test_versions_conflict_and_cursor_round_trip():
     item = {"display_name": "Zoë Example", "kind": "student", "id": 75}
     assert service._decode_cursor(service._encode_cursor(item)) == (
@@ -192,6 +243,23 @@ def test_migration_adds_versions_and_auditable_void_metadata_without_deleting_da
     assert "DELETE FROM" not in upgrade
 
 
+def test_parent_link_storage_prevents_duplicate_pairs_and_preserves_inactive_history():
+    baseline = Path("database/alembic/versions/0001_msi_v2_baseline.sql").read_text()
+    customer_support_repository = Path("backend/modules/customer_support/repository.py").read_text()
+    parent_repository = Path("backend/modules/people/parents/repository.py").read_text()
+
+    link_table = baseline.split(
+        "CREATE TABLE IF NOT EXISTS msi_v2.parent_student_links",
+        1,
+    )[1].split(");", 1)[0]
+    assert "PRIMARY KEY (parent_id, student_id)" in link_table
+    assert "WHERE existing_family.status <> 'active'" in customer_support_repository
+    assert "RETURNING parent_id" in customer_support_repository
+    assert "UPDATE msi_v2.parent_student_links l" in parent_repository
+    assert "SET status = 'inactive'" in parent_repository
+    assert "DELETE FROM msi_v2.parent_student_links" not in parent_repository
+
+
 def test_frontend_contract_is_split_search_first_and_strongly_typed():
     entry = Path("frontend/src/workspaces/customer_support/pages/Home.tsx").read_text()
     workspace = Path("frontend/src/features/customer-support/CustomerSupportWorkspace.tsx").read_text()
@@ -227,6 +295,9 @@ def test_frontend_contract_is_split_search_first_and_strongly_typed():
     assert 'params.set("recordType"' not in records_hook
     assert "Student record ID" not in students
     assert "LinkStudentDialog" in parents and 'status: "active"' in link_dialog
+    assert "excludeParentId: String(parentId)" in link_dialog
+    assert "} while (cursor);" in link_dialog
+    assert "excludedIds" not in link_dialog
     assert "/payments/${payment.id}/void" in students
     for type_name in (
         "SupportSchool",

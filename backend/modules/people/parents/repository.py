@@ -182,6 +182,7 @@ def get_parents_for_student(conn, student_row_id):
         JOIN msi_v2.parents p ON p.id = l.parent_id
         JOIN msi_v2.students st ON st.id = l.student_id
         WHERE st.legacy_student_row_id = %s
+          AND l.status = 'active'
         ORDER BY l.created_at ASC, p.id ASC
         """,
         (int(student_row_id),),
@@ -214,7 +215,9 @@ def get_parent_child_link(conn, parent_id, student_row_id):
         SELECT l.parent_id, st.legacy_student_row_id AS student_row_id, l.created_at
         FROM msi_v2.parent_student_links l
         JOIN msi_v2.students st ON st.id = l.student_id
-        WHERE l.parent_id = %s AND st.legacy_student_row_id = %s
+        WHERE l.parent_id = %s
+          AND st.legacy_student_row_id = %s
+          AND l.status = 'active'
         LIMIT 1
         """,
         (parsed_parent_id, parsed_student_row_id),
@@ -235,6 +238,7 @@ def get_parent_child_link_by_dashboard_id(conn, parent_id, dashboard_student_id)
         JOIN msi_v2.group_students gs ON gs.student_id = st.id
         WHERE l.parent_id = %s
           AND COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) = %s
+          AND l.status = 'active'
           AND gs.enrollment_status = 'active'
         LIMIT 1
         """,
@@ -277,6 +281,7 @@ def list_parent_client_child_rows(conn, parent_id):
         JOIN msi_v2.students st ON st.id = l.student_id
         LEFT JOIN msi_v2.schools sch ON sch.id = st.school_id
         WHERE p.id = %s
+          AND l.status = 'active'
         ORDER BY lower(st.full_name) ASC, st.id ASC
         """,
         (int(parent_id),),
@@ -292,7 +297,8 @@ def list_invite_parent_rows(conn):
             to_char(l.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS linked_at,
             {_CHILD_STUDENT_COLUMNS}
         FROM msi_v2.parents p
-        LEFT JOIN msi_v2.parent_student_links l ON l.parent_id = p.id
+        LEFT JOIN msi_v2.parent_student_links l
+          ON l.parent_id = p.id AND l.status = 'active'
         LEFT JOIN msi_v2.students st ON st.id = l.student_id
         LEFT JOIN msi_v2.schools sch ON sch.id = st.school_id
         ORDER BY lower(p.display_name) ASC, p.id ASC, lower(st.full_name) ASC, st.id ASC
@@ -409,7 +415,9 @@ def get_parent_child_row(conn, parent_id, student_row_id):
         SELECT l.parent_id, st.legacy_student_row_id AS student_row_id, l.created_at AS assigned_at
         FROM msi_v2.parent_student_links l
         JOIN msi_v2.students st ON st.id = l.student_id
-        WHERE l.parent_id = %s AND st.legacy_student_row_id = %s
+        WHERE l.parent_id = %s
+          AND st.legacy_student_row_id = %s
+          AND l.status = 'active'
         """,
         (int(parent_id), int(student_row_id)),
     ).fetchone()
@@ -440,11 +448,13 @@ def insert_parent_student_link(conn, parent_id, student_v2_id):
 def delete_parent_student_link(conn, parent_id, student_row_id):
     return conn.execute(
         """
-        DELETE FROM msi_v2.parent_student_links l
-        USING msi_v2.students st
+        UPDATE msi_v2.parent_student_links l
+        SET status = 'inactive'
+        FROM msi_v2.students st
         WHERE l.student_id = st.id
           AND l.parent_id = %s
           AND st.legacy_student_row_id = %s
+          AND l.status = 'active'
         """,
         (int(parent_id), int(student_row_id)),
     )
@@ -455,7 +465,7 @@ def count_parent_child_links(conn, parent_id):
         """
         SELECT COUNT(*) AS count
         FROM msi_v2.parent_student_links
-        WHERE parent_id = %s
+        WHERE parent_id = %s AND status = 'active'
         """,
         (int(parent_id),),
     ).fetchone()

@@ -50,6 +50,7 @@ def search_record_rows(
     kind: str,
     status: str,
     school_id: int | None,
+    exclude_parent_id: int | None,
     allowed_school_ids: list[int],
     all_schools: bool,
     cursor_name: str,
@@ -103,6 +104,16 @@ def search_record_rows(
             WHERE (%s OR st.school_id = ANY(%s::bigint[]))
               AND (%s::bigint IS NULL OR st.school_id = %s)
               AND (%s = 'all' OR st.status = %s)
+              AND (
+                    %s::bigint IS NULL
+                    OR NOT EXISTS (
+                        SELECT 1
+                        FROM msi_v2.parent_student_links existing_family
+                        WHERE existing_family.parent_id = %s
+                          AND existing_family.student_id = st.id
+                          AND existing_family.status = 'active'
+                    )
+              )
               AND (
                     %s = ''
                     OR st.full_name ILIKE %s
@@ -185,6 +196,8 @@ def search_record_rows(
             school_id,
             status,
             status,
+            exclude_parent_id,
+            exclude_parent_id,
             query,
             pattern,
             pattern,
@@ -702,16 +715,19 @@ def bump_parent_version(conn, *, parent_id: int, expected_version: int):
 
 
 def insert_parent_student_link(conn, *, parent_id: int, student_id: int):
-    conn.execute(
+    row = conn.execute(
         """
-        INSERT INTO msi_v2.parent_student_links (
+        INSERT INTO msi_v2.parent_student_links AS existing_family (
             parent_id, student_id, relationship, status, created_at
         ) VALUES (%s, %s, 'parent', 'active', now())
         ON CONFLICT (parent_id, student_id)
-        DO UPDATE SET status = 'active'
+        DO UPDATE SET status = 'active', created_at = now()
+        WHERE existing_family.status <> 'active'
+        RETURNING parent_id
         """,
         (int(parent_id), int(student_id)),
-    )
+    ).fetchone()
+    return bool(row)
 
 
 def remove_parent_student_link(conn, *, parent_id: int, student_id: int):

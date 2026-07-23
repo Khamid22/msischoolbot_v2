@@ -62,6 +62,9 @@ def test_parent_query_sql_is_owned_by_the_domain():
 
     assert "def get_parent_child_row" in source
     assert "FROM msi_v2" in source
+    assert source.count("l.status = 'active'") >= 6
+    assert "UPDATE msi_v2.parent_student_links l" in source
+    assert "SET status = 'inactive'" in source
 
 
 def test_parent_invite_and_dashboard_logic_live_in_parent_domain():

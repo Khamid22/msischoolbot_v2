@@ -137,7 +137,7 @@ export function ParentsPage({
       ) : null}
       {dialog?.type === "link" && detail ? (
         <LinkStudentDialog
-          excludedIds={detail.children.map((child) => child.id)}
+          parentId={detail.profile.id}
           saving={saving}
           onClose={() => setDialog(null)}
           onLink={linkStudent}

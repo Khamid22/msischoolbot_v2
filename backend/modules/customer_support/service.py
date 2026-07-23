@@ -48,6 +48,11 @@ class DependencyConflictError(CustomerSupportError):
     code = "active_dependencies"
 
 
+class DuplicateLinkError(CustomerSupportError):
+    status_code = 409
+    code = "duplicate_parent_student_link"
+
+
 @dataclass(frozen=True)
 class SupportActor:
     staff_id: int | None
@@ -281,6 +286,7 @@ def search_records(
     kind: str = "all",
     status: str = "all",
     school_id: int | None = None,
+    exclude_parent_id: int | None = None,
     cursor: str = "",
     limit: int = 25,
 ):
@@ -295,12 +301,16 @@ def search_records(
     with _connect() as conn:
         scope = load_scope(conn, actor)
         selected_school = _ensure_school(scope, school_id) if school_id else None
+        excluded_parent = None
+        if exclude_parent_id:
+            excluded_parent = int(_ensure_parent_visible(conn, scope, exclude_parent_id)["id"])
         rows = repository.search_record_rows(
             conn,
             query=_text(query),
             kind=normalized_kind,
             status=normalized_status,
             school_id=selected_school,
+            exclude_parent_id=excluded_parent,
             allowed_school_ids=list(scope.school_ids),
             all_schools=scope.all_schools,
             cursor_name=cursor_name,
@@ -711,7 +721,10 @@ def link_parent_child(
         parent = _ensure_parent_visible(conn, scope, parent_id)
         expected = _ensure_version(parent["version"], expected_version)
         student = _ensure_student_visible(conn, scope, student_id)
-        repository.insert_parent_student_link(conn, parent_id=parent_id, student_id=student_id)
+        if not repository.insert_parent_student_link(
+            conn, parent_id=parent_id, student_id=student_id
+        ):
+            raise DuplicateLinkError("This student is already linked to this parent.")
         if not repository.bump_parent_version(
             conn, parent_id=parent_id, expected_version=expected
         ):
@@ -1024,6 +1037,7 @@ def void_payment(actor: SupportActor, payment_id: int, payload: dict[str, Any]):
 __all__ = [
     "CustomerSupportError",
     "DependencyConflictError",
+    "DuplicateLinkError",
     "NotFoundError",
     "SchoolScope",
     "ScopeError",
