@@ -10,6 +10,7 @@ export function RecordsSearchBar({
   query,
   status,
   schoolId,
+  fixedSchoolLabel,
   onQueryChange,
   onStatusChange,
   onSchoolChange,
@@ -21,6 +22,7 @@ export function RecordsSearchBar({
   query: string;
   status: string;
   schoolId: string;
+  fixedSchoolLabel?: string;
   onQueryChange: (value: string) => void;
   onStatusChange: (value: string) => void;
   onSchoolChange: (value: string) => void;
@@ -56,21 +58,30 @@ export function RecordsSearchBar({
             {kind === "student" ? <option value="archived">Archived</option> : null}
           </select>
         </div>
-        <div>
-          <Label htmlFor={schoolIdValue}>School</Label>
-          <select
-            id={schoolIdValue}
-            value={schoolId}
-            onChange={(event) => onSchoolChange(event.target.value)}
-            className={inputClass}
-            disabled={loadingContext}
-          >
-            <option value="">All allowed schools</option>
-            {context?.schools.map((school) => (
-              <option key={school.id} value={school.id}>{school.school_name}</option>
-            ))}
-          </select>
-        </div>
+        {fixedSchoolLabel ? (
+          <div>
+            <p className="mb-1.5 text-xs font-black uppercase tracking-wide text-muted-foreground">School</p>
+            <div className="flex min-h-11 items-center rounded-lg border border-primary/20 bg-primary/8 px-3 text-sm font-black text-primary">
+              {fixedSchoolLabel} only
+            </div>
+          </div>
+        ) : (
+          <div>
+            <Label htmlFor={schoolIdValue}>School</Label>
+            <select
+              id={schoolIdValue}
+              value={schoolId}
+              onChange={(event) => onSchoolChange(event.target.value)}
+              className={inputClass}
+              disabled={loadingContext}
+            >
+              <option value="">All allowed schools</option>
+              {context?.schools.map((school) => (
+                <option key={school.id} value={school.id}>{school.school_name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         {action}
       </div>
     </section>

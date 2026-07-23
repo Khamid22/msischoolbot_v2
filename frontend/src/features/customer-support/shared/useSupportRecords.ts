@@ -17,6 +17,12 @@ type LocationState = {
   selectedId: number | null;
 };
 
+type SupportRecordsOptions = {
+  fixedSchoolId?: string;
+  fixedSchoolLabel?: string;
+  loadAll?: boolean;
+};
+
 function readLocation(): LocationState {
   const params = new URLSearchParams(window.location.search);
   return {
@@ -47,13 +53,17 @@ export function asSupportApiError(error: unknown, fallback: string) {
   return new SupportApiError(fallback);
 }
 
-export function useSupportRecords<K extends SupportRecordKind>(kind: K) {
+export function useSupportRecords<K extends SupportRecordKind>(
+  kind: K,
+  options: SupportRecordsOptions = {},
+) {
+  const { fixedSchoolId = "", fixedSchoolLabel = "", loadAll = false } = options;
   const initial = useRef(readLocation()).current;
   const [context, setContext] = useState<SupportContext | null>(null);
   const [query, setQuery] = useState(initial.query);
   const [debouncedQuery, setDebouncedQuery] = useState(initial.query.trim());
   const [status, setStatus] = useState(initial.status);
-  const [schoolId, setSchoolId] = useState(initial.schoolId);
+  const [schoolId, setSchoolId] = useState(fixedSchoolId || initial.schoolId);
   const [records, setRecords] = useState<SupportRecordSummary[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(initial.selectedId);
@@ -81,13 +91,13 @@ export function useSupportRecords<K extends SupportRecordKind>(kind: K) {
       setQuery(state.query);
       setDebouncedQuery(state.query.trim());
       setStatus(state.status);
-      setSchoolId(state.schoolId);
+      setSchoolId(fixedSchoolId || state.schoolId);
       setSelectedId(state.selectedId);
       if (!state.selectedId) setDetail(null);
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, []);
+  }, [fixedSchoolId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -121,12 +131,36 @@ export function useSupportRecords<K extends SupportRecordKind>(kind: K) {
     append ? setLoadingMore(true) : setLoadingRecords(true);
     if (!append) setErrorState(null);
 
-    const params = new URLSearchParams({ type: kind, status, limit: "25" });
+    const params = new URLSearchParams({ type: kind, status, limit: loadAll ? "50" : "25" });
     if (debouncedQuery) params.set("q", debouncedQuery);
     if (schoolId) params.set("schoolId", schoolId);
     if (append && cursor) params.set("cursor", cursor);
 
     try {
+      if (loadAll) {
+        const allItems: SupportRecordSummary[] = [];
+        const seenCursors = new Set<string>();
+        let pageCursor = "";
+
+        do {
+          if (pageCursor) params.set("cursor", pageCursor);
+          else params.delete("cursor");
+          const payload = await getSupport<SearchPayload>(`/records?${params}`, controller.signal);
+          if (requestId !== recordsRequestId.current) return;
+          allItems.push(...payload.items);
+          pageCursor = payload.nextCursor || "";
+          if (pageCursor && seenCursors.has(pageCursor)) {
+            throw new SupportApiError("Student pagination returned a repeated cursor.");
+          }
+          if (pageCursor) seenCursors.add(pageCursor);
+        } while (pageCursor);
+
+        setRecords(allItems);
+        setNextCursor(null);
+        listScrollRef.current?.scrollTo({ top: 0 });
+        return;
+      }
+
       const payload = await getSupport<SearchPayload>(`/records?${params}`, controller.signal);
       if (requestId !== recordsRequestId.current) return;
       setRecords((current) => append ? [...current, ...payload.items] : payload.items);
@@ -141,7 +175,7 @@ export function useSupportRecords<K extends SupportRecordKind>(kind: K) {
         append ? setLoadingMore(false) : setLoadingRecords(false);
       }
     }
-  }, [debouncedQuery, kind, schoolId, status]);
+  }, [debouncedQuery, kind, loadAll, schoolId, status]);
 
   useEffect(() => {
     writeLocation({
@@ -239,6 +273,8 @@ export function useSupportRecords<K extends SupportRecordKind>(kind: K) {
 
   return {
     kind,
+    fixedSchoolLabel,
+    allRecordsLoaded: loadAll,
     context,
     query,
     setQuery,

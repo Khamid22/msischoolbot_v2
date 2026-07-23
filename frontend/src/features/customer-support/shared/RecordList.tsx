@@ -12,6 +12,8 @@ export function RecordList({
   loading,
   loadingMore,
   hasMore,
+  allRecordsLoaded,
+  fixedSchoolLabel,
   scrollRef,
   onSelect,
   onLoadMore,
@@ -22,6 +24,8 @@ export function RecordList({
   loading: boolean;
   loadingMore: boolean;
   hasMore: boolean;
+  allRecordsLoaded: boolean;
+  fixedSchoolLabel?: string;
   scrollRef: RefObject<HTMLDivElement>;
   onSelect: (item: SupportRecordSummary) => void;
   onLoadMore: () => void;
@@ -37,7 +41,11 @@ export function RecordList({
         <div>
           <h2 className="text-sm font-black">{title}</h2>
           <p className="text-xs font-semibold text-muted-foreground" aria-live="polite">
-            {loading ? "Searching…" : `${items.length} loaded`}
+            {loading
+              ? "Searching…"
+              : allRecordsLoaded
+                ? `${items.length} ${fixedSchoolLabel ? `${fixedSchoolLabel} ` : ""}${items.length === 1 ? kind : `${kind}s`}`
+                : `${items.length} loaded`}
           </p>
         </div>
         {loading ? <Loader2 className="h-4 w-4 animate-spin text-primary motion-reduce:animate-none" aria-hidden="true" /> : null}

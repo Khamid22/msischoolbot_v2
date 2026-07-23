@@ -48,6 +48,7 @@ export function SupportPageLayout<K extends SupportRecordKind>({
         query={controller.query}
         status={controller.status}
         schoolId={controller.schoolId}
+        fixedSchoolLabel={controller.fixedSchoolLabel}
         onQueryChange={controller.setQuery}
         onStatusChange={controller.setStatus}
         onSchoolChange={controller.setSchoolId}
@@ -68,6 +69,8 @@ export function SupportPageLayout<K extends SupportRecordKind>({
           loading={controller.loadingRecords}
           loadingMore={controller.loadingMore}
           hasMore={Boolean(controller.nextCursor)}
+          allRecordsLoaded={controller.allRecordsLoaded}
+          fixedSchoolLabel={controller.fixedSchoolLabel}
           scrollRef={controller.listScrollRef}
           onSelect={controller.selectRecord}
           onLoadMore={() => void controller.loadMore()}
