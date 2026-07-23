@@ -655,13 +655,17 @@ describe("candidate navigation and progressive disclosure", () => {
     }
     assert.doesNotMatch(directorNav, /Decisions|Pipeline|Analytics|Rejected|Trash Bin|Settings|Tasks/);
     assert.match(workspace, /<AcademicCandidateListView/);
-    for (const label of ["New Candidates", "Successful Candidates", "Rejected Candidates"]) {
+    for (const label of ["New Candidates", "Subject Test", "Successful Candidates", "Rejected Candidates"]) {
       assert.match(candidates, new RegExp(label));
     }
     for (const column of ["Candidate", "Subject \\/ Position", "Demo", "Subject Test", "Evaluator", "Status", "Relevant Date"]) {
       assert.match(candidates, new RegExp(column));
     }
     assert.match(candidates, /candidate_group/);
+    assert.match(candidates, /candidate\.is_unreviewed/);
+    assert.match(candidates, /Not reviewed/);
+    assert.match(candidates, /bg-amber-50/);
+    assert.match(candidates, /notifications\/candidates\/\$\{candidate\.id\}\/read/);
     assert.match(candidates, /setPage\(1\)/);
     assert.match(candidates, /"evaluations"/);
     assert.match(candidates, /Approval requested|Review approval/);

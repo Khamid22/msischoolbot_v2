@@ -1,13 +1,14 @@
 import {
   Ban,
   CheckCircle2,
+  ClipboardCheck,
   Clock3,
   ListFilter,
   Search,
   UserRound,
   X,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useEffect,
   useMemo,
@@ -38,7 +39,11 @@ import { Drawer } from "@/shared/ui/Drawer";
 import { Pagination } from "@/shared/ui/Pagination";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 
-type AcademicCandidateGroup = "new" | "successful" | "rejected";
+type AcademicCandidateGroup =
+  | "new"
+  | "subject_test"
+  | "successful"
+  | "rejected";
 type AcademicRecruitmentRole = "academic_director" | "head_of_department";
 
 type AcademicCandidateListData = {
@@ -48,6 +53,12 @@ type AcademicCandidateListData = {
   total: number;
   total_pages: number;
   group_counts: Record<AcademicCandidateGroup, number>;
+};
+
+type CandidateReviewResult = {
+  message: string;
+  marked_count: number;
+  unread_count: number;
 };
 
 type AcademicCandidateFilters = {
@@ -65,6 +76,12 @@ const candidateGroups = [
     label: "New Candidates",
     icon: Clock3,
     activeClass: "bg-amber-500 text-amber-950",
+  },
+  {
+    key: "subject_test",
+    label: "Subject Test",
+    icon: ClipboardCheck,
+    activeClass: "bg-blue-700 text-white",
   },
   {
     key: "successful",
@@ -91,7 +108,11 @@ const filterKeys: Array<keyof AcademicCandidateFilters> = [
 
 function initialCandidateGroup(): AcademicCandidateGroup {
   const value = new URLSearchParams(window.location.search).get("candidate_group");
-  return value === "successful" || value === "rejected" ? value : "new";
+  return value === "subject_test" ||
+    value === "successful" ||
+    value === "rejected"
+    ? value
+    : "new";
 }
 
 function initialFilters(): AcademicCandidateFilters {
@@ -111,6 +132,7 @@ function candidateStatus(
   candidate: RecruitmentCandidate,
   group: AcademicCandidateGroup,
 ) {
+  if (group === "subject_test") return "Awaiting subject test";
   if (group === "successful") return "Successful";
   if (group === "rejected")
     return candidate.decision_source_evaluation_type === "demo"
@@ -282,6 +304,7 @@ export function AcademicCandidateListView({
   basePath: string;
   role: AcademicRecruitmentRole;
 }) {
+  const queryClient = useQueryClient();
   const [group, setGroup] =
     useState<AcademicCandidateGroup>(initialCandidateGroup);
   const [page, setPage] = useState(() => {
@@ -366,11 +389,42 @@ export function AcademicCandidateListView({
       ) as AcademicCandidateFilters,
     );
   };
-  const openCandidate = (candidate: RecruitmentCandidate) => {
+  const openCandidate = (
+    candidate: RecruitmentCandidate,
+    tab: "evaluations" | "hiring" = "evaluations",
+  ) => {
     rememberRecruitmentReturn("candidates");
-    window.location.assign(
-      candidateHref(basePath, candidate.id, returnQuery, "evaluations"),
-    );
+    const href = candidateHref(basePath, candidate.id, returnQuery, tab);
+    if (!candidate.is_unreviewed) {
+      window.location.assign(href);
+      return;
+    }
+    void recruitmentRequest<CandidateReviewResult>(
+      `${RECRUITMENT_API}/notifications/candidates/${candidate.id}/read`,
+      { method: "POST" },
+    )
+      .then((result) => {
+        queryClient.setQueryData<AcademicCandidateListData>(
+          ["recruitment", "academic-candidates", group, page, filters],
+          (current) =>
+            current
+              ? {
+                  ...current,
+                  items: current.items.map((item) =>
+                    item.id === candidate.id
+                      ? { ...item, is_unreviewed: false }
+                      : item,
+                  ),
+                }
+              : current,
+        );
+        queryClient.setQueryData(
+          ["recruitment", "notifications", "unread-count"],
+          { unread_count: result.unread_count },
+        );
+      })
+      .catch(() => undefined)
+      .finally(() => window.location.assign(href));
   };
 
   return (
@@ -528,15 +582,24 @@ export function AcademicCandidateListView({
                       role="link"
                       tabIndex={0}
                       aria-label={`Open evaluations for ${candidate.full_name}`}
-                      className="cursor-pointer transition-colors hover:bg-muted/35 focus:outline-none focus-visible:bg-primary/5 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
+                      className={`cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 motion-reduce:transition-none ${
+                        candidate.is_unreviewed
+                          ? "bg-amber-50/90 hover:bg-amber-100/80 focus-visible:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/15"
+                          : "hover:bg-muted/35 focus-visible:bg-primary/5"
+                      }`}
                       onClick={() => openCandidate(candidate)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter") openCandidate(candidate);
                       }}
                     >
                       <td className="px-3 py-2">
-                        <span className="font-semibold text-foreground">
+                        <span className="flex flex-wrap items-center gap-1.5 font-semibold text-foreground">
                           {candidate.full_name}
+                          {candidate.is_unreviewed ? (
+                            <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[0.6875rem] font-bold text-amber-900 dark:border-amber-500/50 dark:bg-amber-500/15 dark:text-amber-100">
+                              Not reviewed
+                            </span>
+                          ) : null}
                         </span>
                         <span className="mt-0.5 block text-xs text-muted-foreground">
                           {candidate.phone || "No phone"}
@@ -590,8 +653,9 @@ export function AcademicCandidateListView({
                               <a
                                 href={reviewHref}
                                 onClick={(event) => {
+                                  event.preventDefault();
                                   event.stopPropagation();
-                                  rememberRecruitmentReturn("candidates");
+                                  openCandidate(candidate, "hiring");
                                 }}
                                 onKeyDown={(event) => event.stopPropagation()}
                                 className="inline-flex min-h-9 items-center rounded-lg bg-primary px-2.5 text-xs font-semibold text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
@@ -622,7 +686,14 @@ export function AcademicCandidateListView({
             {candidates.data.items.map((candidate) => {
               const approval = candidate.actionable_approval;
               return (
-                <article key={candidate.id} className="p-3">
+                <article
+                  key={candidate.id}
+                  className={`p-3 ${
+                    candidate.is_unreviewed
+                      ? "bg-amber-50/90 dark:bg-amber-500/10"
+                      : ""
+                  }`}
+                >
                   <a
                     href={candidateHref(
                       basePath,
@@ -630,14 +701,24 @@ export function AcademicCandidateListView({
                       returnQuery,
                       "evaluations",
                     )}
-                    onClick={() => rememberRecruitmentReturn("candidates")}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      openCandidate(candidate);
+                    }}
                     className="block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <h3 className="truncate text-sm font-semibold">
-                          {candidate.full_name}
-                        </h3>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <h3 className="truncate text-sm font-semibold">
+                            {candidate.full_name}
+                          </h3>
+                          {candidate.is_unreviewed ? (
+                            <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[0.6875rem] font-bold text-amber-900 dark:border-amber-500/50 dark:bg-amber-500/15 dark:text-amber-100">
+                              Not reviewed
+                            </span>
+                          ) : null}
+                        </div>
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">
                           {candidate.subject ||
                             candidate.applied_position ||
@@ -690,7 +771,10 @@ export function AcademicCandidateListView({
                           returnQuery,
                           "hiring",
                         )}
-                        onClick={() => rememberRecruitmentReturn("candidates")}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          openCandidate(candidate, "hiring");
+                        }}
                         className="inline-flex min-h-9 items-center justify-center rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground"
                       >
                         Review

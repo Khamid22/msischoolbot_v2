@@ -110,10 +110,13 @@ from backend.modules.hr.recruitment.notification_repository import (
     claim_due_browser_alert_rows,
     insert_recruitment_notification,
     list_recruitment_notification_rows,
+    mark_recruitment_candidate_notifications_read,
     mark_recruitment_notification_read,
     recalculate_future_appointment_reminders,
     recruitment_notification_unread_count,
+    recruitment_unreviewed_candidate_count,
     recruitment_reminder_config_row,
+    unreviewed_recruitment_candidate_ids,
     update_browser_preference,
     update_recruitment_reminder_config,
 )

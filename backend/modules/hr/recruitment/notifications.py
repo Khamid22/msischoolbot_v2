@@ -295,6 +295,14 @@ def unread_count(account_id: int) -> int:
         return repository.recruitment_notification_unread_count(conn, int(account_id))
 
 
+def unreviewed_candidate_count(account_id: int) -> int:
+    with connect_auth_db() as conn:
+        return repository.recruitment_unreviewed_candidate_count(
+            conn,
+            int(account_id),
+        )
+
+
 def mark_notification_read(account_id: int, notification_id: int) -> bool:
     with connect_auth_db() as conn:
         updated = repository.mark_recruitment_notification_read(
@@ -304,6 +312,17 @@ def mark_notification_read(account_id: int, notification_id: int) -> bool:
         )
         conn.commit()
     return updated
+
+
+def mark_candidate_reviewed(account_id: int, candidate_id: int) -> int:
+    with connect_auth_db() as conn:
+        updated_count = repository.mark_recruitment_candidate_notifications_read(
+            conn,
+            account_id=int(account_id),
+            candidate_id=int(candidate_id),
+        )
+        conn.commit()
+    return updated_count
 
 
 def browser_preference(account_id: int) -> dict[str, Any]:
@@ -372,8 +391,10 @@ __all__ = [
     "enqueue_appointment_reminders",
     "enqueue_demo_event",
     "list_notifications",
+    "mark_candidate_reviewed",
     "mark_notification_read",
     "reminder_config",
     "unread_count",
+    "unreviewed_candidate_count",
     "update_browser_preference",
 ]

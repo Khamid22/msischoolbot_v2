@@ -247,6 +247,43 @@ def test_notification_dashboard_can_request_unread_rows_only():
     assert all("read_at IS NULL" in query for query in conn.queries)
 
 
+def test_academic_review_state_counts_candidates_and_marks_all_candidate_events():
+    class Cursor:
+        rowcount = 3
+
+    class Connection:
+        def __init__(self):
+            self.calls = []
+
+        def execute(self, query, params):
+            statement = str(query)
+            self.calls.append((statement, params))
+            if "count(DISTINCT candidate_id)" in statement:
+                return _QueryResult(row={"total": 2})
+            if "SELECT DISTINCT candidate_id" in statement:
+                return _QueryResult(
+                    rows=[{"candidate_id": 7}, {"candidate_id": 11}],
+                )
+            return Cursor()
+
+    conn = Connection()
+
+    assert repository.recruitment_unreviewed_candidate_count(conn, 41) == 2
+    assert repository.unreviewed_recruitment_candidate_ids(
+        conn,
+        account_id=41,
+        candidate_ids=[7, 11, 14],
+    ) == {7, 11}
+    assert repository.mark_recruitment_candidate_notifications_read(
+        conn,
+        account_id=41,
+        candidate_id=7,
+    ) == 3
+    assert all("read_at IS NULL" in statement for statement, _params in conn.calls)
+    assert "candidate_id = ANY(%s::bigint[])" in conn.calls[1][0]
+    assert "SET read_at = COALESCE(read_at, now())" in conn.calls[2][0]
+
+
 def test_naive_form_time_is_interpreted_as_asia_tashkent():
     normalized = service._school_datetime(datetime(2099, 7, 16, 10, 0))
 

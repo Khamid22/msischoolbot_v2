@@ -316,6 +316,51 @@ def recruitment_notification_unread_count(conn: Any, account_id: int) -> int:
     return int(row["total"] or 0) if row else 0
 
 
+def recruitment_unreviewed_candidate_count(conn: Any, account_id: int) -> int:
+    row = conn.execute(
+        """
+        SELECT count(DISTINCT candidate_id) AS total
+        FROM msi_v2.teacher_recruitment_notifications
+        WHERE recipient_account_id = %s
+          AND candidate_id IS NOT NULL
+          AND read_at IS NULL
+          AND deliver_at <= now()
+          AND (
+              notification_type <> 'appointment_reminder'
+              OR browser_delivered_at IS NOT NULL
+          )
+        """,
+        (int(account_id),),
+    ).fetchone()
+    return int(row["total"] or 0) if row else 0
+
+
+def unreviewed_recruitment_candidate_ids(
+    conn: Any,
+    *,
+    account_id: int,
+    candidate_ids: list[int],
+) -> set[int]:
+    if not candidate_ids:
+        return set()
+    rows = conn.execute(
+        """
+        SELECT DISTINCT candidate_id
+        FROM msi_v2.teacher_recruitment_notifications
+        WHERE recipient_account_id = %s
+          AND candidate_id = ANY(%s::bigint[])
+          AND read_at IS NULL
+          AND deliver_at <= now()
+          AND (
+              notification_type <> 'appointment_reminder'
+              OR browser_delivered_at IS NOT NULL
+          )
+        """,
+        (int(account_id), [int(candidate_id) for candidate_id in candidate_ids]),
+    ).fetchall()
+    return {int(row["candidate_id"]) for row in rows}
+
+
 def mark_recruitment_notification_read(
     conn: Any, *, account_id: int, notification_id: int
 ) -> bool:
@@ -330,16 +375,43 @@ def mark_recruitment_notification_read(
     return int(getattr(cursor, "rowcount", 0) or 0) > 0
 
 
+def mark_recruitment_candidate_notifications_read(
+    conn: Any,
+    *,
+    account_id: int,
+    candidate_id: int,
+) -> int:
+    cursor = conn.execute(
+        """
+        UPDATE msi_v2.teacher_recruitment_notifications
+        SET read_at = COALESCE(read_at, now()), updated_at = now()
+        WHERE recipient_account_id = %s
+          AND candidate_id = %s
+          AND read_at IS NULL
+          AND deliver_at <= now()
+          AND (
+              notification_type <> 'appointment_reminder'
+              OR browser_delivered_at IS NOT NULL
+          )
+        """,
+        (int(account_id), int(candidate_id)),
+    )
+    return int(getattr(cursor, "rowcount", 0) or 0)
+
+
 __all__ = [
     "browser_preference_row",
     "cancel_recruitment_notification_reminders",
     "claim_due_browser_alert_rows",
     "insert_recruitment_notification",
     "list_recruitment_notification_rows",
+    "mark_recruitment_candidate_notifications_read",
     "mark_recruitment_notification_read",
     "recalculate_future_appointment_reminders",
     "recruitment_notification_unread_count",
+    "recruitment_unreviewed_candidate_count",
     "recruitment_reminder_config_row",
+    "unreviewed_recruitment_candidate_ids",
     "update_browser_preference",
     "update_recruitment_reminder_config",
 ]

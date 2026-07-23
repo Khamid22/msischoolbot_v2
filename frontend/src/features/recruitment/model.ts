@@ -380,9 +380,10 @@ export type RecruitmentCandidate = {
   academic_demo_status?: "scheduled" | "in_progress" | "";
   academic_demo_responsible_account_id?: number | null;
   academic_demo_responsible_name?: string;
-  candidate_group?: "new" | "successful" | "rejected";
+  candidate_group?: "new" | "subject_test" | "successful" | "rejected";
   relevant_at?: string;
   evaluation_evaluator_name?: string;
+  is_unreviewed?: boolean;
   evaluation_states?: {
     interview: "passed" | "failed" | "missing" | "pending" | string;
     demo: "passed" | "failed" | "missing" | "pending" | string;

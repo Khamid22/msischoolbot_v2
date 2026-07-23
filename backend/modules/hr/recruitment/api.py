@@ -124,7 +124,7 @@ def candidates(
     evaluator_account_id: int | None = None,
     candidate_group: Annotated[
         str,
-        Query(pattern="^(|new|successful|rejected)$"),
+        Query(pattern="^(|new|subject_test|successful|rejected)$"),
     ] = "",
     relevant_from: str = "",
     relevant_to: str = "",
@@ -311,7 +311,17 @@ def notifications(
 def notification_unread_count(user: CurrentUser = Depends(get_current_user)):
     if not user.account_id:
         raise HTTPException(status_code=403, detail="An account is required for notifications.")
-    return api_success({"unread_count": recruitment_notifications.unread_count(int(user.account_id))})
+    return api_success({"unread_count": _notification_unread_count_for_user(user)})
+
+
+def _notification_unread_count_for_user(user: CurrentUser) -> int:
+    if not user.account_id:
+        return 0
+    return (
+        recruitment_notifications.unreviewed_candidate_count(int(user.account_id))
+        if user.role in {"academic_director", "head_of_department"}
+        else recruitment_notifications.unread_count(int(user.account_id))
+    )
 
 
 @router.post("/notifications/{notification_id}/read", operation_id="api_v1_recruitment_notification_read")
@@ -320,7 +330,41 @@ def mark_notification_read(notification_id: int, user: CurrentUser = Depends(get
         raise HTTPException(status_code=403, detail="An account is required for notifications.")
     if not recruitment_notifications.mark_notification_read(int(user.account_id), int(notification_id)):
         raise HTTPException(status_code=404, detail="Notification was not found.")
-    return api_success({"message": "Notification marked as read."})
+    return api_success(
+        {
+            "message": "Notification marked as read.",
+            "unread_count": _notification_unread_count_for_user(user),
+        }
+    )
+
+
+@router.post(
+    "/notifications/candidates/{candidate_id}/read",
+    operation_id="api_v1_recruitment_candidate_notifications_read",
+)
+def mark_candidate_notifications_read(
+    candidate_id: int,
+    user: CurrentUser = Depends(get_current_user),
+):
+    if (
+        user.role not in {"academic_director", "head_of_department"}
+        or not user.account_id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Academic recruitment access is required.",
+        )
+    marked_count = recruitment_notifications.mark_candidate_reviewed(
+        int(user.account_id),
+        int(candidate_id),
+    )
+    return api_success(
+        {
+            "message": "Candidate marked as reviewed.",
+            "marked_count": marked_count,
+            "unread_count": _notification_unread_count_for_user(user),
+        }
+    )
 
 
 def _browser_reminder_account(user: CurrentUser) -> int:

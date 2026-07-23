@@ -40,8 +40,14 @@ class _CandidateQueryConnection:
         (
             "new",
             "academic_demo_appointment.id IS NOT NULL",
-            "COALESCE(academic_demo_appointment.starts_at, latest_demo.demo_at)",
+            "academic_demo_appointment.starts_at",
             "academic_demo_appointment.responsible_account_id",
+        ),
+        (
+            "subject_test",
+            "COALESCE(latest_demo.result, '') = 'passed'",
+            "latest_demo.demo_at",
+            "latest_demo.evaluator_account_id",
         ),
         (
             "successful",
@@ -85,7 +91,13 @@ def test_candidate_group_sql_classifies_filters_and_sorts_by_relevant_event(
         assert evaluator_expression in sql
         assert f"({date_expression})::date >= %s::date" in sql
         assert f"({date_expression})::date <= %s::date" in sql
-    assert f"ORDER BY ({date_expression}) DESC NULLS LAST, candidate.id DESC" in list_sql
+    if group == "new":
+        assert f"CASE WHEN ({date_expression}) >= now() THEN 0 ELSE 1 END" in list_sql
+        assert f"THEN ({date_expression})" in list_sql
+        assert "END ASC NULLS LAST" in list_sql
+        assert f"({date_expression}) DESC NULLS LAST" in list_sql
+    else:
+        assert f"ORDER BY ({date_expression}) DESC NULLS LAST, candidate.id DESC" in list_sql
     assert count_params == (41, "2026-07-01", "2026-07-23")
     assert list_params == (41, "2026-07-01", "2026-07-23", 25, 0)
 
@@ -99,13 +111,20 @@ def test_rejected_group_only_contains_evaluation_rejections():
     assert "candidate_withdrew" not in rejected
 
 
-def test_new_group_keeps_demo_passes_awaiting_a_subject_test():
+def test_new_group_contains_only_candidates_with_an_active_demo():
     new = read_repository._academic_candidate_group_condition("new")
 
     assert "candidate.status NOT IN ('rejected', 'candidate_withdrew', 'trash_bin')" in new
-    assert "latest_demo.result, '') = 'passed'" in new
-    assert "latest_subject_test.id IS NULL" in new
     assert "academic_demo_appointment.id IS NOT NULL" in new
+    assert "latest_demo.result, '') <> 'passed'" in new
+
+
+def test_subject_test_group_contains_demo_passes_without_a_test_result():
+    subject_test = read_repository._academic_candidate_group_condition("subject_test")
+
+    assert "candidate.status NOT IN ('rejected', 'candidate_withdrew', 'trash_bin')" in subject_test
+    assert "latest_demo.result, '') = 'passed'" in subject_test
+    assert "latest_subject_test.result, '') = ''" in subject_test
 
 
 def test_successful_group_excludes_closed_non_evaluation_outcomes():
@@ -118,7 +137,7 @@ def test_successful_group_excludes_closed_non_evaluation_outcomes():
 
 def test_candidate_group_service_returns_counts_and_evaluation_metadata(monkeypatch):
     calls: list[dict] = []
-    totals = {"new": 3, "successful": 2, "rejected": 1}
+    totals = {"new": 3, "subject_test": 4, "successful": 2, "rejected": 1}
     selected_row = {
         "id": 17,
         "full_name": "Newest Candidate",
@@ -138,6 +157,11 @@ def test_candidate_group_service_returns_counts_and_evaluation_metadata(monkeypa
         read_service.repository,
         "list_candidate_rows",
         list_rows,
+    )
+    monkeypatch.setattr(
+        read_service.repository,
+        "unreviewed_recruitment_candidate_ids",
+        lambda *_args, **_kwargs: {17},
     )
 
     @contextmanager
@@ -171,11 +195,13 @@ def test_candidate_group_service_returns_counts_and_evaluation_metadata(monkeypa
         result["items"][0]["evaluation_evaluator_name"]
         == "Head of Mathematics"
     )
+    assert result["items"][0]["is_unreviewed"] is True
     assert calls[0]["visible_account_id"] == 41
     assert calls[0]["visible_subject_ids"] == {8}
     assert calls[0]["limit"] == 25
     assert [call["candidate_group"] for call in calls[1:]] == [
         "new",
+        "subject_test",
         "successful",
         "rejected",
     ]

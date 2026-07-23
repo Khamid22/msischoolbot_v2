@@ -128,7 +128,13 @@ def list_candidates(
             "Evaluation candidate groups require academic recruitment access.",
             status_code=403,
         )
-    if normalized_candidate_group not in {"", "new", "successful", "rejected"}:
+    if normalized_candidate_group not in {
+        "",
+        "new",
+        "subject_test",
+        "successful",
+        "rejected",
+    }:
         raise RecruitmentError("Unknown candidate group.")
     try:
         parsed_closed_from = (
@@ -205,10 +211,24 @@ def list_candidates(
                     candidate_group=group,
                     limit=0,
                 )[1]
-                for group in ("new", "successful", "rejected")
+                for group in ("new", "subject_test", "successful", "rejected")
             }
             if normalized_candidate_group
             else {}
+        )
+        candidate_ids = []
+        for row in rows:
+            candidate_id = int(_row_dict(row).get("id") or 0)
+            if candidate_id > 0:
+                candidate_ids.append(candidate_id)
+        unreviewed_candidate_ids = (
+            repository.unreviewed_recruitment_candidate_ids(
+                conn,
+                account_id=int(user.account_id),
+                candidate_ids=candidate_ids,
+            )
+            if normalized_candidate_group and user.account_id and rows
+            else set()
         )
     items = []
     for row in rows:
@@ -216,14 +236,15 @@ def list_candidates(
         if normalized_candidate_group:
             candidate["candidate_group"] = normalized_candidate_group
             candidate["relevant_at"] = {
-                "new": candidate.get("academic_demo_starts_at")
-                or candidate.get("latest_demo_at"),
+                "new": candidate.get("academic_demo_starts_at"),
+                "subject_test": candidate.get("latest_demo_at"),
                 "successful": candidate.get("latest_subject_test_at"),
                 "rejected": candidate.get("final_decision_at"),
             }[normalized_candidate_group]
             candidate["evaluation_evaluator_name"] = {
                 "new": candidate.get("academic_demo_responsible_name")
                 or candidate.get("latest_demo_evaluator_name"),
+                "subject_test": candidate.get("latest_demo_evaluator_name"),
                 "successful": candidate.get("latest_subject_test_evaluator_name")
                 or candidate.get("latest_demo_evaluator_name"),
                 "rejected": (
@@ -232,6 +253,7 @@ def list_candidates(
                     else candidate.get("latest_subject_test_evaluator_name")
                 ),
             }[normalized_candidate_group]
+            candidate["is_unreviewed"] = candidate["id"] in unreviewed_candidate_ids
         items.append(candidate)
     return {
         "items": items,

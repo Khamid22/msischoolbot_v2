@@ -316,7 +316,12 @@ def _candidate_joins() -> str:
     """
 
 
-_ACADEMIC_CANDIDATE_GROUPS = {"new", "successful", "rejected"}
+_ACADEMIC_CANDIDATE_GROUPS = {
+    "new",
+    "subject_test",
+    "successful",
+    "rejected",
+}
 _ACADEMIC_SUCCESSFUL_CONDITION = """
     candidate.status NOT IN ('rejected', 'candidate_withdrew', 'trash_bin')
     AND COALESCE(latest_demo.result, '') = 'passed'
@@ -327,23 +332,22 @@ _ACADEMIC_REJECTED_CONDITION = """
     AND COALESCE(decision.decision, '') = 'rejected'
     AND COALESCE(decision.source_evaluation_type, '') IN ('demo', 'subject_test')
 """
-_ACADEMIC_NEW_CONDITION = f"""
+_ACADEMIC_SUBJECT_TEST_CONDITION = """
     candidate.status NOT IN ('rejected', 'candidate_withdrew', 'trash_bin')
-    AND NOT ({_ACADEMIC_SUCCESSFUL_CONDITION})
-    AND NOT ({_ACADEMIC_REJECTED_CONDITION})
-    AND (
-        academic_demo_appointment.id IS NOT NULL
-        OR (
-            COALESCE(latest_demo.result, '') = 'passed'
-            AND latest_subject_test.id IS NULL
-        )
-    )
+    AND COALESCE(latest_demo.result, '') = 'passed'
+    AND COALESCE(latest_subject_test.result, '') = ''
+"""
+_ACADEMIC_NEW_CONDITION = """
+    candidate.status NOT IN ('rejected', 'candidate_withdrew', 'trash_bin')
+    AND academic_demo_appointment.id IS NOT NULL
+    AND COALESCE(latest_demo.result, '') <> 'passed'
 """
 
 
 def _academic_candidate_group_condition(candidate_group: str) -> str:
     return {
         "new": _ACADEMIC_NEW_CONDITION,
+        "subject_test": _ACADEMIC_SUBJECT_TEST_CONDITION,
         "successful": _ACADEMIC_SUCCESSFUL_CONDITION,
         "rejected": _ACADEMIC_REJECTED_CONDITION,
     }[candidate_group]
@@ -351,7 +355,8 @@ def _academic_candidate_group_condition(candidate_group: str) -> str:
 
 def _academic_candidate_relevant_expression(candidate_group: str) -> str:
     return {
-        "new": "COALESCE(academic_demo_appointment.starts_at, latest_demo.demo_at)",
+        "new": "academic_demo_appointment.starts_at",
+        "subject_test": "latest_demo.demo_at",
         "successful": "latest_subject_test.test_at",
         "rejected": "decision.created_at",
     }[candidate_group]
@@ -363,6 +368,7 @@ def _academic_candidate_evaluator_expression(candidate_group: str) -> str:
             "COALESCE(academic_demo_appointment.responsible_account_id, "
             "latest_demo.evaluator_account_id)"
         ),
+        "subject_test": "latest_demo.evaluator_account_id",
         "successful": (
             "COALESCE(latest_subject_test.evaluator_account_id, "
             "latest_demo.evaluator_account_id)"
@@ -644,11 +650,23 @@ def list_candidate_rows(
     ).fetchone()
     if limit <= 0:
         return [], int(total_row["total"] or 0) if total_row else 0
-    order_sql = (
-        f"({_academic_candidate_relevant_expression(candidate_group)}) DESC NULLS LAST, candidate.id DESC"
-        if candidate_group
-        else "candidate.updated_at DESC, candidate.id DESC"
-    )
+    if candidate_group == "new":
+        relevant_expression = _academic_candidate_relevant_expression(candidate_group)
+        order_sql = f"""
+            CASE WHEN ({relevant_expression}) >= now() THEN 0 ELSE 1 END,
+            CASE WHEN ({relevant_expression}) >= now()
+                THEN ({relevant_expression})
+            END ASC NULLS LAST,
+            ({relevant_expression}) DESC NULLS LAST,
+            candidate.id DESC
+        """
+    elif candidate_group:
+        order_sql = (
+            f"({_academic_candidate_relevant_expression(candidate_group)}) "
+            "DESC NULLS LAST, candidate.id DESC"
+        )
+    else:
+        order_sql = "candidate.updated_at DESC, candidate.id DESC"
     rows = conn.execute(
         f"""
         SELECT {_CANDIDATE_COLUMNS}

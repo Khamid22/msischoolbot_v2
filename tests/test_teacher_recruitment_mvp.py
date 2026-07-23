@@ -12,7 +12,7 @@ from itsdangerous import TimestampSigner
 from pydantic import ValidationError
 
 from backend.core.access import CurrentUser
-from backend.modules.hr.recruitment import repository, service
+from backend.modules.hr.recruitment import notifications, repository, service
 from backend.modules.hr.recruitment.constants import (
     ALL_STAGES,
     DEMO_CRITERIA,
@@ -907,16 +907,73 @@ def test_candidate_group_filters_are_forwarded_by_the_api(client, monkeypatch):
 
     response = client.get(
         "/api/v1/recruitment/candidates"
-        "?candidate_group=rejected&relevant_from=2026-07-01"
+        "?candidate_group=subject_test&relevant_from=2026-07-01"
         "&relevant_to=2026-07-23&evaluator_account_id=14",
         headers=XHR,
     )
 
     assert response.status_code == 200
-    assert captured["candidate_group"] == "rejected"
+    assert captured["candidate_group"] == "subject_test"
     assert captured["relevant_from"] == "2026-07-01"
     assert captured["relevant_to"] == "2026-07-23"
     assert captured["evaluator_account_id"] == 14
+
+
+def test_academic_recruitment_badge_counts_unreviewed_candidates_and_clears_on_review(
+    client,
+    monkeypatch,
+):
+    state = {"unreviewed_count": 6}
+    monkeypatch.setattr(
+        notifications,
+        "unreviewed_candidate_count",
+        lambda account_id: state["unreviewed_count"] if account_id == 14 else 0,
+    )
+    monkeypatch.setattr(
+        notifications,
+        "unread_count",
+        lambda account_id: 9 if account_id == 10 else 0,
+    )
+    reviewed = {}
+
+    def mark_candidate_reviewed(account_id, candidate_id):
+        reviewed.update(
+            account_id=account_id,
+            candidate_id=candidate_id,
+        )
+        state["unreviewed_count"] -= 1
+        return 3
+
+    monkeypatch.setattr(
+        notifications,
+        "mark_candidate_reviewed",
+        mark_candidate_reviewed,
+    )
+    _set_session(client, "head_of_department", account_id=14, staff_id=24)
+
+    count_response = client.get(
+        "/api/v1/recruitment/notifications/unread-count",
+        headers=XHR,
+    )
+    review_response = client.post(
+        "/api/v1/recruitment/notifications/candidates/27/read",
+        headers=XHR,
+    )
+
+    assert count_response.status_code == 200
+    assert count_response.json()["data"]["unread_count"] == 6
+    assert review_response.status_code == 200
+    assert review_response.json()["data"]["marked_count"] == 3
+    assert review_response.json()["data"]["unread_count"] == 5
+    assert reviewed == {"account_id": 14, "candidate_id": 27}
+
+    _set_session(client, "hr_manager", account_id=10, staff_id=20)
+    hr_count_response = client.get(
+        "/api/v1/recruitment/notifications/unread-count",
+        headers=XHR,
+    )
+    assert hr_count_response.status_code == 200
+    assert hr_count_response.json()["data"]["unread_count"] == 9
 
 
 def test_hr_page_renders_new_shared_workspace_without_legacy_pipeline(client):

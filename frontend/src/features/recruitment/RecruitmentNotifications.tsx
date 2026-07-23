@@ -16,6 +16,7 @@ type NotificationItem = {
 };
 
 type NotificationPage = { items: NotificationItem[]; total: number };
+type NotificationReadResult = { message: string; unread_count: number };
 
 const notificationDashboardKey = ["recruitment", "notifications", "dashboard"] as const;
 const notificationUnreadKey = ["recruitment", "notifications", "unread-count"] as const;
@@ -37,24 +38,24 @@ export function RecruitmentNotificationsPanel({ basePath }: { basePath: string }
     refetchInterval: 30_000,
   });
   const markRead = useMutation({
-    mutationFn: (id: number) => recruitmentRequest(`${RECRUITMENT_API}/notifications/${id}/read`, { method: "POST" }),
+    mutationFn: (id: number) => recruitmentRequest<NotificationReadResult>(`${RECRUITMENT_API}/notifications/${id}/read`, { method: "POST" }),
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: ["recruitment", "notifications"] });
       const previousPage = queryClient.getQueryData<NotificationPage>(notificationDashboardKey);
-      const previousUnread = queryClient.getQueryData<{ unread_count: number }>(notificationUnreadKey);
       queryClient.setQueryData<NotificationPage>(notificationDashboardKey, (current) => current ? {
         ...current,
         items: current.items.filter((item) => item.id !== id),
         total: Math.max(0, current.total - 1),
       } : current);
-      queryClient.setQueryData<{ unread_count: number }>(notificationUnreadKey, (current) => current ? {
-        unread_count: Math.max(0, current.unread_count - 1),
-      } : current);
-      return { previousPage, previousUnread };
+      return { previousPage };
+    },
+    onSuccess: (result) => {
+      queryClient.setQueryData(notificationUnreadKey, {
+        unread_count: result.unread_count,
+      });
     },
     onError: (_error, _id, context) => {
       if (context?.previousPage) queryClient.setQueryData(notificationDashboardKey, context.previousPage);
-      if (context?.previousUnread) queryClient.setQueryData(notificationUnreadKey, context.previousUnread);
     },
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ["recruitment", "notifications"] }),
   });
