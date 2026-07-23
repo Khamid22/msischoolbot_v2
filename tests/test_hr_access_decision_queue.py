@@ -625,6 +625,66 @@ def test_academic_director_rejection_revokes_open_requests_and_audits(monkeypatc
     assert conn.commits == 1
 
 
+def test_hr_withdrawal_uses_an_active_database_reason(monkeypatch):
+    conn = _Connection()
+    decisions = []
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(
+        repository,
+        "recruitment_setting_value_exists",
+        lambda _conn, *, category, value: (
+            category == "withdrawal_reason"
+            and value == "accepted_another_offer"
+        ),
+    )
+    monkeypatch.setattr(
+        repository,
+        "lock_candidate_decision_row",
+        lambda *_args: {
+            "id": 8,
+            "status": "test_and_demo",
+            "version": 4,
+            "academy_teacher_id": None,
+            "active_teacher_id": None,
+        },
+    )
+    monkeypatch.setattr(
+        repository, "revoke_open_approvals", lambda *_args, **_kwargs: []
+    )
+    monkeypatch.setattr(
+        repository, "cancel_scheduled_appointments", lambda *_args, **_kwargs: []
+    )
+    monkeypatch.setattr(
+        repository, "update_candidate_stage", lambda *_args, **_kwargs: True
+    )
+    monkeypatch.setattr(
+        repository,
+        "insert_final_decision",
+        lambda *_args, **kwargs: decisions.append(kwargs["values"]) or 18,
+    )
+    monkeypatch.setattr(repository, "insert_audit", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        service,
+        "get_candidate",
+        lambda *_args: {"id": 8, "status": "candidate_withdrew"},
+    )
+
+    result = service.make_final_decision(
+        _user("hr_manager"),
+        8,
+        {
+            "decision": "candidate_withdrew",
+            "withdrawal_reason": "accepted_another_offer",
+            "reason_detail": "",
+        },
+    )
+
+    assert result["status"] == "candidate_withdrew"
+    assert decisions[0]["withdrawal_reason"] == "accepted_another_offer"
+    assert decisions[0]["rejection_reason"] == ""
+    assert conn.commits == 1
+
+
 @pytest.mark.parametrize("decision", ["candidate_withdrew"])
 def test_academic_director_cannot_record_hr_operational_outcomes(decision):
     with pytest.raises(service.RecruitmentError) as exc:

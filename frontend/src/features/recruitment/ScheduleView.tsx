@@ -1234,6 +1234,7 @@ export function ScheduleView({
           <DemoSessionModal
             candidate={sessionCandidate.data}
             appointment={sessionSelection}
+            options={options}
             open
             onClose={() => setSessionSelection(null)}
             onAnnouncement={onAnnouncement}

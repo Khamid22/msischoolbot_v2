@@ -565,6 +565,52 @@ const CandidateCard = memo(function CandidateCard({
   );
 });
 
+function OutcomeReasonFields({
+  kind,
+  options,
+}: {
+  kind: "rejection" | "withdrawal";
+  options?: RecruitmentOptions;
+}) {
+  const [reason, setReason] = useState("");
+  const reasonOptions =
+    kind === "rejection"
+      ? options?.rejection_reason_options || []
+      : options?.withdrawal_reason_options || [];
+  const fieldName =
+    kind === "rejection" ? "rejection_reason" : "withdrawal_reason";
+  return (
+    <div className="grid gap-2">
+      <label className="text-xs font-semibold">
+        {kind === "rejection" ? "Rejection reason" : "Withdrawal reason"}
+        <select
+          autoFocus
+          required
+          name={fieldName}
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          className={`${fieldClass} mt-1`}
+        >
+          <option value="">Select a reason</option>
+          {reasonOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="text-xs font-semibold">
+        Explanation {reason === "other" ? "(required)" : "(optional)"}
+        <textarea
+          name="reason_detail"
+          required={reason === "other"}
+          className={`${fieldClass} mt-1 min-h-24`}
+        />
+      </label>
+    </div>
+  );
+}
+
 export function PipelineView({
   basePath,
   options,
@@ -977,11 +1023,11 @@ export function PipelineView({
       <PipelineStagesDrawer open={stageManagerOpen} onClose={() => setStageManagerOpen(false)} onAnnouncement={onAnnouncement} />
 
       <Modal open={Boolean(rejectSelection)} onClose={() => { if (!reject.isPending) setRejectSelection(null); }} title="Reject candidate" subtitle={rejectSelection?.candidate.full_name} size="sm">
-        {rejectSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); reject.mutate({ candidate: rejectSelection.candidate, values: formValues(event.currentTarget) }); }}><ModalBody className="grid gap-2"><label className="text-xs font-semibold">Rejection reason<select autoFocus required name="rejection_reason" className={`${fieldClass} mt-1`}><option value="">Select a reason</option>{(options?.rejection_reason_options || []).map((reason) => <option key={reason.value} value={reason.value}>{reason.label}</option>)}</select></label><label className="text-xs font-semibold">Explanation<textarea name="reason_detail" className={`${fieldClass} mt-1 min-h-24`} /></label><p className="text-xs text-muted-foreground">The system will record that the candidate was rejected from {rejectSelection.candidate.status_label || recruitmentStageLabel(rejectSelection.candidate.status, options?.stage_labels)}.</p></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setRejectSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={reject.isPending}>{reject.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}Reject</button></div></ModalFooter></form> : null}
+        {rejectSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); reject.mutate({ candidate: rejectSelection.candidate, values: formValues(event.currentTarget) }); }}><ModalBody className="grid gap-2"><OutcomeReasonFields kind="rejection" options={options} /><p className="text-xs text-muted-foreground">The system will record that the candidate was rejected from {rejectSelection.candidate.status_label || recruitmentStageLabel(rejectSelection.candidate.status, options?.stage_labels)}.</p></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setRejectSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={reject.isPending}>{reject.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}Reject</button></div></ModalFooter></form> : null}
       </Modal>
 
       <Modal open={Boolean(withdrawSelection)} onClose={() => { if (!withdraw.isPending) setWithdrawSelection(null); }} title="Candidate withdrew" subtitle={withdrawSelection?.candidate.full_name} size="sm">
-        {withdrawSelection ? <form className="flex min-h-0 flex-1 flex-col" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); withdraw.mutate({ candidate: withdrawSelection.candidate, values: formValues(event.currentTarget) }); }}><ModalBody><label className="text-xs font-semibold">Withdrawal reason<textarea autoFocus required name="reason_detail" className={`${fieldClass} mt-1 min-h-24`} /></label><p className="mt-3 text-xs text-muted-foreground">The system records that this candidate withdrew from {withdrawSelection.candidate.status_label || recruitmentStageLabel(withdrawSelection.candidate.status, options?.stage_labels)} and cancels active appointments.</p></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setWithdrawSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={withdraw.isPending}>{withdraw.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserMinus className="h-4 w-4" />}Confirm withdrawal</button></div></ModalFooter></form> : null}
+        {withdrawSelection ? <form className="flex min-h-0 flex-1 flex-col" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); withdraw.mutate({ candidate: withdrawSelection.candidate, values: formValues(event.currentTarget) }); }}><ModalBody><OutcomeReasonFields kind="withdrawal" options={options} /><p className="mt-3 text-xs text-muted-foreground">The system records that this candidate withdrew from {withdrawSelection.candidate.status_label || recruitmentStageLabel(withdrawSelection.candidate.status, options?.stage_labels)} and cancels active appointments.</p></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setWithdrawSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={withdraw.isPending}>{withdraw.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserMinus className="h-4 w-4" />}Confirm withdrawal</button></div></ModalFooter></form> : null}
       </Modal>
 
       <Modal open={Boolean(scheduleSelection)} onClose={() => { if (!schedule.isPending) setScheduleSelection(null); }} title={scheduleSelection?.appointmentType === "job_interview" ? "Schedule job interview" : "Schedule demo lesson"} subtitle={scheduleSelection?.candidate.full_name} size="md">

@@ -6,7 +6,6 @@ import {
   Clock3,
   Link2,
   Loader2,
-  LockKeyhole,
   Pencil,
   Plus,
   RotateCcw,
@@ -268,12 +267,6 @@ function SettingsPanel({
           <div className="min-w-0">
             <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-[0.8125rem] font-semibold text-foreground">
               <span className="min-w-0 break-words">{item.label}</span>
-              {item.is_system ? (
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[0.625rem] font-semibold text-muted-foreground">
-                  <LockKeyhole className="h-3 w-3" />
-                  System
-                </span>
-              ) : null}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               <span className="inline-flex rounded-full bg-muted/80 px-2 py-0.5 font-medium tabular-nums">
@@ -282,7 +275,7 @@ function SettingsPanel({
               </span>
             </p>
           </div>
-          {!readOnly && !item.is_system ? (
+          {!readOnly ? (
             <div className="flex shrink-0 items-center gap-1">
               <button
                 type="button"
@@ -538,6 +531,7 @@ export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: str
     { category: "expected_salary", title: "Expected salary", detail: "Stable salary bands rather than free-form amounts.", icon: <Tags className="h-4 w-4" /> },
     { category: "teaching_experience", title: "Teaching experience", detail: "Comparable experience ranges for reporting.", icon: <Tags className="h-4 w-4" /> },
     { category: "rejection_reason", title: "Rejection reasons", detail: "Historical records remain intact when an option is disabled.", icon: <Tags className="h-4 w-4" /> },
+    { category: "withdrawal_reason", title: "Withdrawal reasons", detail: "Standard reasons used whenever HR records that a candidate withdrew.", icon: <Tags className="h-4 w-4" /> },
   ];
 
   const sourceItems = settings.data.items.filter((item) => item.category === "source");
@@ -714,11 +708,14 @@ export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: str
         <section aria-labelledby="evaluation-settings-title">
           <SettingsSectionHeading
             id="evaluation-settings-title"
-            title="Evaluation & Rejection Options"
-            detail="Control standardized rejection reasons without changing historical candidate records."
+            title="Candidate Outcome Reasons"
+            detail="Control the database-backed reasons used for rejection and candidate withdrawal without changing historical records."
             icon={ShieldAlert}
           />
-          <div className="max-w-3xl">{renderPanel("rejection_reason")}</div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {renderPanel("rejection_reason")}
+            {renderPanel("withdrawal_reason")}
+          </div>
         </section>
       </div>
       <ConfirmDialog

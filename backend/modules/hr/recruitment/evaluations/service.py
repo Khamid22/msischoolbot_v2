@@ -12,7 +12,6 @@ from backend.modules.hr.recruitment import repository
 from backend.modules.hr.recruitment import notifications as recruitment_notifications
 from backend.modules.hr.recruitment.constants import (
     DEMO_CRITERIA,
-    DEMO_FAILURE_REJECTION_REASONS,
     DEMO_RESULTS,
     INTERVIEW_RESULTS,
 )
@@ -51,6 +50,30 @@ def _actor_account(user: CurrentUser) -> int | None:
 
 def _actor_staff(user: CurrentUser) -> int | None:
     return int(user.staff_id) if user.staff_id else None
+
+
+def _reason_label(value: str) -> str:
+    return " ".join(_text(value).replace("_", " ").split()).capitalize()
+
+
+def _validate_rejection_reason(
+    conn: Any,
+    values: dict[str, Any],
+    *,
+    database_backed: bool,
+) -> tuple[str, str]:
+    rejection_reason = _text(values.get("rejection_reason"))
+    if not rejection_reason:
+        raise RecruitmentError("Select a rejection reason.")
+    if database_backed and not repository.recruitment_setting_value_exists(
+        conn,
+        category="rejection_reason",
+        value=rejection_reason,
+    ):
+        raise RecruitmentError("Select an active rejection reason.")
+    if rejection_reason == "other" and not _text(values.get("reason_detail")):
+        raise RecruitmentError("Explain the reason when Other is selected.")
+    return rejection_reason, _reason_label(rejection_reason)
 
 
 def add_interview(
@@ -277,20 +300,16 @@ def _add_record(
             criteria_scores, average_score = _validated_demo_criteria(values)
             values["criteria_scores"] = criteria_scores
             values["score"] = average_score
-            if (
-                _text(values.get("result")) == "failed"
-                and candidate_stage != "teacher_academy"
-            ):
-                rejection_reason = _text(values.get("rejection_reason"))
-                if rejection_reason not in DEMO_FAILURE_REJECTION_REASONS:
-                    raise RecruitmentError(
-                        "Select Insufficient subject knowledge, "
-                        "Insufficient experience, or Other."
-                    )
-                if rejection_reason == "other" and not _text(
-                    values.get("reason_detail")
-                ):
-                    raise RecruitmentError("Explain the reason when Other is selected.")
+        failure_reason: tuple[str, str] | None = None
+        if (
+            _text(values.get("result")) == "failed"
+            and candidate_stage != "teacher_academy"
+        ):
+            failure_reason = _validate_rejection_reason(
+                conn,
+                values,
+                database_backed=database_backed,
+            )
         record_id = inserter(
             conn,
             candidate_id=int(candidate_id),
@@ -372,14 +391,9 @@ def _add_record(
                     "A finalized candidate cannot receive another rejecting evaluation.",
                     status_code=409,
                 )
-            if evaluation_type == "demo":
-                rejection_reason = _text(values.get("rejection_reason"))
-                rejection_label = DEMO_FAILURE_REJECTION_REASONS[rejection_reason]
-            else:
-                rejection_reason, rejection_label = {
-                    "interview": ("failed_job_interview", "Failed job interview"),
-                    "subject_test": ("failed_subject_test", "Failed subject test"),
-                }[evaluation_type]
+            if not failure_reason:
+                raise RecruitmentError("Select a rejection reason.")
+            rejection_reason, rejection_label = failure_reason
             evaluator_account_id = (
                 int(
                     values.get("interviewer_account_id")

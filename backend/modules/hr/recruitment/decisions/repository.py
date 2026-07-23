@@ -103,7 +103,8 @@ def list_decision_rows(conn: Any, candidate_id: int) -> list[Any]:
     return conn.execute(
         """
         SELECT decision.id, decision.candidate_id, decision.decision,
-               decision.rejection_reason, decision.reason_detail,
+               decision.rejection_reason, decision.withdrawal_reason,
+               decision.reason_detail,
                decision.origin_stage,
                decision.is_system_generated, decision.source_evaluation_type,
                decision.source_evaluation_id,
@@ -266,12 +267,13 @@ def insert_final_decision(
     row = conn.execute(
         """
         INSERT INTO msi_v2.teacher_candidate_final_decisions (
-            candidate_id, decision, rejection_reason, reason_detail,
+            candidate_id, decision, rejection_reason, withdrawal_reason,
+            reason_detail,
             origin_stage, follow_up_at, approval_id, decided_by_account_id,
             decided_by_login, created_at, is_system_generated,
             source_evaluation_type, source_evaluation_id
         ) VALUES (
-            %s, %s, %s, %s, %s, NULLIF(%s, '')::timestamptz, %s, %s, %s,
+            %s, %s, %s, %s, %s, %s, NULLIF(%s, '')::timestamptz, %s, %s, %s,
             %s::timestamptz, %s, %s, %s
         )
         RETURNING id
@@ -280,6 +282,7 @@ def insert_final_decision(
             candidate_id,
             values["decision"],
             values.get("rejection_reason", ""),
+            values.get("withdrawal_reason", ""),
             values.get("reason_detail", ""),
             values.get("origin_stage", ""),
             values.get("follow_up_at", ""),

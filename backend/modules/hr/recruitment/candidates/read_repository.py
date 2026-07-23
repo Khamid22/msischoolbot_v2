@@ -69,6 +69,7 @@ _CANDIDATE_COLUMNS = """
     END::text AS current_sla_anchor_at,
     COALESCE(decision.decision, '') AS final_decision,
     COALESCE(decision.rejection_reason, '') AS rejection_reason,
+    COALESCE(decision.withdrawal_reason, '') AS withdrawal_reason,
     COALESCE(decision.reason_detail, '') AS decision_reason_detail,
     COALESCE(decision.origin_stage, '') AS decision_origin_stage,
     COALESCE(decision_origin_definition.label, '') AS decision_origin_stage_label,
@@ -188,7 +189,8 @@ def _candidate_joins() -> str:
         LEFT JOIN msi_v2.accounts stage_responsible
           ON stage_responsible.id = stage_history.responsible_account_id
         LEFT JOIN LATERAL (
-            SELECT d.decision, d.rejection_reason, d.reason_detail,
+            SELECT d.decision, d.rejection_reason, d.withdrawal_reason,
+                   d.reason_detail,
                    d.origin_stage, d.follow_up_at, d.created_at,
                    d.decided_by_account_id, d.decided_by_login,
                    d.source_evaluation_type, d.source_evaluation_id

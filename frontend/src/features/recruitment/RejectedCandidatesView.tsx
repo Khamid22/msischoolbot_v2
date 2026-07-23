@@ -101,6 +101,22 @@ export function RejectedCandidatesView({ basePath, options, onAnnouncement }: Pr
   Object.entries(filters).forEach(([key, value]) => { if (value) returnParams.set(key, value); });
   const returnQuery = encodeURIComponent(`?${returnParams.toString()}`);
   const candidateHref = (candidateId: number) => `${basePath}/candidates/${candidateId}?tab=hiring&origin=rejected&return=${returnQuery}`;
+  const reasonLabel = (candidate: RecruitmentCandidate) => {
+    const value =
+      tab === "rejected"
+        ? candidate.rejection_reason || ""
+        : candidate.withdrawal_reason || "";
+    const reasonOptions =
+      tab === "rejected"
+        ? options?.rejection_reason_options || []
+        : options?.withdrawal_reason_options || [];
+    return (
+      reasonOptions.find((reason) => reason.value === value)?.label ||
+      humanize(value) ||
+      candidate.decision_reason_detail ||
+      "No reason recorded"
+    );
+  };
 
   return (
     <div className="space-y-2">
@@ -148,7 +164,7 @@ export function RejectedCandidatesView({ basePath, options, onAnnouncement }: Pr
                     <tr key={candidate.id} className="h-[3.875rem] hover:bg-muted/30">
                       <td className="px-3 py-1"><a href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("rejected")} className="block truncate font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{candidate.full_name}</a><p className="truncate text-[0.6875rem] text-muted-foreground">{candidate.applied_position || candidate.subject || "Position not set"}</p></td>
                       <td className="px-3 py-1"><StatusBadge status={candidate.decision_origin_stage || "new_candidate"}>{candidate.decision_origin_stage_label || recruitmentStageLabel(candidate.decision_origin_stage || "Unknown", options?.stage_labels)}</StatusBadge></td>
-                      <td className="px-3 py-1"><p className="truncate">{candidate.rejection_reason ? humanize(candidate.rejection_reason) : candidate.decision_reason_detail || "No reason recorded"}</p>{candidate.rejection_reason && candidate.decision_reason_detail ? <p className="truncate text-[0.6875rem] text-muted-foreground">{candidate.decision_reason_detail}</p> : null}</td>
+                      <td className="px-3 py-1"><p className="truncate">{reasonLabel(candidate)}</p>{(candidate.rejection_reason || candidate.withdrawal_reason) && candidate.decision_reason_detail ? <p className="truncate text-[0.6875rem] text-muted-foreground">{candidate.decision_reason_detail}</p> : null}</td>
                       <td className="truncate px-3 py-1">{candidate.final_decision_actor || "System"}</td>
                       <td className="px-3 py-1 text-muted-foreground">{dateLabel(candidate.final_decision_at || candidate.stage_changed_at)}</td>
                       <td className="px-3 py-1"><ClosedCandidateActions candidate={candidate} onAnnouncement={onAnnouncement} /></td>
@@ -163,7 +179,7 @@ export function RejectedCandidatesView({ basePath, options, onAnnouncement }: Pr
                   <a href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("rejected")} className="block rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
                     <div className="flex items-start justify-between gap-2"><span className="text-sm font-semibold">{candidate.full_name}</span><StatusBadge status={tab}>{tab === "rejected" ? "Rejected" : "Withdrawn"}</StatusBadge></div>
                     <p className="mt-1 text-xs text-muted-foreground">From {candidate.decision_origin_stage_label || recruitmentStageLabel(candidate.decision_origin_stage || "Unknown stage", options?.stage_labels)}</p>
-                    <p className="mt-1 line-clamp-2 text-[0.8125rem]">{candidate.rejection_reason ? humanize(candidate.rejection_reason) : candidate.decision_reason_detail || "No reason recorded"}</p>
+                    <p className="mt-1 line-clamp-2 text-[0.8125rem]">{reasonLabel(candidate)}</p>
                     <p className="mt-1 text-xs text-muted-foreground">By {candidate.final_decision_actor || "System"} · {dateLabel(candidate.final_decision_at || candidate.stage_changed_at)}</p>
                   </a>
                   <ClosedCandidateActions candidate={candidate} onAnnouncement={onAnnouncement} />

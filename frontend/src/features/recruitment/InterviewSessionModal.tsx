@@ -72,7 +72,8 @@ export function InterviewSessionModal({
   const [confirmStart, setConfirmStart] = useState(false);
   const [confirmUndoStart, setConfirmUndoStart] = useState(false);
   const [confirmFail, setConfirmFail] = useState(false);
-  const [failReason, setFailReason] = useState("");
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [reasonDetail, setReasonDetail] = useState("");
   const supplemental = candidate.status === "teacher_academy";
 
   useEffect(() => {
@@ -80,7 +81,8 @@ export function InterviewSessionModal({
     setConfirmStart(false);
     setConfirmUndoStart(false);
     setConfirmFail(false);
-    setFailReason("");
+    setRejectionReason("");
+    setReasonDetail("");
   }, [appointment]);
 
   const start = useMutation({
@@ -103,9 +105,11 @@ export function InterviewSessionModal({
   const complete = useMutation({
     mutationFn: ({
       result,
+      rejectionReason: selectedRejectionReason,
       reasonDetail,
     }: {
       result: "passed" | "failed";
+      rejectionReason?: string;
       reasonDetail?: string;
     }) =>
       recruitmentRequest<SessionResponse>(
@@ -115,6 +119,7 @@ export function InterviewSessionModal({
           body: jsonBody({
             expected_version: session.version,
             result,
+            rejection_reason: selectedRejectionReason || "",
             reason_detail: reasonDetail || "",
             ...interviewValues(formRef.current),
           }),
@@ -303,17 +308,34 @@ export function InterviewSessionModal({
                   : "Failing this interview rejects the candidate and cancels remaining appointments."}
               </p>
               {!supplemental ? (
-                <label className="block text-xs font-semibold text-foreground">
-                  Reason for rejection
-                  <textarea
-                    autoFocus
-                    required
-                    value={failReason}
-                    onChange={(event) => setFailReason(event.target.value)}
-                    className={`${fieldClass} mt-1 min-h-20`}
-                    placeholder="Why is this candidate being rejected?"
-                  />
-                </label>
+                <div className="grid gap-2 text-foreground">
+                  <label className="block text-xs font-semibold">
+                    Rejection reason
+                    <select
+                      autoFocus
+                      required
+                      value={rejectionReason}
+                      onChange={(event) => setRejectionReason(event.target.value)}
+                      className={`${fieldClass} mt-1`}
+                    >
+                      <option value="">Select a reason</option>
+                      {(options?.rejection_reason_options || []).map((reason) => (
+                        <option key={reason.value} value={reason.value}>
+                          {reason.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block text-xs font-semibold">
+                    Explanation {rejectionReason === "other" ? "(required)" : "(optional)"}
+                    <textarea
+                      required={rejectionReason === "other"}
+                      value={reasonDetail}
+                      onChange={(event) => setReasonDetail(event.target.value)}
+                      className={`${fieldClass} mt-1 min-h-20`}
+                    />
+                  </label>
+                </div>
               ) : null}
             </div>
           ) : null}
@@ -417,12 +439,16 @@ export function InterviewSessionModal({
                 type="button"
                 className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-destructive px-3 text-sm font-semibold text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={
-                  pending || (!supplemental && !failReason.trim())
+                  pending ||
+                  (!supplemental &&
+                    (!rejectionReason ||
+                      (rejectionReason === "other" && !reasonDetail.trim())))
                 }
                 onClick={() =>
                   complete.mutate({
                     result: "failed",
-                    reasonDetail: failReason.trim(),
+                    rejectionReason: supplemental ? "" : rejectionReason,
+                    reasonDetail: supplemental ? "" : reasonDetail.trim(),
                   })
                 }
               >

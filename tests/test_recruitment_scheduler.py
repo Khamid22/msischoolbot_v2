@@ -195,7 +195,7 @@ def test_workflow_simplification_migration_preserves_history_and_enforces_one_ac
     assert "DELETE FROM msi_v2.teacher_candidate_appointments" not in migration
 
 
-def test_notification_migration_preserves_history_and_protects_system_reasons():
+def test_notification_migration_preserves_history_and_seeds_automatic_reason_values():
     migration = (ROOT / "database/alembic/versions/0020_recruitment_notifications_and_auto_outcomes.py").read_text()
 
     assert 'revision = "0020_recruitment_notifications"' in migration
@@ -1107,7 +1107,15 @@ def test_failed_evaluation_cancels_remaining_upcoming_appointments(monkeypatch):
     monkeypatch.setattr(repository, "insert_audit", lambda *_args, **kwargs: events.append((kwargs["event_type"], kwargs["detail"])))
     monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7, "next_appointment": None})
 
-    result = service.add_interview(_user(), 7, {"result": "failed", "notes": "Did not pass"})
+    result = service.add_interview(
+        _user(),
+        7,
+        {
+            "result": "failed",
+            "notes": "Did not pass",
+            "rejection_reason": "insufficient_experience",
+        },
+    )
 
     assert result["next_appointment"] is None
     assert conn.commits == 1
@@ -1116,7 +1124,7 @@ def test_failed_evaluation_cancels_remaining_upcoming_appointments(monkeypatch):
     assert events[1][0] == "candidate.interview_recorded"
 
 
-def test_failed_interview_atomically_rejects_with_evaluator_origin_and_system_reason(monkeypatch):
+def test_failed_interview_atomically_rejects_with_selected_database_reason(monkeypatch):
     conn = _DatabaseConnection()
     stage_updates = []
     decisions = []
@@ -1126,6 +1134,11 @@ def test_failed_interview_atomically_rejects_with_evaluator_origin_and_system_re
     monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
     monkeypatch.setattr(repository, "lock_candidate_decision_row", lambda *_args, **_kwargs: candidate)
     monkeypatch.setattr(repository, "insert_interview", lambda *_args, **_kwargs: 108)
+    monkeypatch.setattr(
+        repository,
+        "recruitment_setting_value_exists",
+        lambda *_args, **_kwargs: True,
+    )
     monkeypatch.setattr(repository, "cancel_scheduled_appointments", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(repository, "revoke_open_approvals", lambda *_args, **_kwargs: [33])
     monkeypatch.setattr(repository, "update_candidate_stage", lambda *_args, **kwargs: stage_updates.append(kwargs) or {"id": 7})
@@ -1133,12 +1146,20 @@ def test_failed_interview_atomically_rejects_with_evaluator_origin_and_system_re
     monkeypatch.setattr(repository, "insert_audit", lambda *_args, **kwargs: events.append((kwargs["event_type"], kwargs)))
     monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7, "status": "rejected"})
 
-    result = service.add_interview(_user(), 7, {"result": "failed", "notes": "Insufficient interview result"})
+    result = service.add_interview(
+        _user(),
+        7,
+        {
+            "result": "failed",
+            "notes": "Insufficient interview result",
+            "rejection_reason": "unprofessional_behaviour",
+        },
+    )
 
     assert result["status"] == "rejected"
     assert stage_updates[0]["stage"] == "rejected"
     assert stage_updates[0]["expected_version"] == 4
-    assert decisions[0]["values"]["rejection_reason"] == "failed_job_interview"
+    assert decisions[0]["values"]["rejection_reason"] == "unprofessional_behaviour"
     assert decisions[0]["values"]["origin_stage"] == "job_interview"
     assert decisions[0]["values"]["source_evaluation_type"] == "interview"
     assert decisions[0]["values"]["source_evaluation_id"] == 108
@@ -1183,6 +1204,11 @@ def test_failed_interview_records_hr_supplied_rejection_reason(monkeypatch):
     monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
     monkeypatch.setattr(repository, "lock_candidate_decision_row", lambda *_a, **_k: candidate)
     monkeypatch.setattr(repository, "insert_interview", lambda *_a, **_k: 108)
+    monkeypatch.setattr(
+        repository,
+        "recruitment_setting_value_exists",
+        lambda *_args, **_kwargs: True,
+    )
     monkeypatch.setattr(repository, "cancel_scheduled_appointments", lambda *_a, **_k: [])
     monkeypatch.setattr(repository, "revoke_open_approvals", lambda *_a, **_k: [])
     monkeypatch.setattr(repository, "update_candidate_stage", lambda *_a, **_k: {"id": 7})
@@ -1193,11 +1219,19 @@ def test_failed_interview_records_hr_supplied_rejection_reason(monkeypatch):
     service.add_interview(
         _user(),
         7,
-        {"result": "failed", "notes": "n", "reason_detail": "Weak subject knowledge"},
+        {
+            "result": "failed",
+            "notes": "n",
+            "rejection_reason": "insufficient_subject_knowledge",
+            "reason_detail": "Weak subject knowledge",
+        },
     )
 
     assert decisions[0]["values"]["reason_detail"] == "Weak subject knowledge"
-    assert decisions[0]["values"]["rejection_reason"] == "failed_job_interview"
+    assert (
+        decisions[0]["values"]["rejection_reason"]
+        == "insufficient_subject_knowledge"
+    )
 
 
 def test_manual_pass_with_a_low_demo_average_remains_in_test_and_demo(monkeypatch):
@@ -1293,6 +1327,11 @@ def test_failed_demo_rejects_with_the_selected_recruitment_reason(monkeypatch):
         repository,
         "insert_demo",
         lambda *_args, **kwargs: saved_values.append(kwargs["values"]) or 109,
+    )
+    monkeypatch.setattr(
+        repository,
+        "recruitment_setting_value_exists",
+        lambda *_args, **_kwargs: True,
     )
     monkeypatch.setattr(
         repository,

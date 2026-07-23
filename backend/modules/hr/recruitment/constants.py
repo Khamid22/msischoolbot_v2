@@ -42,6 +42,7 @@ RECRUITMENT_OPTION_CATEGORIES = frozenset(
         "source",
         "subsource",
         "rejection_reason",
+        "withdrawal_reason",
         "position",
         "english_level",
         "schedule",
@@ -65,6 +66,17 @@ REJECTION_REASONS = (
     "other",
 )
 
+WITHDRAWAL_REASONS = (
+    "candidate_no_longer_interested",
+    "accepted_another_offer",
+    "personal_circumstances",
+    "schedule_incompatibility",
+    "salary_expectation_incompatibility",
+    "relocation_or_location",
+    "unresponsive",
+    "other",
+)
+
 INTERVIEW_RESULTS = frozenset(
     {"passed", "failed", "additional_interview", "candidate_withdrew"}
 )
@@ -77,11 +89,6 @@ DEMO_CRITERIA = (
     "Student engagement",
     "Confidence & delivery",
 )
-DEMO_FAILURE_REJECTION_REASONS = {
-    "insufficient_subject_knowledge": "Insufficient subject knowledge",
-    "insufficient_experience": "Insufficient experience",
-    "other": "Other",
-}
 TASK_STATUSES = frozenset({"pending", "completed", "cancelled"})
 APPOINTMENT_TYPES = frozenset({"job_interview", "demo_lesson"})
 APPOINTMENT_STATUSES = frozenset(
@@ -110,7 +117,6 @@ __all__ = [
     "ALL_STAGES",
     "ALTERNATIVE_STAGES",
     "DEMO_CRITERIA",
-    "DEMO_FAILURE_REJECTION_REASONS",
     "DEMO_RESULTS",
     "DOCUMENT_TYPES",
     "DEMO_EVALUATOR_ROLES",
@@ -128,4 +134,5 @@ __all__ = [
     "PIPELINE_STAGE_COLOR_TOKENS",
     "SUBJECT_TEST_RESULTS",
     "TASK_STATUSES",
+    "WITHDRAWAL_REASONS",
 ]

@@ -356,6 +356,7 @@ export type RecruitmentCandidate = {
   version: number;
   final_decision?: string;
   rejection_reason?: string;
+  withdrawal_reason?: string;
   decision_reason_detail?: string;
   restore_stage?: string;
   decision_origin_stage?: string;
@@ -478,6 +479,8 @@ export type RecruitmentOptions = {
   optional_document_types: string[];
   rejection_reasons: string[];
   rejection_reason_options: Array<{ value: string; label: string }>;
+  withdrawal_reasons: string[];
+  withdrawal_reason_options: Array<{ value: string; label: string }>;
   subjects: Array<{ id: number; name: string }>;
   staff: Array<{ id: number; role: string; name: string; login: string }>;
   document_upload_enabled: boolean;
@@ -485,7 +488,7 @@ export type RecruitmentOptions = {
 
 export type RecruitmentSetting = {
   id: number;
-  category: "source" | "subsource" | "rejection_reason" | "position" | "english_level" | "schedule" | "availability" | "expected_salary" | "teaching_experience";
+  category: "source" | "subsource" | "rejection_reason" | "withdrawal_reason" | "position" | "english_level" | "schedule" | "availability" | "expected_salary" | "teaching_experience";
   value: string;
   label: string;
   parent_id?: number | null;
@@ -500,6 +503,7 @@ export type RecruitmentSettingsData = {
   sources: RecruitmentSetting[];
   subsources: RecruitmentSetting[];
   rejection_reasons: RecruitmentSetting[];
+  withdrawal_reasons: RecruitmentSetting[];
   positions: RecruitmentSetting[];
   english_levels: RecruitmentSetting[];
   schedules: RecruitmentSetting[];

@@ -6,10 +6,7 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
-from backend.modules.hr.recruitment.constants import (
-    DEMO_CRITERIA,
-    DEMO_FAILURE_REJECTION_REASONS,
-)
+from backend.modules.hr.recruitment.constants import DEMO_CRITERIA
 
 
 def _blank_to_none(value: Any) -> Any:
@@ -121,12 +118,21 @@ class InterviewSessionStart(StrictModel):
 class InterviewSessionComplete(StrictModel):
     expected_version: int = Field(ge=1)
     result: str = Field(pattern="^(passed|failed)$")
+    rejection_reason: str = Field(default="", max_length=120)
     reason_detail: str = Field(default="", max_length=10000)
     english_level_option_id: OptionalInt = Field(default=None, ge=1)
     education_background: str = Field(default="", max_length=5000)
     teaching_experience_option_id: OptionalInt = Field(default=None, ge=1)
     interests_hobbies: str = Field(default="", max_length=3000)
     motivation_expectations: str = Field(default="", max_length=5000)
+
+    @model_validator(mode="after")
+    def validate_failure_reason(self):
+        if self.result == "passed" and (self.rejection_reason or self.reason_detail):
+            raise ValueError("Passing interviews cannot include a rejection reason.")
+        if self.rejection_reason == "other" and not self.reason_detail:
+            raise ValueError("Explain the reason when Other is selected.")
+        return self
 
 
 class AssignmentReplace(StrictModel):
@@ -149,6 +155,16 @@ class InterviewWrite(StrictModel):
     hr_recommendation: str = Field(default="", max_length=5000)
     recommendation_code: str = Field(default="", max_length=80)
     result: str = Field(min_length=1, max_length=80)
+    rejection_reason: str = Field(default="", max_length=120)
+    reason_detail: str = Field(default="", max_length=5000)
+
+    @model_validator(mode="after")
+    def validate_failure_reason(self):
+        if self.result == "passed" and (self.rejection_reason or self.reason_detail):
+            raise ValueError("Passing interviews cannot include a rejection reason.")
+        if self.rejection_reason == "other" and not self.reason_detail:
+            raise ValueError("Explain the reason when Other is selected.")
+        return self
 
 
 class StructuredScore(StrictModel):
@@ -184,6 +200,16 @@ class SubjectTestWrite(StrictModel):
     topic_scores: list[TopicScore] = Field(default_factory=list, max_length=50)
     notes: str = Field(default="", max_length=10000)
     result: str = Field(min_length=1, max_length=80)
+    rejection_reason: str = Field(default="", max_length=120)
+    reason_detail: str = Field(default="", max_length=5000)
+
+    @model_validator(mode="after")
+    def validate_failure_reason(self):
+        if self.result == "passed" and (self.rejection_reason or self.reason_detail):
+            raise ValueError("Passing subject tests cannot include a rejection reason.")
+        if self.rejection_reason == "other" and not self.reason_detail:
+            raise ValueError("Explain the reason when Other is selected.")
+        return self
 
 
 class DemoLessonWrite(StrictModel):
@@ -214,8 +240,6 @@ class DemoLessonWrite(StrictModel):
                 "Demo lesson scores are required for English fluency, lesson structure, "
                 "board skills, student engagement, and confidence & delivery."
             )
-        if self.rejection_reason and self.rejection_reason not in DEMO_FAILURE_REJECTION_REASONS:
-            raise ValueError("Select a valid demo lesson rejection reason.")
         if self.result == "passed" and (self.rejection_reason or self.reason_detail):
             raise ValueError("Passing demo lessons cannot include a rejection reason.")
         if self.rejection_reason == "other" and not self.reason_detail:
@@ -248,6 +272,7 @@ class ApprovalReview(StrictModel):
 class FinalDecisionCreate(StrictModel):
     decision: str = Field(min_length=1, max_length=80)
     rejection_reason: str = Field(default="", max_length=120)
+    withdrawal_reason: str = Field(default="", max_length=120)
     reason_detail: str = Field(default="", max_length=5000)
     follow_up_at: OptionalDateTime = None
     approval_id: OptionalInt = Field(default=None, ge=1)
@@ -266,7 +291,7 @@ class TeacherHandoffClose(StrictModel):
 
 class RecruitmentSettingCreate(StrictModel):
     category: str = Field(
-        pattern="^(source|subsource|rejection_reason|position|english_level|schedule|availability|expected_salary|teaching_experience)$"
+        pattern="^(source|subsource|rejection_reason|withdrawal_reason|position|english_level|schedule|availability|expected_salary|teaching_experience)$"
     )
     label: str = Field(min_length=1, max_length=120)
     parent_id: OptionalInt = Field(default=None, ge=1)

@@ -234,14 +234,18 @@ def make_final_decision(
     if decision == "candidate_withdrew" and user.role not in {"hr_manager", "ceo"}:
         raise RecruitmentError("You cannot record this outcome.", status_code=403)
     rejection_reason = _text(values.get("rejection_reason"))
+    withdrawal_reason = _text(values.get("withdrawal_reason"))
     reason_detail = _text(values.get("reason_detail"))
     if decision == "rejected":
         if not rejection_reason:
             raise RecruitmentError("Select a rejection reason.")
         if rejection_reason == "other" and (not reason_detail):
             raise RecruitmentError("Explain the other rejection reason.")
-    if decision == "candidate_withdrew" and (not reason_detail):
-        raise RecruitmentError("Add the candidate withdrawal reason.")
+    if decision == "candidate_withdrew":
+        if not withdrawal_reason:
+            raise RecruitmentError("Select a candidate withdrawal reason.")
+        if withdrawal_reason == "other" and not reason_detail:
+            raise RecruitmentError("Explain the other withdrawal reason.")
     now = _now()
     approval_id = int(values.get("approval_id") or 0)
     with dependencies.connect() as conn:
@@ -251,6 +255,12 @@ def make_final_decision(
             )
         ):
             raise RecruitmentError("Select an active rejection reason.")
+        if decision == "candidate_withdrew" and (
+            not repository.recruitment_setting_value_exists(
+                conn, category="withdrawal_reason", value=withdrawal_reason
+            )
+        ):
+            raise RecruitmentError("Select an active withdrawal reason.")
         candidate = dependencies.lock_candidate(conn, int(candidate_id))
         if not candidate:
             raise RecruitmentError("Candidate was not found.", status_code=404)
@@ -358,7 +368,7 @@ def make_final_decision(
             revoked_approval_ids = repository.revoke_open_approvals(
                 conn,
                 candidate_id=int(candidate_id),
-                comment=reason_detail or rejection_reason,
+                comment=reason_detail or rejection_reason or withdrawal_reason,
                 actor_account_id=_actor_account(user),
                 now=now,
             )
@@ -371,6 +381,7 @@ def make_final_decision(
             now=now,
             comment=reason_detail
             or rejection_reason
+            or withdrawal_reason
             or f"Finalized as {decision.replace('_', ' ')}.",
             transition_source="manual",
         )
@@ -397,6 +408,7 @@ def make_final_decision(
             **values,
             "decision": decision,
             "rejection_reason": rejection_reason,
+            "withdrawal_reason": withdrawal_reason,
             "reason_detail": reason_detail,
             "origin_stage": _text(candidate["status"]),
             "follow_up_at": _iso(values.get("follow_up_at")),
@@ -419,7 +431,9 @@ def make_final_decision(
                 event_type="candidate.hire_approvals_revoked",
                 detail={
                     "approval_ids": revoked_approval_ids,
-                    "reason": reason_detail or rejection_reason,
+                    "reason": reason_detail
+                    or rejection_reason
+                    or withdrawal_reason,
                 },
                 actor_account_id=_actor_account(user),
                 actor_staff_id=_actor_staff(user),
@@ -446,6 +460,7 @@ def make_final_decision(
                 "decision_id": decision_id,
                 "decision": decision,
                 "rejection_reason": rejection_reason,
+                "withdrawal_reason": withdrawal_reason,
                 "reason_detail": reason_detail,
                 "origin_stage": _text(candidate["status"]),
                 "approval_id": approval_id or None,

@@ -203,7 +203,7 @@ def rename_recruitment_setting(
         SET label = %s,
             updated_by_account_id = %s,
             updated_at = %s::timestamptz
-        WHERE id = %s AND is_system = false
+        WHERE id = %s
         RETURNING id, category, value, label, parent_id, is_active,
                   sort_order, is_system, is_legacy,
                   created_at::text AS created_at, updated_at::text AS updated_at
@@ -253,6 +253,12 @@ def recruitment_setting_usage_counts(conn: Any) -> dict[int, int]:
         JOIN msi_v2.teacher_candidate_final_decisions d ON d.rejection_reason = s.value
         WHERE s.category = 'rejection_reason'
         GROUP BY s.id
+        UNION ALL
+        SELECT s.id AS setting_id, count(d.id) AS usage_count
+        FROM msi_v2.teacher_recruitment_settings s
+        JOIN msi_v2.teacher_candidate_final_decisions d ON d.withdrawal_reason = s.value
+        WHERE s.category = 'withdrawal_reason'
+        GROUP BY s.id
         """
     ).fetchall()
     counts: dict[int, int] = {}
@@ -277,7 +283,7 @@ def deactivate_recruitment_setting(
         SET is_active = false,
             updated_by_account_id = %s,
             updated_at = %s::timestamptz
-        WHERE id = %s AND is_active = true AND is_system = false
+        WHERE id = %s AND is_active = true
         RETURNING id, category, value, label, parent_id, is_active,
                   sort_order, is_system, is_legacy,
                   created_at::text AS created_at, updated_at::text AS updated_at
@@ -364,6 +370,11 @@ def list_recruitment_options(conn: Any) -> dict[str, Any]:
         for row in setting_rows
         if row["category"] == "rejection_reason"
     ]
+    withdrawal_reason_options = [
+        {"value": str(row["value"]), "label": str(row["label"])}
+        for row in setting_rows
+        if row["category"] == "withdrawal_reason"
+    ]
     return {
         "subjects": [dict(row) for row in subject_rows],
         "staff": [dict(row) for row in staff_rows],
@@ -371,6 +382,7 @@ def list_recruitment_options(conn: Any) -> dict[str, Any]:
         "subsources": option_categories["subsource"],
         "option_categories": option_categories,
         "rejection_reason_options": rejection_reason_options,
+        "withdrawal_reason_options": withdrawal_reason_options,
     }
 
 

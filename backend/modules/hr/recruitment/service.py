@@ -33,6 +33,7 @@ from backend.modules.hr.recruitment.constants import (
     SCHEDULED_STAGE_TYPES,
     SLA_STAGES,
     TASK_STATUSES,
+    WITHDRAWAL_REASONS,
     OPTIONAL_DOCUMENT_TYPES,
 )
 from backend.modules.hr.recruitment.decisions import service as decision_service
@@ -851,6 +852,13 @@ def options() -> dict[str, Any]:
             for value in REJECTION_REASONS
         ]
     )
+    configured_withdrawal_reasons = list(
+        values.get("withdrawal_reason_options")
+        or [
+            {"value": value, "label": value.replace("_", " ").title()}
+            for value in WITHDRAWAL_REASONS
+        ]
+    )
     stage_definitions = [_pipeline_stage_payload(row) for row in stage_rows]
     return {
         **values,
@@ -865,6 +873,10 @@ def options() -> dict[str, Any]:
         "optional_document_types": sorted(OPTIONAL_DOCUMENT_TYPES),
         "rejection_reasons": [item["value"] for item in configured_reasons],
         "rejection_reason_options": configured_reasons,
+        "withdrawal_reasons": [
+            item["value"] for item in configured_withdrawal_reasons
+        ],
+        "withdrawal_reason_options": configured_withdrawal_reasons,
         "document_upload_enabled": bool(is_r2_configured()),
     }
 
@@ -903,6 +915,7 @@ def list_settings(user: CurrentUser) -> dict[str, Any]:
         "sources": grouped["source"],
         "subsources": grouped["subsource"],
         "rejection_reasons": grouped["rejection_reason"],
+        "withdrawal_reasons": grouped["withdrawal_reason"],
         "sla_rules": [_row_dict(row) for row in sla_rows],
         "appointment_reminders": (
             _row_dict(reminder_config)
@@ -1100,10 +1113,6 @@ def rename_setting(
         existing = repository.recruitment_setting_by_id(conn, int(setting_id))
         if not existing:
             raise RecruitmentError("Recruitment setting was not found.", status_code=404)
-        if bool(existing["is_system"]):
-            raise RecruitmentError(
-                "System rejection reasons cannot be renamed.", status_code=409
-            )
         duplicate = repository.recruitment_setting_by_label_or_value(
             conn,
             category=_text(existing["category"]),
@@ -1155,11 +1164,6 @@ def remove_setting(user: CurrentUser, setting_id: int) -> dict[str, Any]:
         )
     now = _now()
     with connect_auth_db() as conn:
-        existing = repository.recruitment_setting_by_id(conn, int(setting_id))
-        if existing and bool(existing["is_system"]):
-            raise RecruitmentError(
-                "System rejection reasons cannot be removed.", status_code=409
-            )
         removed = repository.deactivate_recruitment_setting(
             conn,
             setting_id=int(setting_id),

@@ -195,6 +195,20 @@ describe("recruitment scheduling and browser appointment reminders", () => {
     assert.doesNotMatch(appointmentForm, /min=/);
   });
 
+  test("uses database-backed reasons for every failed or withdrawn outcome", () => {
+    const interviewSession = source("InterviewSessionModal.tsx");
+    const demoSession = source("DemoSessionModal.tsx");
+    const settings = source("SettingsView.tsx");
+    assert.match(interviewSession, /options\?\.rejection_reason_options/);
+    assert.match(interviewSession, /name="rejection_reason"|rejection_reason:/);
+    assert.match(demoSession, /options\?\.rejection_reason_options/);
+    assert.match(pipeline, /options\?\.withdrawal_reason_options/);
+    assert.match(pipeline, /name=\{fieldName\}/);
+    assert.match(profile, /options\?\.withdrawal_reason_options/);
+    assert.match(profile, /name="withdrawal_reason"/);
+    assert.match(settings, /category: "withdrawal_reason"/);
+  });
+
   test("includes HR staff in the shared demo evaluator role contract", () => {
     assert.match(model, /function isDemoEvaluatorRole/);
     assert.match(model, /\["hr_manager", "academic_director", "head_of_department"\]/);
@@ -360,8 +374,7 @@ describe("candidate navigation and progressive disclosure", () => {
     }
     assert.match(demoSession, /Average score:/);
     assert.match(demoSession, /The final Pass or Fail\s+decision remains manual/);
-    assert.match(demoSession, /insufficient_subject_knowledge/);
-    assert.match(demoSession, /insufficient_experience/);
+    assert.match(demoSession, /options\?\.rejection_reason_options/);
     assert.match(demoSession, /rejectionReason === "other"/);
     assert.match(demoSession, /reasonDetail\.trim\(\)/);
     assert.match(
@@ -371,7 +384,8 @@ describe("candidate navigation and progressive disclosure", () => {
   });
 
   test("records a compact subject percentage and Passed or Failed status", () => {
-    const testFields = profile.split('case "record_test":')[1]?.split('case "record_demo":')[0] || "";
+    const testFields =
+      profile.split("function SubjectTestFields")[1]?.split("function ActionFields")[0] || "";
     assert.match(profile, /open=\{action\?\.kind === "record_test"\}/);
     assert.match(profile, /title="Record subject test"/);
     assert.match(profile, /subjectTestPaperTitle\(candidate\)/);
@@ -380,6 +394,8 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(testFields, /Status/);
     assert.match(testFields, /value="passed">Passed/);
     assert.match(testFields, /value="failed">Failed/);
+    assert.match(testFields, /rejection_reason_options/);
+    assert.match(testFields, /name="rejection_reason"/);
     assert.doesNotMatch(testFields, /Paper \/ version|Maximum score|Topic result|Notes/);
     assert.match(profile, /maximum_score: 100/);
     assert.match(profile, /<SubjectTestList/);
@@ -507,7 +523,7 @@ describe("candidate navigation and progressive disclosure", () => {
       "Candidate Sources",
       "Candidate Profile Options",
       "Schedules & Availability",
-      "Evaluation & Rejection Options",
+      "Candidate Outcome Reasons",
     ]) {
       assert.match(settings, new RegExp(section));
     }
@@ -519,6 +535,8 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(settings, /motion-reduce:/);
     assert.match(settings, /Remind before session/);
     assert.match(settings, /Option & usage/);
+    assert.match(settings, /withdrawal_reason/);
+    assert.doesNotMatch(settings, />\s*System\s*</);
   });
 
   test("adds an essential HR and CEO recruitment analytics dashboard", () => {

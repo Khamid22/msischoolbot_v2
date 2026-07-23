@@ -324,6 +324,7 @@ def complete_interview_session(
             "expected_version": int(values.get("expected_version") or 0),
             "notes": "",
             "result": _text(values.get("result")),
+            "rejection_reason": _text(values.get("rejection_reason")),
             "reason_detail": _text(values.get("reason_detail")),
             "interviewer_account_id": _actor_account(user),
             "english_level_option_id": values.get("english_level_option_id"),

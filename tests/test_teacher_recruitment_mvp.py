@@ -1251,28 +1251,12 @@ def test_hr_setting_rename_keeps_value_and_audits_old_and_new_label(monkeypatch)
     ]
 
 
-def test_hr_setting_rename_rejects_system_rows_and_duplicate_labels(monkeypatch):
+def test_hr_setting_rename_rejects_duplicate_labels(monkeypatch):
     @contextmanager
     def connect():
         yield object()
 
     monkeypatch.setattr(service, "connect_auth_db", connect)
-    monkeypatch.setattr(
-        repository,
-        "recruitment_setting_by_id",
-        lambda *_args, **_kwargs: {
-            "id": 1,
-            "category": "rejection_reason",
-            "value": "failed_job_interview",
-            "label": "Failed job interview",
-            "parent_id": None,
-            "is_active": True,
-            "is_system": True,
-        },
-    )
-    with pytest.raises(service.RecruitmentError, match="cannot be renamed"):
-        service.rename_setting(_user(), 1, label="New name")
-
     monkeypatch.setattr(
         repository,
         "recruitment_setting_by_id",
@@ -1565,6 +1549,22 @@ def test_recruitment_settings_migration_seeds_editable_taxonomies_without_candid
     assert "is_active BOOLEAN NOT NULL DEFAULT true" in upgrade_source
     assert "DELETE FROM" not in upgrade_source
     assert "teacher_candidates" not in upgrade_source
+
+
+def test_outcome_reason_migration_unifies_rejections_and_preserves_withdrawals():
+    source = Path(
+        "database/alembic/versions/0039_recruitment_outcome_reasons.py"
+    ).read_text()
+    upgrade_source = source.split("def downgrade", 1)[0]
+
+    assert 'revision = "0040_outcome_reasons"' in source
+    assert 'down_revision = "0039_test_demo_color"' in source
+    assert "'withdrawal_reason'" in upgrade_source
+    assert "ADD COLUMN IF NOT EXISTS withdrawal_reason" in upgrade_source
+    assert "decision = 'candidate_withdrew'" in upgrade_source
+    assert "length(btrim(reason_detail)) > 0" in upgrade_source
+    assert "SET is_system = false" in upgrade_source
+    assert "'withdrawal_reason', 'other', 'Other'" in upgrade_source
 
 
 def test_candidate_trash_bin_migration_is_soft_delete_only():

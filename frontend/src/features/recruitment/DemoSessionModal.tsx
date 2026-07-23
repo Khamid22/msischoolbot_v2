@@ -14,6 +14,7 @@ import {
   dateTimeLabel,
   type RecruitmentAppointment,
   type RecruitmentCandidate,
+  type RecruitmentOptions,
 } from "@/features/recruitment/model";
 import {
   RECRUITMENT_API,
@@ -46,15 +47,6 @@ type DemoCompletion = {
   reasonDetail?: string;
 };
 
-const demoFailureReasons = [
-  {
-    value: "insufficient_subject_knowledge",
-    label: "Insufficient subject knowledge",
-  },
-  { value: "insufficient_experience", label: "Insufficient experience" },
-  { value: "other", label: "Other" },
-] as const;
-
 function emptyDemoScores(): Record<DemoScoreKey, string> {
   return {
     english_fluency: "",
@@ -68,12 +60,14 @@ function emptyDemoScores(): Record<DemoScoreKey, string> {
 export function DemoSessionModal({
   candidate,
   appointment,
+  options,
   open,
   onClose,
   onAnnouncement,
 }: {
   candidate: RecruitmentCandidate;
   appointment: RecruitmentAppointment;
+  options?: RecruitmentOptions;
   open: boolean;
   onClose: () => void;
   onAnnouncement: (message: string, tone?: FloatingToastTone) => void;
@@ -359,7 +353,7 @@ export function DemoSessionModal({
                     className={`${fieldClass} mt-1`}
                   >
                     <option value="">Select a reason</option>
-                    {demoFailureReasons.map((reason) => (
+                    {(options?.rejection_reason_options || []).map((reason) => (
                       <option key={reason.value} value={reason.value}>
                         {reason.label}
                       </option>

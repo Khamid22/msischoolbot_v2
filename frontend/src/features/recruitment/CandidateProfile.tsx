@@ -1081,6 +1081,64 @@ function TrainingPanel({
   );
 }
 
+function WithdrawalReasonFields({
+  options,
+  autoFocus = false,
+}: {
+  options?: RecruitmentOptions;
+  autoFocus?: boolean;
+}) {
+  const [withdrawalReason, setWithdrawalReason] = useState("");
+  return (
+    <>
+      <label className="text-xs font-semibold">
+        Withdrawal reason
+        <select
+          autoFocus={autoFocus}
+          required
+          name="withdrawal_reason"
+          value={withdrawalReason}
+          onChange={(event) => setWithdrawalReason(event.target.value)}
+          className={`${fieldClass} mt-1`}
+        >
+          <option value="">Select a reason</option>
+          {(options?.withdrawal_reason_options || []).map((reason) => (
+            <option key={reason.value} value={reason.value}>
+              {reason.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="text-xs font-semibold">
+        Explanation {withdrawalReason === "other" ? "(required)" : "(optional)"}
+        <textarea
+          name="reason_detail"
+          required={withdrawalReason === "other"}
+          className={`${fieldClass} mt-1 min-h-24`}
+        />
+      </label>
+    </>
+  );
+}
+
+function decisionReasonLabel(
+  decision: Record<string, unknown>,
+  options?: RecruitmentOptions,
+) {
+  const isWithdrawal = text(decision.decision) === "candidate_withdrew";
+  const value = text(
+    isWithdrawal ? decision.withdrawal_reason : decision.rejection_reason,
+  );
+  const reasonOptions = isWithdrawal
+    ? options?.withdrawal_reason_options || []
+    : options?.rejection_reason_options || [];
+  return (
+    reasonOptions.find((reason) => reason.value === value)?.label ||
+    humanize(value) ||
+    text(decision.reason_detail || "No reason")
+  );
+}
+
 function OutcomeFields({
   candidate,
   options,
@@ -1159,15 +1217,18 @@ function OutcomeFields({
           </select>
         </label>
       ) : null}
-      {["rejected", "candidate_withdrew"].includes(decision) ? (
+      {decision === "rejected" ? (
         <label className="text-xs font-semibold">
-          Reason / explanation
+          Explanation {rejectionReason === "other" ? "(required)" : "(optional)"}
           <textarea
             name="reason_detail"
             required={rejectionReason === "other"}
             className={`${fieldClass} mt-1 min-h-24`}
           />
         </label>
+      ) : null}
+      {decision === "candidate_withdrew" ? (
+        <WithdrawalReasonFields options={options} />
       ) : null}
     </>
   );
@@ -1187,6 +1248,94 @@ function CandidateOptionFields({ candidate, options }: { candidate: RecruitmentC
       <label className="text-xs font-semibold">Expected salary<select name="expected_salary_option_id" defaultValue={candidate.expected_salary_option_id || ""} className={`${fieldClass} mt-1`}><option value="">Not set</option>{category("expected_salary").map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
       <label className="text-xs font-semibold sm:col-span-2">Teaching experience<select name="teaching_experience_option_id" defaultValue={candidate.teaching_experience_option_id || ""} className={`${fieldClass} mt-1`}><option value="">Not set</option>{category("teaching_experience").map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
     </>
+  );
+}
+
+function SubjectTestFields({
+  candidate,
+  options,
+}: {
+  candidate: RecruitmentCandidate;
+  options?: RecruitmentOptions;
+}) {
+  const [result, setResult] = useState<"passed" | "failed">("passed");
+  const [rejectionReason, setRejectionReason] = useState("");
+  return (
+    <div className="grid gap-2">
+      <div className="rounded-lg bg-muted/60 px-3 py-1.5">
+        <span className="block text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
+          Subject test
+        </span>
+        <strong className="mt-0.5 block text-sm">
+          {subjectTestPaperTitle(candidate)}
+        </strong>
+      </div>
+      <label className="text-xs font-semibold">
+        Percentage
+        <div className="relative mt-1">
+          <input
+            autoFocus
+            required
+            name="percentage"
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            inputMode="decimal"
+            className={`${fieldClass} pr-10`}
+          />
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-muted-foreground">
+            %
+          </span>
+        </div>
+      </label>
+      <label className="text-xs font-semibold">
+        Status
+        <select
+          required
+          name="result"
+          value={result}
+          onChange={(event) => {
+            const next = event.target.value as "passed" | "failed";
+            setResult(next);
+            if (next === "passed") setRejectionReason("");
+          }}
+          className={`${fieldClass} mt-1`}
+        >
+          <option value="passed">Passed</option>
+          <option value="failed">Failed</option>
+        </select>
+      </label>
+      {result === "failed" ? (
+        <>
+          <label className="text-xs font-semibold">
+            Rejection reason
+            <select
+              required
+              name="rejection_reason"
+              value={rejectionReason}
+              onChange={(event) => setRejectionReason(event.target.value)}
+              className={`${fieldClass} mt-1`}
+            >
+              <option value="">Select a reason</option>
+              {(options?.rejection_reason_options || []).map((reason) => (
+                <option key={reason.value} value={reason.value}>
+                  {reason.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-semibold">
+            Explanation {rejectionReason === "other" ? "(required)" : "(optional)"}
+            <textarea
+              name="reason_detail"
+              required={rejectionReason === "other"}
+              className={`${fieldClass} mt-1 min-h-20`}
+            />
+          </label>
+        </>
+      ) : null}
+    </div>
   );
 }
 
@@ -1353,42 +1502,7 @@ function ActionFields({
         </div>
       );
     case "record_test":
-      return (
-        <div className="grid gap-2">
-          <div className="rounded-lg bg-muted/60 px-3 py-1.5">
-            <span className="block text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
-              Subject test
-            </span>
-            <strong className="mt-0.5 block text-sm">
-              {subjectTestPaperTitle(candidate)}
-            </strong>
-          </div>
-          <label className="text-xs font-semibold">
-            Percentage
-            <div className="relative mt-1">
-              <input
-                autoFocus
-                required
-                name="percentage"
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                inputMode="decimal"
-                className={`${fieldClass} pr-10`}
-              />
-              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-muted-foreground">%</span>
-            </div>
-          </label>
-          <label className="text-xs font-semibold">
-            Status
-            <select required name="result" className={`${fieldClass} mt-1`}>
-              <option value="passed">Passed</option>
-              <option value="failed">Failed</option>
-            </select>
-          </label>
-        </div>
-      );
+      return <SubjectTestFields candidate={candidate} options={options} />;
     case "schedule_appointment":
       return (
         <AppointmentForm
@@ -1547,15 +1661,9 @@ function ActionFields({
       );
     case "withdraw_candidate":
       return (
-        <label className="text-xs font-semibold">
-          Withdrawal reason
-          <textarea
-            autoFocus
-            required
-            name="reason_detail"
-            className={`${fieldClass} mt-1 min-h-24`}
-          />
-        </label>
+        <div className="grid gap-2">
+          <WithdrawalReasonFields options={options} autoFocus />
+        </div>
       );
     case "delete_evaluation":
       return (
@@ -2046,6 +2154,8 @@ export function CandidateProfile({
         return;
       submit("/subject-tests", {
         result: values.result,
+        rejection_reason: values.rejection_reason || "",
+        reason_detail: values.reason_detail || "",
         subject_id: candidate.subject_id || null,
         subject_label: candidate.subject || "",
         paper: subjectTestPaperTitle(candidate),
@@ -3134,8 +3244,7 @@ export function CandidateProfile({
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {humanize(item.rejection_reason) ||
-                        text(item.reason_detail || "No reason")}
+                      {decisionReasonLabel(item, options.data)}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {item.decided_by ? `By ${text(item.decided_by)}` : "Recorded by system"}
@@ -3478,6 +3587,7 @@ export function CandidateProfile({
           open
           candidate={candidate}
           appointment={demoSession}
+          options={options.data}
           onClose={() => setDemoSession(null)}
           onAnnouncement={onAnnouncement}
         />
