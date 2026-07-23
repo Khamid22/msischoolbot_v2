@@ -541,27 +541,34 @@ describe("candidate navigation and progressive disclosure", () => {
 
   test("adds an essential HR and CEO recruitment analytics dashboard", () => {
     const analytics = source("AnalyticsView.tsx");
+    const monthlyActivity = source("analytics/MonthlyActivity.tsx");
+    const monthlyOutcomes = source("analytics/MonthlyOutcomes.tsx");
+    const analyticsModel = source("model.ts");
     assert.match(workspace, /key: "analytics", label: "Analytics"/);
     assert.match(workspace, /<AnalyticsView/);
     assert.match(analytics, /\/api\/v1\/hr\/analytics/);
-    assert.match(analytics, /Application Received/);
-    assert.match(analytics, /Rejected/);
-    assert.match(analytics, /In Process/);
-    assert.match(analytics, /Job Interview/);
-    assert.match(analytics, /Test & Demo/);
-    assert.match(analytics, /Final Decision/);
-    assert.match(analytics, /Teacher Academy/);
-    assert.match(analytics, /monthly_stage_totals/);
-    assert.match(analytics, /min-w-\[68rem\]/);
-    assert.match(analytics, /overflow-x-auto/);
+    assert.match(analytics, /<MonthlyActivity/);
+    assert.match(analytics, /<MonthlyOutcomes/);
+    assert.match(analytics, /<RecruitmentFunnel/);
+    assert.match(monthlyActivity, /Applications Received/);
+    assert.match(monthlyActivity, /Entered Process/);
+    assert.match(monthlyActivity, /Interviews Conducted/);
+    assert.match(monthlyActivity, /Tests & Demos Conducted/);
+    assert.match(monthlyActivity, /Academy Admissions/);
+    assert.match(monthlyOutcomes, /Rejected/);
+    assert.match(monthlyOutcomes, /Candidate Withdrew/);
+    assert.match(analyticsModel, /monthly_stage_totals/);
+    assert.match(analyticsModel, /monthly_activity/);
+    assert.match(analyticsModel, /monthly_outcomes/);
+    assert.match(analyticsModel, /cohort_scope/);
     assert.match(analytics, /Employees Turnover/);
     assert.match(analytics, /turnover_rate/);
     assert.match(analytics, /Funnel Overview/);
-    assert.match(analytics, /New Applications/);
-    assert.match(analytics, /Shortlisted/);
-    assert.match(analytics, /Candidate Outcomes/);
-    assert.match(analytics, /Rejections/);
-    assert.match(analytics, /Candidate Withdraw/);
+    assert.match(analytics, /Applications/);
+    assert.match(analytics, /Responded/);
+    assert.match(analytics, /Reached Job Interview/);
+    assert.match(analytics, /Reached Test & Demo/);
+    assert.match(analytics, /Reached Final Review/);
     assert.match(analytics, /outcome_reason_breakdown/);
     assert.match(analytics, /analytics_outcome/);
     assert.match(analytics, /type="month"/);
@@ -574,17 +581,47 @@ describe("candidate navigation and progressive disclosure", () => {
     );
   });
 
+  test("separates overlapping monthly activity from distinct monthly outcomes", () => {
+    const monthlyActivity = source("analytics/MonthlyActivity.tsx");
+    const monthlyOutcomes = source("analytics/MonthlyOutcomes.tsx");
+
+    assert.match(
+      monthlyActivity,
+      /Event-based metrics are non-exclusive\. One candidate may appear in\s+multiple metrics\./,
+    );
+    assert.doesNotMatch(
+      monthlyActivity,
+      /Rejected|ChevronRight|ArrowRight|<svg|<polygon|overflow-x-auto/,
+    );
+    assert.match(monthlyActivity, /xl:grid-cols-5/);
+
+    assert.match(
+      monthlyOutcomes,
+      /Outcomes are distinct final candidate outcomes recorded during the\s+selected month\./,
+    );
+    assert.match(monthlyOutcomes, /label: "Rejected"/);
+    assert.match(monthlyOutcomes, /label: "Candidate Withdrew"/);
+    assert.match(monthlyOutcomes, /aria-pressed=\{active\}/);
+    assert.match(monthlyOutcomes, /selected === card\.key/);
+    assert.match(monthlyOutcomes, /onSelect\(card\.key\)/);
+    assert.match(monthlyOutcomes, /ReasonDistribution/);
+  });
+
   test("renders Funnel Overview as responsive SVG and mobile cards", () => {
     const analytics = source("AnalyticsView.tsx");
-    const funnelComponent = analytics
-      .split("function RecruitmentFunnel", 2)[1]
-      ?.split("function OutcomeDistribution", 1)[0] || "";
+    const funnelComponent = source("analytics/RecruitmentFunnel.tsx");
     const funnelPanel = analytics
       .split('title="Funnel Overview"', 2)[1]
       ?.split("</Panel>", 1)[0] || "";
+    const funnelDefinitions =
+      analytics
+        .split("const funnelDefinitions", 2)[1]
+        ?.split("const funnel =", 1)[0] || "";
 
-    assert.match(analytics, /function RecruitmentFunnel/);
-    assert.match(funnelPanel, /<RecruitmentFunnel stages=\{funnel\} \/>/);
+    assert.match(
+      funnelPanel,
+      /<RecruitmentFunnel stages=\{funnel\} scope=\{data\.cohort_scope\} \/>/,
+    );
     assert.doesNotMatch(funnelPanel, /overflow-x-auto|min-w-\[46rem\]/);
     assert.match(funnelComponent, /<svg/);
     assert.match(funnelComponent, /viewBox=\{`0 0 \$\{viewWidth\} \$\{viewHeight\}`\}/);
@@ -595,6 +632,24 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.doesNotMatch(
       funnelComponent,
       /ChevronRight|overflow-x-auto|min-w-\[46rem\]/,
+    );
+    assert.match(funnelDefinitions, /label: "Applications"/);
+    assert.match(funnelDefinitions, /label: "Responded"/);
+    assert.match(funnelDefinitions, /label: "Reached Job Interview"/);
+    assert.match(funnelDefinitions, /label: "Reached Test & Demo"/);
+    assert.match(funnelDefinitions, /label: "Reached Final Review"/);
+    assert.doesNotMatch(funnelDefinitions, /Shortlisted|Final Decision/);
+    assert.match(
+      funnelComponent,
+      /Tracks valid candidates who applied during the selected month\. Each\s+stage is cumulative/,
+    );
+    assert.match(
+      funnelComponent,
+      /scope\.excluded_trash_candidates > 0/,
+    );
+    assert.match(
+      funnelComponent,
+      /candidates currently in Trash are excluded/,
     );
   });
 

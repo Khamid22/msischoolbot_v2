@@ -612,6 +612,31 @@ def _monthly_stage_totals(
     ).fetchone()
 
 
+def _cohort_scope(
+    conn: Any,
+    *,
+    where_sql: str,
+    params: list[Any],
+) -> Any:
+    """Reconcile period applications with the non-trash funnel cohort."""
+
+    return conn.execute(
+        f"""
+        SELECT
+          COUNT(DISTINCT candidate.id) AS applications_received,
+          COUNT(DISTINCT candidate.id) FILTER (
+            WHERE candidate.status <> 'trash_bin'
+          ) AS included_candidates,
+          COUNT(DISTINCT candidate.id) FILTER (
+            WHERE candidate.status = 'trash_bin'
+          ) AS excluded_trash_candidates
+        FROM msi_v2.teacher_candidates candidate
+        WHERE {where_sql}
+        """,
+        tuple(params),
+    ).fetchone()
+
+
 def _outcome_reason_rows(
     conn: Any,
     *,
@@ -825,6 +850,12 @@ def dashboard_rows(
         date_to=comparison_to,
         **filter_values,
     )
+    cohort_scope_where, cohort_scope_params = _candidate_filters(
+        date_from=date_from,
+        date_to=date_to,
+        include_trash=True,
+        **filter_values,
+    )
     base_where, base_params = _candidate_filters(**filter_values)
     event_filter_values = {
         **filter_values,
@@ -884,6 +915,11 @@ def dashboard_rows(
         date_from=date_from,
         date_to=date_to,
     )
+    cohort_scope = _cohort_scope(
+        conn,
+        where_sql=cohort_scope_where,
+        params=cohort_scope_params,
+    )
     outcome_reasons = _outcome_reason_rows(
         conn,
         base_where=event_base_where,
@@ -915,7 +951,10 @@ def dashboard_rows(
                    COUNT(*) FILTER (
                      WHERE (
                        stages.stage_kind = 'system'
-                       AND candidate_facts.furthest_rank >= stages.stage_rank
+                       AND (
+                         stages.stage = 'new_candidate'
+                         OR candidate_facts.furthest_rank >= stages.stage_rank
+                       )
                      ) OR (
                        stages.stage_kind = 'custom'
                        AND EXISTS (
@@ -1211,6 +1250,7 @@ def dashboard_rows(
         "comparison_event_summary": comparison_event_summary,
         "total_event_summary": total_event_summary,
         "monthly_stage_totals": monthly_stage_totals,
+        "cohort_scope": cohort_scope,
         "outcome_reasons": outcome_reasons,
         "turnover": turnover,
         "journey": journey,

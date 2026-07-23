@@ -543,6 +543,22 @@ export type HrAnalyticsDashboard = {
     "application_received" | "rejected" | "in_process" | "job_interview" | "test_and_demo" | "teacher_academy",
     number
   >;
+  monthly_activity: {
+    applications_received: number;
+    entered_process: number;
+    interviews_conducted: number;
+    tests_and_demos_conducted: number;
+    academy_admissions: number;
+  };
+  monthly_outcomes: {
+    rejected: number;
+    candidate_withdrew: number;
+  };
+  cohort_scope: {
+    applications_received: number;
+    included_candidates: number;
+    excluded_trash_candidates: number;
+  };
   turnover: {
     population: "recruited_active_teachers";
     from: string;

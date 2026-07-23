@@ -197,6 +197,11 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
             "test_and_demo": 5,
             "teacher_academy": 1,
         },
+        "cohort_scope": {
+            "applications_received": 10,
+            "included_candidates": 9,
+            "excluded_trash_candidates": 1,
+        },
         "outcome_reasons": [
             {
                 "outcome": "rejected",
@@ -234,8 +239,11 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
             "active_teacher_roster_total": 3,
         },
         "journey": [
-            {"stage": "new_candidate", "candidates": 10},
-            {"stage": "under_review", "candidates": 6},
+            {"stage": "new_candidate", "candidates": 9},
+            {"stage": "responded", "candidates": 8},
+            {"stage": "job_interview", "candidates": 6},
+            {"stage": "test_and_demo", "candidates": 5},
+            {"stage": "under_review", "candidates": 4},
         ],
         "outcomes": [
             {"outcome": "teacher_academy", "candidates": 1},
@@ -305,6 +313,22 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
         "job_interview": 6,
         "test_and_demo": 5,
         "teacher_academy": 1,
+    }
+    assert result["monthly_activity"] == {
+        "applications_received": 10,
+        "entered_process": 8,
+        "interviews_conducted": 6,
+        "tests_and_demos_conducted": 5,
+        "academy_admissions": 1,
+    }
+    assert result["monthly_outcomes"] == {
+        "rejected": 3,
+        "candidate_withdrew": 1,
+    }
+    assert result["cohort_scope"] == {
+        "applications_received": 10,
+        "included_candidates": 9,
+        "excluded_trash_candidates": 1,
     }
     assert result["turnover"]["population"] == "recruited_active_teachers"
     assert result["turnover"]["monthly"] == [
@@ -382,6 +406,120 @@ def test_analytics_trend_fills_empty_buckets_and_zero_comparison_is_safe():
     }
 
 
+def test_analytics_semantics_allow_overlapping_activity_and_outcome_counts():
+    analytics_service._ensure_semantic_consistency(
+        journey=[
+            {"stage": "new_candidate", "candidates": 4},
+            {"stage": "responded", "candidates": 4},
+            {"stage": "job_interview", "candidates": 3},
+            {"stage": "test_and_demo", "candidates": 2},
+            {"stage": "under_review", "candidates": 1},
+        ],
+        monthly_activity={
+            "applications_received": 5,
+            "entered_process": 5,
+            "interviews_conducted": 3,
+            "tests_and_demos_conducted": 2,
+            "academy_admissions": 1,
+        },
+        monthly_outcomes={
+            "rejected": 2,
+            "candidate_withdrew": 1,
+        },
+        cohort_scope={
+            "applications_received": 5,
+            "included_candidates": 4,
+            "excluded_trash_candidates": 1,
+        },
+        outcome_reason_breakdown={
+            "rejected": {
+                "total": 2,
+                "items": [
+                    {
+                        "value": "low_english_level",
+                        "candidates": 2,
+                    }
+                ],
+            },
+            "candidate_withdrew": {"total": 1, "items": []},
+        },
+    )
+
+
+def test_analytics_rejects_non_monotonic_application_cohort():
+    with pytest.raises(
+        analytics_service.HrAnalyticsError,
+        match="funnel counts are not monotonic",
+    ) as error:
+        analytics_service._ensure_semantic_consistency(
+            journey=[
+                {"stage": "new_candidate", "candidates": 4},
+                {"stage": "responded", "candidates": 3},
+                {"stage": "job_interview", "candidates": 4},
+                {"stage": "test_and_demo", "candidates": 2},
+                {"stage": "under_review", "candidates": 1},
+            ],
+            monthly_activity={
+                "applications_received": 4,
+                "entered_process": 3,
+                "interviews_conducted": 3,
+                "tests_and_demos_conducted": 2,
+                "academy_admissions": 1,
+            },
+            monthly_outcomes={
+                "rejected": 1,
+                "candidate_withdrew": 0,
+            },
+            cohort_scope={
+                "applications_received": 4,
+                "included_candidates": 4,
+                "excluded_trash_candidates": 0,
+            },
+            outcome_reason_breakdown={
+                "rejected": {"total": 1, "items": []},
+                "candidate_withdrew": {"total": 0, "items": []},
+            },
+        )
+    assert error.value.status_code == 500
+
+
+def test_analytics_rejects_rejection_reason_total_mismatch():
+    with pytest.raises(
+        analytics_service.HrAnalyticsError,
+        match="Rejected outcome reasons do not match",
+    ) as error:
+        analytics_service._ensure_semantic_consistency(
+            journey=[
+                {"stage": "new_candidate", "candidates": 4},
+                {"stage": "responded", "candidates": 3},
+                {"stage": "job_interview", "candidates": 2},
+                {"stage": "test_and_demo", "candidates": 1},
+                {"stage": "under_review", "candidates": 1},
+            ],
+            monthly_activity={
+                "applications_received": 4,
+                "entered_process": 3,
+                "interviews_conducted": 2,
+                "tests_and_demos_conducted": 1,
+                "academy_admissions": 0,
+            },
+            monthly_outcomes={
+                "rejected": 2,
+                "candidate_withdrew": 0,
+            },
+            cohort_scope={
+                "applications_received": 4,
+                "included_candidates": 4,
+                "excluded_trash_candidates": 0,
+            },
+            outcome_reason_breakdown={
+                "rejected": {"total": 1, "items": []},
+                "candidate_withdrew": {"total": 0, "items": []},
+            },
+        )
+    assert error.value.status_code == 500
+
+
 def test_analytics_repository_queries_bind_every_placeholder():
     executed_queries = []
 
@@ -437,8 +575,38 @@ def test_analytics_repository_queries_bind_every_placeholder():
     monthly_totals_query = next(
         query for query in executed_queries if "test_demo_participants AS" in query
     )
+    monthly_activity_base = monthly_totals_query.split(
+        "), latest_decision AS", 1
+    )[0]
+    assert "candidate.status <>" not in monthly_activity_base
+    assert "candidate.status =" not in monthly_activity_base
+    assert "COUNT(DISTINCT history.candidate_id)" in monthly_totals_query
+    assert "COUNT(DISTINCT interview.candidate_id)" in monthly_totals_query
     assert "COUNT(DISTINCT participant.candidate_id)" in monthly_totals_query
+    assert "COUNT(DISTINCT decision.candidate_id)" in monthly_totals_query
+    assert "demo.voided_at IS NULL" in monthly_totals_query
+    assert "test.voided_at IS NULL" in monthly_totals_query
+    assert "interview.voided_at IS NULL" in monthly_totals_query
+    assert "decision.voided_at IS NULL" in monthly_totals_query
     assert "history.stage = 'responded'" in monthly_totals_query
+    cohort_scope_query = next(
+        query
+        for query in executed_queries
+        if "AS excluded_trash_candidates" in query
+    )
+    assert cohort_scope_query.count("COUNT(DISTINCT candidate.id)") == 3
+    assert "candidate.status <> 'trash_bin'" in cohort_scope_query
+    assert "candidate.status = 'trash_bin'" in cohort_scope_query
+    assert "candidate.application_date BETWEEN" in cohort_scope_query
+    assert "candidate.is_application_received = true" in cohort_scope_query
+    for filter_column in (
+        "candidate.source_option_id",
+        "candidate.subsource_option_id",
+        "candidate.position_option_id",
+        "candidate.subject_id",
+        "responsible_history.responsible_account_id",
+    ):
+        assert filter_column in cohort_scope_query
     outcome_reason_query = next(
         query
         for query in executed_queries

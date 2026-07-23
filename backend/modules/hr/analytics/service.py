@@ -17,6 +17,13 @@ TASHKENT = ZoneInfo("Asia/Tashkent")
 ANALYTICS_ROLES = frozenset({"hr_manager", "ceo"})
 PERIODS = frozenset({"today", "week", "month", "quarter", "year", "custom"})
 OUTCOMES = ("teacher_academy", "active_teacher", "rejected", "candidate_withdrew")
+COHORT_STAGE_ORDER = (
+    "new_candidate",
+    "responded",
+    "job_interview",
+    "test_and_demo",
+    "under_review",
+)
 
 
 class HrAnalyticsError(ValueError):
@@ -199,6 +206,61 @@ def _comparison_metric(current: Any, previous: Any) -> dict[str, Any]:
     }
 
 
+def _ensure_semantic_consistency(
+    *,
+    journey: list[dict[str, Any]],
+    monthly_activity: dict[str, int],
+    monthly_outcomes: dict[str, int],
+    cohort_scope: dict[str, int],
+    outcome_reason_breakdown: dict[str, dict[str, Any]],
+) -> None:
+    journey_counts = {
+        str(item.get("stage") or ""): int(item.get("candidates") or 0)
+        for item in journey
+    }
+    cohort_counts = [
+        journey_counts.get(stage, 0) for stage in COHORT_STAGE_ORDER
+    ]
+    if any(
+        current > previous
+        for previous, current in zip(cohort_counts, cohort_counts[1:])
+    ):
+        raise HrAnalyticsError(
+            "Application cohort funnel counts are not monotonic.",
+            status_code=500,
+        )
+    if cohort_counts[0] != cohort_scope["included_candidates"]:
+        raise HrAnalyticsError(
+            "Application cohort total does not match its included scope.",
+            status_code=500,
+        )
+    if (
+        cohort_scope["included_candidates"]
+        + cohort_scope["excluded_trash_candidates"]
+        != cohort_scope["applications_received"]
+    ):
+        raise HrAnalyticsError(
+            "Application cohort scope reconciliation is inconsistent.",
+            status_code=500,
+        )
+    if (
+        monthly_activity["applications_received"]
+        != cohort_scope["applications_received"]
+    ):
+        raise HrAnalyticsError(
+            "Monthly applications do not match cohort scope applications.",
+            status_code=500,
+        )
+    if (
+        monthly_outcomes["rejected"]
+        != int(outcome_reason_breakdown["rejected"]["total"] or 0)
+    ):
+        raise HrAnalyticsError(
+            "Rejected outcome reasons do not match the monthly rejected total.",
+            status_code=500,
+        )
+
+
 def options(user: CurrentUser) -> dict[str, Any]:
     _ensure_access(user)
     with connect_auth_db() as conn:
@@ -291,6 +353,22 @@ def dashboard(
             "teacher_academy",
         )
     }
+    cohort_scope_row = _dict(rows.get("cohort_scope"))
+    cohort_scope = {
+        key: int(cohort_scope_row.get(key) or 0)
+        for key in (
+            "applications_received",
+            "included_candidates",
+            "excluded_trash_candidates",
+        )
+    }
+    monthly_activity = {
+        "applications_received": monthly_stage_totals["application_received"],
+        "entered_process": monthly_stage_totals["in_process"],
+        "interviews_conducted": monthly_stage_totals["job_interview"],
+        "tests_and_demos_conducted": monthly_stage_totals["test_and_demo"],
+        "academy_admissions": monthly_stage_totals["teacher_academy"],
+    }
     outcome_reason_breakdown = {
         "rejected": {"total": 0, "items": []},
         "candidate_withdrew": {"total": 0, "items": []},
@@ -317,6 +395,12 @@ def dashboard(
                 for row in matching
             ],
         }
+    monthly_outcomes = {
+        "rejected": monthly_stage_totals["rejected"],
+        "candidate_withdrew": int(
+            outcome_reason_breakdown["candidate_withdrew"]["total"] or 0
+        ),
+    }
     turnover_series = [
         {
             "bucket": str(row.get("bucket") or ""),
@@ -350,6 +434,13 @@ def dashboard(
             }
         )
         previous_count = count
+    _ensure_semantic_consistency(
+        journey=journey,
+        monthly_activity=monthly_activity,
+        monthly_outcomes=monthly_outcomes,
+        cohort_scope=cohort_scope,
+        outcome_reason_breakdown=outcome_reason_breakdown,
+    )
 
     outcome_counts = {
         str(row["outcome"]): int(row["candidates"] or 0)
@@ -417,6 +508,9 @@ def dashboard(
             "subject_id": subject_id,
             "responsible_account_id": responsible_account_id,
         },
+        "monthly_activity": monthly_activity,
+        "monthly_outcomes": monthly_outcomes,
+        "cohort_scope": cohort_scope,
         "monthly_stage_totals": monthly_stage_totals,
         "turnover": {
             "population": "recruited_active_teachers",
