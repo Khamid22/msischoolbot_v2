@@ -139,6 +139,12 @@ describe("compact recruitment pipeline", () => {
     assert.doesNotMatch(pipeline, /recharts|chart\.js/i);
   });
 
+  test("keeps Test & Demo visually distinct from Teacher Academy", () => {
+    assert.match(pipeline, /test_and_demo: "orange"/);
+    assert.match(pipeline, /teacher_academy: "amber"/);
+    assert.match(pipeline, /orange: \{ card: "border-orange-300 bg-orange-50/);
+  });
+
   test("shows semantic appointment progress and overdue card states", () => {
     assert.match(pipeline, /appointment\?\.is_overdue/);
     assert.match(pipeline, /border-red-400 bg-red-50/);

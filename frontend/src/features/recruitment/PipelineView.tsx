@@ -104,7 +104,7 @@ const canonicalSummaryColors: Record<string, PipelineStageColorToken> = {
   new_candidate: "neutral",
   responded: "blue",
   job_interview: "green",
-  test_and_demo: "green",
+  test_and_demo: "orange",
   under_review: "violet",
   teacher_academy: "amber",
   active_teacher: "blue",

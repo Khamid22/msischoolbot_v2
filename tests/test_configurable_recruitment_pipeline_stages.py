@@ -243,6 +243,19 @@ def test_registry_migration_preserves_records_and_replaces_fixed_stage_checks():
     assert "UPDATE msi_v2.teacher_candidates" not in migration.split("def downgrade", 1)[0]
 
 
+def test_test_and_demo_stage_has_a_unique_orange_color_migration():
+    migration = Path(
+        "database/alembic/versions/0038_test_demo_stage_color.py"
+    ).read_text(encoding="utf-8")
+    upgrade = migration.split("def downgrade", 1)[0]
+
+    assert 'revision = "0039_test_demo_color"' in migration
+    assert 'down_revision = "0038_appt_start_rollback"' in migration
+    assert "stage_key = 'test_and_demo'" in upgrade
+    assert "color_token = 'orange'" in upgrade
+    assert "stage_key = 'teacher_academy'" not in migration
+
+
 def test_custom_stage_sla_uses_application_date_with_created_at_fallback():
     source = Path(
         "backend/modules/hr/recruitment/candidates/repository.py"
