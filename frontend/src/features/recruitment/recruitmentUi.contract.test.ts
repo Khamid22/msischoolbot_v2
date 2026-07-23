@@ -423,6 +423,13 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(workspace, /CV must be 20 MB or smaller/);
   });
 
+  test("keeps the HR logout action inside the profile", () => {
+    assert.match(workspace, /effectiveRole === "hr_manager" \? <form action=\{routes\.logout\} method="post">/);
+    assert.match(workspace, /name="csrf_token" value=\{csrfToken\}/);
+    assert.match(workspace, /<LogOut aria-hidden="true"/);
+    assert.match(workspace, />Log out<\/button>/);
+  });
+
   test("opens documents directly while keeping permission-scoped replace and remove controls", () => {
     const documentPanel = profile.split('{tab === "documents" ? (')[1]?.split('{tab === "hiring" ? (')[0] || "";
     assert.match(documentPanel, /href=\{`\$\{RECRUITMENT_API\}\/candidates\/\$\{candidateId\}\/documents\/\$\{text\(document\.id\)\}\/open`\}/);

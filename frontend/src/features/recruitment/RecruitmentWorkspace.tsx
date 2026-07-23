@@ -1,4 +1,4 @@
-import { Ban, BarChart3, BriefcaseBusiness, CalendarClock, CalendarDays, KanbanSquare, Loader2, Plus, Settings2, ShieldCheck, Trash2, UsersRound } from "lucide-react";
+import { Ban, BarChart3, BriefcaseBusiness, CalendarClock, CalendarDays, KanbanSquare, Loader2, LogOut, Plus, Settings2, ShieldCheck, Trash2, UsersRound } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
@@ -29,6 +29,7 @@ import {
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { FloatingToast, type FloatingToastTone, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { RoleWorkspaceShell } from "@/shared/ui/RoleWorkspaceShell";
+import { routes } from "@/shared/lib/routes";
 import {
   AcademicDirectorPageShell,
   HeadOfDepartmentPageShell,
@@ -198,7 +199,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       {view === "settings" && ["hr_manager", "ceo"].includes(effectiveRole) ? <SettingsView onAnnouncement={showToast} /> : null}
       {view === "trash" && effectiveRole === "hr_manager" ? <TrashBinView basePath={basePath} options={options.data} onAnnouncement={showToast} /> : null}
       {view === "candidate" && Number(candidateId) > 0 ? <CandidateProfile candidateId={Number(candidateId)} basePath={basePath} role={effectiveRole} onAnnouncement={showToast} /> : null}
-      {view === "profile" ? <div className="space-y-2"><section className="rounded-xl border border-border bg-card p-3"><div className="flex items-center gap-2"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div><div><h2 className="text-sm font-semibold">{authLogin || roleLabel(effectiveRole)}</h2><p className="text-xs text-muted-foreground">{roleLabel(effectiveRole)} recruitment access</p></div></div><div className="mt-4 flex flex-wrap gap-2">{effectiveRole !== "hr_manager" ? <a className={secondaryButtonClass} href={home}>Back to main workspace</a> : null}<a className={secondaryButtonClass} href="/account/security">Account security</a></div></section>{["hr_manager", "academic_director", "head_of_department"].includes(effectiveRole) ? <BrowserReminderPreferencesCard /> : null}</div> : null}
+      {view === "profile" ? <div className="space-y-2"><section className="rounded-xl border border-border bg-card p-3"><div className="flex items-center gap-2"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div><div><h2 className="text-sm font-semibold">{authLogin || roleLabel(effectiveRole)}</h2><p className="text-xs text-muted-foreground">{roleLabel(effectiveRole)} recruitment access</p></div></div><div className="mt-4 flex flex-wrap gap-2">{effectiveRole !== "hr_manager" ? <a className={secondaryButtonClass} href={home}>Back to main workspace</a> : null}<a className={secondaryButtonClass} href={routes.accountSecurity}>Account security</a>{effectiveRole === "hr_manager" ? <form action={routes.logout} method="post"><input type="hidden" name="csrf_token" value={csrfToken} /><button type="submit" className={`${secondaryButtonClass} border-destructive/30 text-destructive hover:bg-destructive/10`}><LogOut aria-hidden="true" className="h-4 w-4" />Log out</button></form> : null}</div></section>{["hr_manager", "academic_director", "head_of_department"].includes(effectiveRole) ? <BrowserReminderPreferencesCard /> : null}</div> : null}
 
       <NewCandidateModal open={newCandidateOpen} onClose={() => setNewCandidateOpen(false)} onCreated={showToast} options={options.data} />
     </>
