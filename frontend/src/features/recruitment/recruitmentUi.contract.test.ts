@@ -574,6 +574,30 @@ describe("candidate navigation and progressive disclosure", () => {
     );
   });
 
+  test("renders Funnel Overview as responsive SVG and mobile cards", () => {
+    const analytics = source("AnalyticsView.tsx");
+    const funnelComponent = analytics
+      .split("function RecruitmentFunnel", 2)[1]
+      ?.split("function OutcomeDistribution", 1)[0] || "";
+    const funnelPanel = analytics
+      .split('title="Funnel Overview"', 2)[1]
+      ?.split("</Panel>", 1)[0] || "";
+
+    assert.match(analytics, /function RecruitmentFunnel/);
+    assert.match(funnelPanel, /<RecruitmentFunnel stages=\{funnel\} \/>/);
+    assert.doesNotMatch(funnelPanel, /overflow-x-auto|min-w-\[46rem\]/);
+    assert.match(funnelComponent, /<svg/);
+    assert.match(funnelComponent, /viewBox=\{`0 0 \$\{viewWidth\} \$\{viewHeight\}`\}/);
+    assert.match(funnelComponent, /role="img"/);
+    assert.match(funnelComponent, /md:block/);
+    assert.match(funnelComponent, /<ol/);
+    assert.match(funnelComponent, /md:hidden/);
+    assert.doesNotMatch(
+      funnelComponent,
+      /ChevronRight|overflow-x-auto|min-w-\[46rem\]/,
+    );
+  });
+
   test("uses a dedicated HR-only Trash Bin that cannot expose active candidates", () => {
     const trash = source("TrashBinView.tsx");
     assert.match(workspace, /effectiveRole === "hr_manager"/);
