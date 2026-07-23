@@ -1,6 +1,7 @@
 """Parent portal page renderer + invite-link flow."""
 
 import html
+import logging
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
@@ -23,6 +24,9 @@ from backend.modules.people.parents.service import (
 from backend.modules.people.parents.cards import build_parent_workspace_cards
 from backend.platform.telegram.init_data import telegram_user_from_init_data
 from backend.modules.identity.session import set_account_session, url_for
+
+
+LOGGER = logging.getLogger("msi.parent_invites")
 
 
 def _page(title, body_html, status_code=200, lang="uz", telegram_webapp=False):
@@ -408,6 +412,7 @@ def register_parent_invite_routes(app):
                     telegram_user_id=telegram_parent["telegram_user_id"],
                 )
             except Exception:
+                LOGGER.exception("Telegram parent invite claim failed.")
                 return _telegram_connect_page(
                     code,
                     student_name,
@@ -457,6 +462,7 @@ def register_parent_invite_routes(app):
                 telegram_user_id=None,
             )
         except Exception:
+            LOGGER.exception("Manual parent invite claim failed.")
             return _invite_form_page(
                 code, student_name, student_code,
                 error_key="technical",

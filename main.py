@@ -1,4 +1,5 @@
 import errno
+import hashlib
 import os
 import sys
 
@@ -7,6 +8,7 @@ import logging
 import threading
 
 from backend.core.runtime.config import get_web_settings
+from backend.core.database import connect_auth_db
 from backend.modules.identity.bootstrap import init_storage
 
 
@@ -46,6 +48,73 @@ def _is_railway_runtime():
 def _uvicorn_access_log_enabled():
     """Keep local request logs while avoiding high-volume Railway access logs."""
     return _env_flag("UVICORN_ACCESS_LOG", default=not _is_railway_runtime())
+
+
+def _bot_polling_lock_key(bot_token):
+    digest = hashlib.sha256(str(bot_token or "").encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], byteorder="big", signed=True)
+
+
+def _bot_polling_lock_retry_seconds():
+    try:
+        parsed = float(str(os.getenv("BOT_POLL_LOCK_RETRY_SECONDS", "10") or "").strip())
+    except ValueError:
+        return 10.0
+    return max(1.0, min(parsed, 60.0))
+
+
+def _try_acquire_bot_polling_lock(bot_token):
+    connection = connect_auth_db()
+    try:
+        row = connection.execute(
+            "SELECT pg_try_advisory_lock(%s) AS acquired",
+            (_bot_polling_lock_key(bot_token),),
+        ).fetchone()
+        connection.commit()
+        if row and bool(row["acquired"]):
+            return connection
+    except Exception:
+        connection.close()
+        raise
+    connection.close()
+    return None
+
+
+def _release_bot_polling_lock(connection, bot_token):
+    if connection is None:
+        return
+    try:
+        connection.execute(
+            "SELECT pg_advisory_unlock(%s)",
+            (_bot_polling_lock_key(bot_token),),
+        )
+        connection.commit()
+    except Exception:
+        logging.exception("Unable to release the Telegram polling advisory lock.")
+    finally:
+        connection.close()
+
+
+async def _wait_for_bot_polling_lock(bot_token):
+    waiting_logged = False
+    while True:
+        try:
+            connection = _try_acquire_bot_polling_lock(bot_token)
+        except Exception:
+            logging.exception(
+                "Unable to check the Telegram polling advisory lock; retrying."
+            )
+            connection = None
+        if connection is not None:
+            if waiting_logged:
+                logging.info("Telegram polling leadership acquired.")
+            return connection
+        if not waiting_logged:
+            logging.warning(
+                "Another application instance owns Telegram polling; waiting for leadership."
+            )
+            waiting_logged = True
+        await asyncio.sleep(_bot_polling_lock_retry_seconds())
 
 
 def _is_wildcard_host(host):
@@ -183,39 +252,46 @@ async def run_bot():
     from tgbot.routing import BOT_ROUTERS
     from tgbot.settings import settings as bot_settings
 
-    bot = Bot(
-        token=bot_settings.bot_token,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
-    )
-    dp = Dispatcher()
-
-    bot_routers = tuple(BOT_ROUTERS)
-    for router in bot_routers:
-        dp.include_router(router)
-
+    polling_lock = await _wait_for_bot_polling_lock(bot_settings.bot_token)
+    bot = None
     try:
-        web_app = WebAppInfo(url=bot_settings.mini_app_url)
-        await bot.set_chat_menu_button(
-            menu_button=MenuButtonWebApp(text="Open MSI School", web_app=web_app)
+        bot = Bot(
+            token=bot_settings.bot_token,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML),
         )
-        await bot.set_my_commands([BotCommand(command="start", description="Open MSI School")])
-    except Exception:
-        logging.exception("Unable to configure the Telegram Mini App menu button.")
+        dp = Dispatcher()
 
-    if bot_routers:
-        logging.info("Starting Telegram bot polling (%d routers).", len(bot_routers))
-    else:
-        logging.warning(
-            "Starting Telegram bot polling with no registered routers. "
-            "The old handler layer was removed; install the new bot routing layer "
-            "before expecting commands or callbacks to respond."
-        )
-    try:
-        # Clear any webhook + stale queued updates, then long-poll for updates.
-        await bot.delete_webhook(drop_pending_updates=True)
+        bot_routers = tuple(BOT_ROUTERS)
+        for router in bot_routers:
+            dp.include_router(router)
+
+        try:
+            web_app = WebAppInfo(url=bot_settings.mini_app_url)
+            await bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(text="Open MSI School", web_app=web_app)
+            )
+            await bot.set_my_commands(
+                [BotCommand(command="start", description="Open MSI School")]
+            )
+        except Exception:
+            logging.exception("Unable to configure the Telegram Mini App menu button.")
+
+        if bot_routers:
+            logging.info("Starting Telegram bot polling (%d routers).", len(bot_routers))
+        else:
+            logging.warning(
+                "Starting Telegram bot polling with no registered routers. "
+                "The old handler layer was removed; install the new bot routing layer "
+                "before expecting commands or callbacks to respond."
+            )
+
+        # Preserve queued invite commands across deploys, then long-poll.
+        await bot.delete_webhook(drop_pending_updates=False)
         await dp.start_polling(bot)
     finally:
-        await bot.session.close()
+        if bot is not None:
+            await bot.session.close()
+        _release_bot_polling_lock(polling_lock, bot_settings.bot_token)
 
 
 def _resolve_run_mode():
@@ -270,4 +346,5 @@ if __name__ == "__main__":
             logging.exception(
                 "Telegram bot stopped; keeping the web server running."
             )
+        finally:
             web_thread.join()
