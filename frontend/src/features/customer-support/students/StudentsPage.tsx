@@ -42,7 +42,7 @@ export function StudentsPage({
   description: string;
 }) {
   const controller = useSupportRecords("student", {
-    fixedSchoolId: "5",
+    fixedSchoolKey: "school5",
     fixedSchoolLabel: "School 5",
     loadAll: true,
   });

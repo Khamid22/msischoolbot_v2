@@ -19,6 +19,7 @@ type LocationState = {
 
 type SupportRecordsOptions = {
   fixedSchoolId?: string;
+  fixedSchoolKey?: string;
   fixedSchoolLabel?: string;
   loadAll?: boolean;
 };
@@ -57,13 +58,20 @@ export function useSupportRecords<K extends SupportRecordKind>(
   kind: K,
   options: SupportRecordsOptions = {},
 ) {
-  const { fixedSchoolId = "", fixedSchoolLabel = "", loadAll = false } = options;
+  const {
+    fixedSchoolId = "",
+    fixedSchoolKey = "",
+    fixedSchoolLabel = "",
+    loadAll = false,
+  } = options;
   const initial = useRef(readLocation()).current;
   const [context, setContext] = useState<SupportContext | null>(null);
   const [query, setQuery] = useState(initial.query);
   const [debouncedQuery, setDebouncedQuery] = useState(initial.query.trim());
   const [status, setStatus] = useState(initial.status);
-  const [schoolId, setSchoolId] = useState(fixedSchoolId || initial.schoolId);
+  const [schoolId, setSchoolId] = useState(
+    fixedSchoolId || (fixedSchoolKey ? "" : initial.schoolId),
+  );
   const [records, setRecords] = useState<SupportRecordSummary[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(initial.selectedId);
@@ -91,29 +99,47 @@ export function useSupportRecords<K extends SupportRecordKind>(
       setQuery(state.query);
       setDebouncedQuery(state.query.trim());
       setStatus(state.status);
-      setSchoolId(fixedSchoolId || state.schoolId);
+      setSchoolId((current) => (
+        fixedSchoolId || (fixedSchoolKey ? current : state.schoolId)
+      ));
       setSelectedId(state.selectedId);
       if (!state.selectedId) setDetail(null);
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [fixedSchoolId]);
+  }, [fixedSchoolId, fixedSchoolKey]);
 
   useEffect(() => {
     const controller = new AbortController();
     setLoadingContext(true);
     getSupport<SupportContext>("/context", controller.signal)
-      .then(setContext)
+      .then((payload) => {
+        setContext(payload);
+        if (!fixedSchoolKey) return;
+        const normalizedKey = fixedSchoolKey.trim().toLocaleLowerCase();
+        const fixedSchool = payload.schools.find((school) => (
+          school.school_key.trim().toLocaleLowerCase() === normalizedKey
+          || school.school_name.trim().toLocaleLowerCase() === normalizedKey
+        ));
+        if (!fixedSchool) {
+          throw new SupportApiError(
+            `${fixedSchoolLabel || fixedSchoolKey} is not available in your allowed school scope.`,
+            { code: "school_scope_denied" },
+          );
+        }
+        setSchoolId(String(fixedSchool.id));
+      })
       .catch((error) => {
         if ((error as Error).name !== "AbortError") {
           setErrorState({ error: asSupportApiError(error, "Could not load Customer Support.") });
+          if (fixedSchoolKey) setLoadingRecords(false);
         }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoadingContext(false);
       });
     return () => controller.abort();
-  }, []);
+  }, [fixedSchoolKey, fixedSchoolLabel]);
 
   const removeSelected = useCallback(() => {
     setSelectedId(null);
@@ -178,6 +204,7 @@ export function useSupportRecords<K extends SupportRecordKind>(
   }, [debouncedQuery, kind, loadAll, schoolId, status]);
 
   useEffect(() => {
+    if (fixedSchoolKey && !schoolId) return;
     writeLocation({
       query: debouncedQuery,
       status,
@@ -188,7 +215,7 @@ export function useSupportRecords<K extends SupportRecordKind>(
     return () => recordsController.current?.abort();
     // selectedId belongs in the URL but must not trigger a list request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQuery, fetchRecords, recordsReloadKey, schoolId, status]);
+  }, [debouncedQuery, fetchRecords, fixedSchoolKey, recordsReloadKey, schoolId, status]);
 
   useEffect(() => {
     if (!selectedId) {
