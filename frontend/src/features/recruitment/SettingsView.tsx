@@ -1,4 +1,23 @@
-import { BellRing, Check, Clock3, Link2, Loader2, LockKeyhole, Pencil, Plus, RotateCcw, Search, Tags, Trash2, X } from "lucide-react";
+import {
+  BellRing,
+  BriefcaseBusiness,
+  CalendarDays,
+  Check,
+  Clock3,
+  Link2,
+  Loader2,
+  LockKeyhole,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  ShieldAlert,
+  Tags,
+  Trash2,
+  UsersRound,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent, type ReactNode } from "react";
 
@@ -10,6 +29,34 @@ import type { FloatingToastTone } from "@/shared/ui/FloatingToast";
 
 type SettingCategory = RecruitmentSetting["category"];
 type MutationPayload = { message: string; setting: RecruitmentSetting };
+
+function SettingsSectionHeading({
+  id,
+  title,
+  detail,
+  icon: Icon,
+}: {
+  id: string;
+  title: string;
+  detail: string;
+  icon: LucideIcon;
+}) {
+  return (
+    <div className="mb-3 flex items-start gap-2.5">
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <Icon className="h-4 w-4" aria-hidden="true" />
+      </span>
+      <div className="min-w-0">
+        <h2 id={id} className="text-base font-bold tracking-tight text-foreground">
+          {title}
+        </h2>
+        <p className="mt-0.5 max-w-3xl text-[0.8125rem] leading-5 text-muted-foreground">
+          {detail}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function AppointmentReminderSettings({
   leadMinutes,
@@ -26,32 +73,71 @@ function AppointmentReminderSettings({
 }) {
   const [draft, setDraft] = useState(String(leadMinutes));
   return (
-    <section className="mb-3 rounded-xl border border-border bg-card p-3 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-start gap-2">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><BellRing className="h-4 w-4" /></span>
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold">Appointment reminder timing</h2>
-            <p className="mt-0.5 text-xs leading-5 text-muted-foreground">One browser alert before each scheduled interview or demo. Future reminders are recalculated when this changes.</p>
-          </div>
-        </div>
-        <form className="flex w-full items-end gap-2 sm:w-auto" onSubmit={(event) => {
+    <section className="rounded-xl border border-border bg-card shadow-sm">
+      <div className="border-b border-border px-4 py-3">
+        <h3 className="text-[0.6875rem] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+          Appointment reminder
+        </h3>
+        <p className="mt-1 text-[0.8125rem] leading-5 text-foreground">
+          One browser alert before every scheduled interview or demo.
+        </p>
+      </div>
+      <div className="p-4">
+        <form className="flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={(event) => {
           event.preventDefault();
           const value = Number(draft);
           if (!Number.isInteger(value) || value < 5 || value > 120 || value === leadMinutes) return;
           onSave(value, version);
         }}>
-          <label className="min-w-0 flex-1 text-xs font-semibold sm:w-36 sm:flex-none">Remind before
+          <label className="min-w-0 flex-1 text-xs font-semibold">
+            Remind before session
             <span className="mt-1 flex items-center gap-2">
-              <input type="number" min={5} max={120} value={draft} disabled={readOnly || busy} onChange={(event) => setDraft(event.target.value)} className={`${fieldClass} min-w-0`} aria-describedby="reminder-minutes-help" />
-              <span className="text-xs font-medium text-muted-foreground">min</span>
+              <input
+                type="number"
+                min={5}
+                max={120}
+                inputMode="numeric"
+                value={draft}
+                disabled={readOnly || busy}
+                onChange={(event) => setDraft(event.target.value)}
+                className={`${fieldClass} min-h-11 min-w-0`}
+                aria-describedby="reminder-minutes-help"
+              />
+              <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                minutes
+              </span>
             </span>
           </label>
-          {!readOnly ? <button type="submit" className={buttonClass} disabled={busy || Number(draft) === leadMinutes || Number(draft) < 5 || Number(draft) > 120}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Save</button> : null}
+          {!readOnly ? (
+            <button
+              type="submit"
+              className={`${buttonClass} min-h-11 sm:min-w-24`}
+              disabled={
+                busy ||
+                Number(draft) === leadMinutes ||
+                Number(draft) < 5 ||
+                Number(draft) > 120
+              }
+            >
+              {busy ? (
+                <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+              Save
+            </button>
+          ) : null}
         </form>
+        <p id="reminder-minutes-help" className="mt-2 text-xs leading-5 text-muted-foreground">
+          Range 5–120 minutes. Short-notice appointments created inside this
+          window skip the reminder.
+        </p>
+        {readOnly ? (
+          <p className="mt-2 inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+            Read-only CEO view
+          </p>
+        ) : null}
       </div>
-      <p id="reminder-minutes-help" className="mt-2 text-[0.6875rem] text-muted-foreground">Allowed range: 5–120 minutes. Short-notice appointments created inside this window do not send a reminder.</p>
-      {readOnly ? <p className="mt-1 text-xs text-muted-foreground">Read-only CEO view.</p> : null}
     </section>
   );
 }
@@ -135,24 +221,89 @@ function SettingsPanel({
   };
 
   const renderRow = (item: RecruitmentSetting) => (
-    <div key={item.id} className="flex min-h-12 items-center justify-between gap-2 px-3 py-1.5">
+    <div
+      key={item.id}
+      className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 py-2 transition-colors duration-150 hover:bg-muted/25 motion-reduce:transition-none"
+    >
       {renamingId === item.id ? (
-        <form className="flex min-w-0 flex-1 items-center gap-1" onSubmit={(event) => { event.preventDefault(); commitRename(item); }}>
-          <input autoFocus value={renameDraft} onChange={(event) => setRenameDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") cancelRename(); }} maxLength={120} className={`${fieldClass} min-h-9 flex-1 py-1`} />
-          <button type="submit" disabled={busy} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-emerald-700 hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 disabled:opacity-50 dark:text-emerald-300" aria-label="Save name"><Check className="h-4 w-4" /></button>
-          <button type="button" onClick={cancelRename} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" aria-label="Cancel rename"><X className="h-4 w-4" /></button>
+        <form
+          className="col-span-2 flex min-w-0 items-center gap-1.5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            commitRename(item);
+          }}
+        >
+          <label className="min-w-0 flex-1">
+            <span className="sr-only">Option name</span>
+            <input
+              autoFocus
+              value={renameDraft}
+              onChange={(event) => setRenameDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") cancelRename();
+              }}
+              maxLength={120}
+              className={`${fieldClass} min-h-11 flex-1`}
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={busy}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-emerald-700 transition-colors hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 disabled:opacity-50 motion-reduce:transition-none dark:text-emerald-300"
+            aria-label="Save name"
+          >
+            <Check className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={cancelRename}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 motion-reduce:transition-none"
+            aria-label="Cancel rename"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </form>
       ) : (
         <>
-          <span className="min-w-0 truncate text-[0.8125rem] font-medium text-foreground">
-            {item.label}
-            {item.is_system ? <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[0.625rem] text-muted-foreground"><LockKeyhole className="h-3 w-3" />System</span> : null}
-            {item.usage_count ? <span className="ml-2 font-normal text-muted-foreground">· {item.usage_count} candidate{item.usage_count === 1 ? "" : "s"}</span> : null}
-          </span>
+          <div className="min-w-0">
+            <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-[0.8125rem] font-semibold text-foreground">
+              <span className="min-w-0 break-words">{item.label}</span>
+              {item.is_system ? (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[0.625rem] font-semibold text-muted-foreground">
+                  <LockKeyhole className="h-3 w-3" />
+                  System
+                </span>
+              ) : null}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              <span className="inline-flex rounded-full bg-muted/80 px-2 py-0.5 font-medium tabular-nums">
+                {item.usage_count || 0} candidate
+                {item.usage_count === 1 ? "" : "s"}
+              </span>
+            </p>
+          </div>
           {!readOnly && !item.is_system ? (
             <div className="flex shrink-0 items-center gap-1">
-              <button type="button" onClick={() => startRename(item)} disabled={busy} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50" aria-label={`Rename ${item.label}`} title={`Rename ${item.label}`}><Pencil className="h-4 w-4" /></button>
-              <button type="button" onClick={() => onRemove(item)} disabled={busy} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/30 disabled:opacity-50" aria-label={`Remove ${item.label}`} title={`Remove ${item.label}`}><Trash2 className="h-4 w-4" /></button>
+              <button
+                type="button"
+                onClick={() => startRename(item)}
+                disabled={busy}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50 motion-reduce:transition-none"
+                aria-label={`Rename ${item.label}`}
+                title={`Rename ${item.label}`}
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onRemove(item)}
+                disabled={busy}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/30 disabled:opacity-50 motion-reduce:transition-none"
+                aria-label={`Remove ${item.label}`}
+                title={`Remove ${item.label}`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
             </div>
           ) : null}
         </>
@@ -161,70 +312,156 @@ function SettingsPanel({
   );
 
   return (
-    <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
-      <div className="flex items-start gap-2">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">{icon}</span>
-        <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="flex items-start gap-2.5 border-b border-border px-4 py-3.5">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          {icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-bold text-foreground">{title}</h3>
+            <span className="rounded-full bg-muted px-2 py-1 text-[0.6875rem] font-semibold tabular-nums text-muted-foreground">
+              {activeItems.length} active
+            </span>
+          </div>
           <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{detail}</p>
         </div>
       </div>
-      {!readOnly ? (
-        <form onSubmit={submit} className="mt-3 flex gap-2">
-          {parentItems?.length ? <label className="min-w-0 flex-1"><span className="sr-only">Parent source</span><select value={parentId} onChange={(event) => setParentId(event.target.value)} className={fieldClass} required><option value="">Select source</option>{parentItems.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label> : null}
-          <label className="min-w-0 flex-1">
-            <span className="sr-only">New {title.toLowerCase()}</span>
-            <input
-              value={label}
-              onChange={(event) => setLabel(event.target.value)}
-              maxLength={120}
-              placeholder={`Add ${title.toLowerCase()}`}
-              className={fieldClass}
-            />
-          </label>
-          <button type="submit" className={buttonClass} disabled={busy || !label.trim() || Boolean(parentItems?.length && !parentId)}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            <span className="hidden sm:inline">Add</span>
-          </button>
-        </form>
-      ) : null}
       {activeItems.length > 8 ? (
-        <div className="relative mt-2">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${title.toLowerCase()}`} className={`${fieldClass} pl-9`} />
-        </div>
+        <label className="block border-b border-border px-4 py-3 text-xs font-semibold">
+          Search
+          <span className="relative mt-1 block">
+            <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={`Search ${title.toLowerCase()}`}
+              className={`${fieldClass} min-h-11 pl-9`}
+            />
+          </span>
+        </label>
       ) : null}
+      <div
+        className={`hidden border-b border-border bg-muted/35 px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-[0.08em] text-muted-foreground sm:grid ${
+          readOnly ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_7rem]"
+        }`}
+      >
+        <span>{readOnly ? "Option & usage" : "Option"}</span>
+        {!readOnly ? <span className="text-right">Actions</span> : null}
+      </div>
       {grouped ? (
-        <div className="mt-3 overflow-hidden rounded-lg border border-border">
+        <div>
           {grouped.map((group, index) => (
-            <div key={group.key} className={index > 0 ? "border-t border-border" : undefined}>
-              <div className="bg-muted/40 px-3 py-1 text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</div>
-              <div className="divide-y divide-border border-t border-border">{group.items.map(renderRow)}</div>
+            <div
+              key={group.key}
+              className={index > 0 ? "border-t border-border" : undefined}
+            >
+              <div className="bg-muted/40 px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wide text-muted-foreground">
+                {group.label}
+              </div>
+              <div className="divide-y divide-border border-t border-border">
+                {group.items.map(renderRow)}
+              </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="mt-3 divide-y divide-border overflow-hidden rounded-lg border border-border">{visibleActive.map(renderRow)}</div>
+        <div className="divide-y divide-border">{visibleActive.map(renderRow)}</div>
       )}
-      {!visibleActive.length ? <div className="mt-3"><EmptyLine>{normalizedSearch ? "No matches." : "No active options."}</EmptyLine></div> : null}
+      {!visibleActive.length ? (
+        <div className="p-4">
+          <EmptyLine>{normalizedSearch ? "No matches." : "No active options."}</EmptyLine>
+        </div>
+      ) : null}
       {!readOnly && inactiveItems.length ? (
-        <div className="mt-2">
-          <button type="button" className="text-xs font-semibold text-muted-foreground underline-offset-2 hover:underline" onClick={() => setShowRemoved((value) => !value)}>
+        <div className="border-t border-border px-4 py-3">
+          <button
+            type="button"
+            className="min-h-11 rounded-lg px-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 motion-reduce:transition-none"
+            onClick={() => setShowRemoved((value) => !value)}
+            aria-expanded={showRemoved}
+          >
             {showRemoved ? "Hide removed" : `Show removed (${inactiveItems.length})`}
           </button>
           {showRemoved ? (
             <div className="mt-2 divide-y divide-dashed divide-border overflow-hidden rounded-lg border border-dashed border-border">
               {inactiveItems.map((item) => (
-                <div key={item.id} className="flex min-h-12 items-center justify-between gap-2 px-3 py-1.5">
-                  <span className="min-w-0 truncate text-[0.8125rem] text-muted-foreground line-through">{item.label}</span>
-                  <button type="button" onClick={() => onRestore(item)} disabled={busy} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-primary hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50">
-                    <RotateCcw className="h-3.5 w-3.5" />Restore
+                <div
+                  key={item.id}
+                  className="flex min-h-14 items-center justify-between gap-2 px-3 py-2"
+                >
+                  <span className="min-w-0 break-words text-[0.8125rem] text-muted-foreground line-through">
+                    {item.label}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onRestore(item)}
+                    disabled={busy}
+                    className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50 motion-reduce:transition-none"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Restore
                   </button>
                 </div>
               ))}
             </div>
           ) : null}
         </div>
+      ) : null}
+      {!readOnly ? (
+        <form
+          onSubmit={submit}
+          className={`grid gap-2 border-t border-border bg-muted/20 px-4 py-3 ${
+            parentItems?.length
+              ? "sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+              : "sm:grid-cols-[minmax(0,1fr)_auto]"
+          }`}
+        >
+          {parentItems?.length ? (
+            <label className="min-w-0 text-xs font-semibold">
+              Source
+              <select
+                value={parentId}
+                onChange={(event) => setParentId(event.target.value)}
+                className={`${fieldClass} mt-1 min-h-11`}
+                required
+              >
+                <option value="">Select source</option>
+                {parentItems.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <label className="min-w-0 text-xs font-semibold">
+            New option
+            <input
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+              maxLength={120}
+              placeholder={`Add ${title.toLowerCase()}`}
+              className={`${fieldClass} mt-1 min-h-11`}
+            />
+          </label>
+          <button
+            type="submit"
+            className={`${buttonClass} min-h-11 self-end`}
+            disabled={
+              busy ||
+              !label.trim() ||
+              Boolean(parentItems?.length && !parentId)
+            }
+          >
+            {busy ? (
+              <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+            Add
+          </button>
+        </form>
       ) : null}
     </section>
   );
@@ -307,68 +544,182 @@ export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: str
   const activeSourceItems = sourceItems.filter((item) => item.is_active);
   const sourceOrderIds = sourceItems.map((item) => item.id);
   const sourceLabelById = Object.fromEntries(sourceItems.map((item) => [item.id, item.label]));
+  const renderPanel = (category: SettingCategory) => {
+    const panel = panels.find((item) => item.category === category);
+    if (!panel) return null;
+    return (
+      <SettingsPanel
+        key={panel.category}
+        {...panel}
+        items={settings.data.items.filter(
+          (item) => item.category === panel.category,
+        )}
+        parentItems={panel.category === "subsource" ? activeSourceItems : undefined}
+        parentOrderIds={panel.category === "subsource" ? sourceOrderIds : undefined}
+        parentLabelById={panel.category === "subsource" ? sourceLabelById : undefined}
+        busy={mutation.isPending}
+        readOnly={settings.data.read_only}
+        onAdd={add}
+        onRemove={setRemoveSetting}
+        onRename={rename}
+        onRestore={restore}
+      />
+    );
+  };
 
   return (
     <>
-      <AppointmentReminderSettings
-        key={`${settings.data.appointment_reminders.version}:${settings.data.appointment_reminders.lead_minutes}`}
-        leadMinutes={settings.data.appointment_reminders.lead_minutes}
-        version={settings.data.appointment_reminders.version}
-        readOnly={settings.data.read_only}
-        busy={reminderMutation.isPending}
-        onSave={(leadMinutes, expectedVersion) => reminderMutation.mutate({ leadMinutes, expectedVersion })}
-      />
-      <section className="mb-3 rounded-xl border border-border bg-card p-3 shadow-sm">
-        <div className="flex items-start gap-2"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Clock3 className="h-4 w-4" /></span><div><h2 className="text-sm font-semibold">Stage SLA targets</h2><p className="mt-0.5 text-xs text-muted-foreground">Calendar days in Asia/Tashkent. Changes apply only to future stage entries.</p></div></div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-          {settings.data.sla_rules.map((rule) => (
-            <label key={rule.stage} className="rounded-lg border border-border p-2 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
-              {rule.stage_label || humanize(rule.stage)}
-              <div className="mt-1 flex items-center gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  max={90}
-                  defaultValue={rule.target_days}
-                  disabled={settings.data.read_only}
-                  className={`${fieldClass} min-w-0`}
-                  onBlur={(event) => {
-                    const target = Number(event.target.value);
-                    if (!Number.isFinite(target) || target === rule.target_days) return;
-                    if (target < 1 || target > 90) { event.target.value = String(rule.target_days); return; }
-                    const input = event.target;
-                    slaMutation.mutate({ stage: rule.stage, target_days: target }, { onError: () => { input.value = String(rule.target_days); } });
-                  }}
-                />
-                <span className="text-xs normal-case">days</span>
-                {slaMutation.isPending && slaMutation.variables?.stage === rule.stage ? (
-                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
-                ) : savedStage === rule.stage ? (
-                  <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-label="Saved" />
-                ) : null}
-              </div>
-            </label>
-          ))}
-        </div>
-        {settings.data.read_only ? <p className="mt-2 text-xs text-muted-foreground">Read-only CEO view.</p> : null}
-      </section>
-      <div className="grid gap-2 lg:grid-cols-2">
-        {panels.map((panel) => (
-          <SettingsPanel
-            key={panel.category}
-            {...panel}
-            items={settings.data.items.filter((item) => item.category === panel.category)}
-            parentItems={panel.category === "subsource" ? activeSourceItems : undefined}
-            parentOrderIds={panel.category === "subsource" ? sourceOrderIds : undefined}
-            parentLabelById={panel.category === "subsource" ? sourceLabelById : undefined}
-            busy={mutation.isPending}
-            readOnly={settings.data.read_only}
-            onAdd={add}
-            onRemove={setRemoveSetting}
-            onRename={rename}
-            onRestore={restore}
+      <div className="space-y-8 pb-4">
+        <section aria-labelledby="automation-settings-title">
+          <SettingsSectionHeading
+            id="automation-settings-title"
+            title="Automation & SLAs"
+            detail="Define target response times and automated reminders for each recruitment stage."
+            icon={BellRing}
           />
-        ))}
+          <div className="max-w-lg">
+            <AppointmentReminderSettings
+              key={`${settings.data.appointment_reminders.version}:${settings.data.appointment_reminders.lead_minutes}`}
+              leadMinutes={settings.data.appointment_reminders.lead_minutes}
+              version={settings.data.appointment_reminders.version}
+              readOnly={settings.data.read_only}
+              busy={reminderMutation.isPending}
+              onSave={(leadMinutes, expectedVersion) =>
+                reminderMutation.mutate({ leadMinutes, expectedVersion })
+              }
+            />
+          </div>
+          <section className="mt-3 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <div className="border-b border-border px-4 py-3">
+              <h3 className="text-[0.6875rem] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+                Stage SLA targets (max days)
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Calendar days in Asia/Tashkent. Changes apply only to future
+                stage entries.
+              </p>
+            </div>
+            <div className="grid gap-2 p-4 sm:grid-cols-2 xl:grid-cols-5">
+              {settings.data.sla_rules.map((rule) => (
+                <label
+                  key={rule.stage}
+                  className="rounded-lg border border-border bg-muted/15 p-2.5 text-[0.6875rem] font-bold uppercase tracking-wide text-muted-foreground"
+                >
+                  {rule.stage_label || humanize(rule.stage)}
+                  <span className="relative mt-1.5 block">
+                    <input
+                      type="number"
+                      min={1}
+                      max={90}
+                      inputMode="numeric"
+                      defaultValue={rule.target_days}
+                      disabled={settings.data.read_only}
+                      className={`${fieldClass} min-h-11 min-w-0 pr-14 tabular-nums`}
+                      onBlur={(event) => {
+                        const target = Number(event.target.value);
+                        if (
+                          !Number.isFinite(target) ||
+                          target === rule.target_days
+                        )
+                          return;
+                        if (target < 1 || target > 90) {
+                          event.target.value = String(rule.target_days);
+                          return;
+                        }
+                        const input = event.target;
+                        slaMutation.mutate(
+                          { stage: rule.stage, target_days: target },
+                          {
+                            onError: () => {
+                              input.value = String(rule.target_days);
+                            },
+                          },
+                        );
+                      }}
+                    />
+                    <span className="pointer-events-none absolute right-3 top-3.5 text-[0.625rem] font-semibold normal-case tracking-normal text-muted-foreground">
+                      days
+                    </span>
+                  </span>
+                  <span className="mt-1.5 flex min-h-4 items-center text-[0.625rem] font-medium normal-case tracking-normal">
+                    {slaMutation.isPending &&
+                    slaMutation.variables?.stage === rule.stage ? (
+                      <>
+                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
+                        Saving…
+                      </>
+                    ) : savedStage === rule.stage ? (
+                      <span className="inline-flex items-center text-emerald-700 dark:text-emerald-300">
+                        <Check className="mr-1 h-3.5 w-3.5" />
+                        Saved
+                      </span>
+                    ) : (
+                      <span>1–90 days</span>
+                    )}
+                  </span>
+                </label>
+              ))}
+            </div>
+            {settings.data.read_only ? (
+              <div className="border-t border-border px-4 py-3">
+                <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                  Read-only CEO view
+                </span>
+              </div>
+            ) : null}
+          </section>
+        </section>
+
+        <section aria-labelledby="candidate-sources-settings-title">
+          <SettingsSectionHeading
+            id="candidate-sources-settings-title"
+            title="Candidate Sources"
+            detail="Manage acquisition channels and the universities, referrals, or partners tracked under them."
+            icon={UsersRound}
+          />
+          <div className="grid gap-3 xl:grid-cols-2">
+            {renderPanel("source")}
+            {renderPanel("subsource")}
+          </div>
+        </section>
+
+        <section aria-labelledby="candidate-profile-settings-title">
+          <SettingsSectionHeading
+            id="candidate-profile-settings-title"
+            title="Candidate Profile Options"
+            detail="Maintain the canonical values used across registration forms, filters, and recruitment analytics."
+            icon={BriefcaseBusiness}
+          />
+          <div className="grid gap-3 lg:grid-cols-2">
+            {renderPanel("position")}
+            {renderPanel("english_level")}
+            {renderPanel("expected_salary")}
+            {renderPanel("teaching_experience")}
+          </div>
+        </section>
+
+        <section aria-labelledby="schedule-availability-settings-title">
+          <SettingsSectionHeading
+            id="schedule-availability-settings-title"
+            title="Schedules & Availability"
+            detail="Manage the standard schedule preferences and employment availability choices used during recruitment."
+            icon={CalendarDays}
+          />
+          <div className="grid gap-3 lg:grid-cols-2">
+            {renderPanel("schedule")}
+            {renderPanel("availability")}
+          </div>
+        </section>
+
+        <section aria-labelledby="evaluation-settings-title">
+          <SettingsSectionHeading
+            id="evaluation-settings-title"
+            title="Evaluation & Rejection Options"
+            detail="Control standardized rejection reasons without changing historical candidate records."
+            icon={ShieldAlert}
+          />
+          <div className="max-w-3xl">{renderPanel("rejection_reason")}</div>
+        </section>
       </div>
       <ConfirmDialog
         open={Boolean(removeSetting)}

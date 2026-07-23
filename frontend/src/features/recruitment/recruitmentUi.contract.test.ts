@@ -494,6 +494,27 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(settings, /readOnly=\{settings\.data\.read_only\}/);
   });
 
+  test("organizes Settings into responsive, accessible administration sections without removing capabilities", () => {
+    const settings = source("SettingsView.tsx");
+    for (const section of [
+      "Automation & SLAs",
+      "Candidate Sources",
+      "Candidate Profile Options",
+      "Schedules & Availability",
+      "Evaluation & Rejection Options",
+    ]) {
+      assert.match(settings, new RegExp(section));
+    }
+    assert.match(settings, /SettingsSectionHeading/);
+    assert.match(settings, /aria-labelledby="automation-settings-title"/);
+    assert.match(settings, /min-h-11/);
+    assert.match(settings, /sm:grid-cols-2/);
+    assert.match(settings, /lg:grid-cols-2/);
+    assert.match(settings, /motion-reduce:/);
+    assert.match(settings, /Remind before session/);
+    assert.match(settings, /Option & usage/);
+  });
+
   test("adds an essential HR and CEO recruitment analytics dashboard", () => {
     const analytics = source("AnalyticsView.tsx");
     assert.match(workspace, /key: "analytics", label: "Analytics"/);
