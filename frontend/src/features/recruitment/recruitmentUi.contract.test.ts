@@ -711,6 +711,9 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(schedule, /Array\.from\(\{ length: 6 \}/);
     assert.match(schedule, /addDaysToDateKey\(fullWeekBounds\.start, 5\)/);
     assert.match(schedule, /grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-6/);
+    assert.match(schedule, /xl:h-\[calc\(100dvh-17rem\)\]/);
+    assert.match(schedule, /xl:min-h-\[32rem\]/);
+    assert.match(schedule, /miniapp-scroll[\s\S]*xl:flex-1[\s\S]*xl:overflow-y-auto/);
     assert.match(schedule, /xl:overflow-y-auto/);
     assert.match(schedule, /InterviewSessionModal/);
     assert.match(schedule, /DemoSessionModal/);
@@ -720,6 +723,7 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(schedule, /appointmentType: "demo_lesson"/);
     assert.match(schedule, /placeholderData: keepPreviousData/);
     assert.doesNotMatch(schedule, /Completed/);
+    assert.doesNotMatch(schedule, /xl:h-\[min\(62vh,42rem\)\]/);
     assert.doesNotMatch(schedule, /overflow-x-auto|min-w-\[84rem\]/);
     assert.doesNotMatch(schedule, /fullcalendar|react-big-calendar|dnd-kit/i);
   });

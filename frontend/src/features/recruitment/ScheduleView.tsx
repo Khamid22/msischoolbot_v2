@@ -797,10 +797,10 @@ export function ScheduleView({
         return (
           <div
             key={day}
-            className="min-w-0 overflow-hidden rounded-xl border border-border bg-card xl:h-[min(62vh,42rem)] xl:overflow-y-auto"
+            className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card xl:h-[calc(100dvh-17rem)] xl:min-h-[32rem]"
           >
             <div
-              className={`sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border px-3 py-2.5 text-xs font-semibold shadow-sm ${
+              className={`flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2.5 text-xs font-semibold shadow-sm ${
                 isToday
                   ? "bg-primary/10 text-primary"
                   : "bg-muted text-foreground"
@@ -811,7 +811,7 @@ export function ScheduleView({
                 {dayItems.length}
               </span>
             </div>
-            <div className="space-y-2 p-2">
+            <div className="miniapp-scroll space-y-2 p-2 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-y-contain">
               {dayItems.map((item) => (
                 <AppointmentRow
                   key={item.id}
