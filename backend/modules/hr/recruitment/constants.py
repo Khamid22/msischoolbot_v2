@@ -53,23 +53,22 @@ RECRUITMENT_OPTION_CATEGORIES = frozenset(
 )
 
 REJECTION_REASONS = (
-    "insufficient_subject_knowledge",
-    "insufficient_english_level",
+    "low_english_level",
+    "low_subject_knowledge",
+    "poor_soft_skills",
     "weak_demo_lesson",
     "schedule_incompatibility",
     "salary_expectation_incompatibility",
-    "insufficient_experience",
     "unprofessional_behaviour",
     "missing_or_invalid_documents",
     "candidate_did_not_attend",
     "position_already_filled",
-    "other",
 )
 
 WITHDRAWAL_REASONS = (
     "candidate_no_longer_interested",
-    "accepted_another_offer",
-    "personal_circumstances",
+    "received_counter_offer",
+    "personal_reasons",
     "schedule_incompatibility",
     "salary_expectation_incompatibility",
     "relocation_or_location",

@@ -66,7 +66,12 @@ def test_stage_and_rejection_taxonomies_are_stable():
         "candidate_withdrew",
         "trash_bin",
     }
-    assert "other" in REJECTION_REASONS
+    assert {
+        "low_english_level",
+        "low_subject_knowledge",
+        "poor_soft_skills",
+    }.issubset(REJECTION_REASONS)
+    assert "other" not in REJECTION_REASONS
     assert "missing_or_invalid_documents" in REJECTION_REASONS
 
 
@@ -1565,6 +1570,45 @@ def test_outcome_reason_migration_unifies_rejections_and_preserves_withdrawals()
     assert "length(btrim(reason_detail)) > 0" in upgrade_source
     assert "SET is_system = false" in upgrade_source
     assert "'withdrawal_reason', 'other', 'Other'" in upgrade_source
+
+
+def test_reason_consolidation_migration_remaps_candidate_outcomes_and_catalogs():
+    source = Path(
+        "database/alembic/versions/0040_consolidate_recruitment_reasons.py"
+    ).read_text()
+    upgrade_source = source.split("def downgrade", 1)[0]
+
+    assert 'revision = "0041_consolidate_reasons"' in source
+    assert 'down_revision = "0040_outcome_reasons"' in source
+    for canonical_value, canonical_label in (
+        ("low_english_level", "Low English Level"),
+        ("low_subject_knowledge", "Low Subject Knowledge"),
+        ("poor_soft_skills", "Poor Soft Skills"),
+        ("received_counter_offer", "Recieved Counter-Offer"),
+        ("personal_reasons", "Personal Reasons"),
+    ):
+        assert canonical_value in upgrade_source
+        assert canonical_label in upgrade_source
+    for historical_label in (
+        "hired by another private school",
+        "hired by other education center",
+        "hired by other private school",
+        "hunted by other education center",
+        "hunted by other private school",
+        "she got offer",
+        "she got another job offer",
+        "she got another offer",
+        "personal reasons",
+        "plans changed",
+    ):
+        assert historical_label in upgrade_source
+    assert "SET rejection_reason = reason_group.canonical_value" in upgrade_source
+    assert "SET withdrawal_reason = reason_group.canonical_value" in upgrade_source
+    assert "DELETE FROM msi_v2.teacher_candidates" not in upgrade_source
+    assert (
+        "DELETE FROM msi_v2.teacher_candidate_final_decisions"
+        not in upgrade_source
+    )
 
 
 def test_candidate_trash_bin_migration_is_soft_delete_only():
