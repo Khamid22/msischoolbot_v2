@@ -676,6 +676,7 @@ describe("candidate navigation and progressive disclosure", () => {
   test("moves Academy and Active outcomes into a dedicated Teachers switcher", () => {
     const teachers = source("TeachersView.tsx");
     const roster = projectSource("features/teacher-academy/TeacherAcademyRoster.tsx");
+    const promotionRequests = projectSource("features/teacher-academy/TeacherPromotionRequests.tsx");
     const academyPanel = projectSource("features/teacher-academy/TeacherAcademyPanel.tsx");
     const cards = projectSource("features/teacher-academy/TeacherAcademyCards.tsx");
     const dashboard = projectSource("features/teacher-academy/TeacherAcademyDashboard.tsx");
@@ -713,7 +714,19 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(roster, /TeacherCardGridSkeleton/);
     assert.match(roster, /Try again/);
     assert.doesNotMatch(roster, /ResponsiveTable|MobileCardList/);
+    assert.match(roster, /reviewPromotionRequests/);
+    assert.match(roster, /<TeacherPromotionRequests/);
+    assert.match(promotionRequests, /promotion_only=true/);
+    assert.match(promotionRequests, /<ResponsiveTable/);
+    assert.match(promotionRequests, /<MobileCardList/);
+    assert.match(promotionRequests, />\s*Confirm\s*</);
+    assert.match(promotionRequests, />\s*Reject\s*</);
+    assert.match(promotionRequests, /status: selection\.action === "confirm" \? "approved" : "returned"/);
+    assert.match(promotionRequests, /A reason is required|Reason for rejection/);
+    assert.match(promotionRequests, /Awaiting CEO/);
+    assert.match(promotionRequests, /approval-requests\/\$\{approvalId\}\/review/);
     assert.match(academyPanel, /<TeacherAcademyRoster/);
+    assert.match(academyPanel, /reviewPromotionRequests=\{activeView === "active_teachers"\}/);
     assert.match(academyPanel, /<ScopedTeacherAcademyRoster/);
     assert.doesNotMatch(academyPanel, /AppointedLessonsView|appointed_lessons|Appointed Lessons/);
     assert.match(academyPanel, /export interface TeacherAcademyPanelProps/);

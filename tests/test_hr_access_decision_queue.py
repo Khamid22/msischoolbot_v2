@@ -338,6 +338,74 @@ def test_academic_director_decision_queue_endpoint_is_role_scoped(client, monkey
     assert denied.status_code == 403
 
 
+def test_academic_director_can_filter_decision_queue_to_academy_promotions(
+    client, monkeypatch
+):
+    captured = {}
+
+    def list_queue(user, **values):
+        captured.update(values)
+        return {
+            "items": [],
+            "page": 1,
+            "per_page": values["per_page"],
+            "total": 0,
+            "total_pages": 1,
+            "role": user.role,
+        }
+
+    monkeypatch.setattr(service, "list_decision_queue", list_queue)
+    _set_session(client, "academic_director")
+
+    response = client.get(
+        "/api/v1/recruitment/decision-queue"
+        "?page=1&per_page=100&promotion_only=true",
+        headers=XHR,
+    )
+
+    assert response.status_code == 200
+    assert captured["promotion_only"] is True
+    assert captured["per_page"] == 100
+
+
+def test_promotion_queue_selects_only_open_academy_to_active_requests():
+    class _Result:
+        def fetchone(self):
+            return {"total": 0}
+
+        def fetchall(self):
+            return []
+
+    class _RecordingConnection:
+        def __init__(self):
+            self.calls = []
+
+        def execute(self, sql, params=None):
+            self.calls.append((sql, params))
+            return _Result()
+
+    conn = _RecordingConnection()
+
+    rows, total = repository.list_decision_queue_rows(
+        conn,
+        account_id=41,
+        promotion_only=True,
+        limit=100,
+        offset=0,
+    )
+
+    assert rows == []
+    assert total == 0
+    assert len(conn.calls) == 2
+    for sql, _params in conn.calls:
+        assert "candidate.status = 'teacher_academy'" in sql
+        assert "queue_visibility.requested_outcome = 'active_teacher'" in sql
+        assert "queue_visibility.status IN ('requested', 'approved')" in sql
+        assert "queue_assignment" not in sql
+    assert conn.calls[0][1] is None
+    assert conn.calls[1][1] == (100, 0)
+
+
 def test_decision_queue_sql_unions_assignment_and_actionable_approval():
     sql, params = repository._visibility_clause(41, None, include_decision_queue=True)
 

@@ -31,6 +31,7 @@ import {
   academyStatusPresentation,
   type TeacherAcademySort,
 } from "@/features/teacher-academy/model";
+import { TeacherPromotionRequests } from "@/features/teacher-academy/TeacherPromotionRequests";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { Pagination } from "@/shared/ui/Pagination";
 
@@ -108,6 +109,7 @@ type TeacherAcademyRosterProps = {
   onAnnouncement: (message: string, tone?: RosterMessageTone) => void;
   toolbarLeading?: ReactNode;
   toolbarLayout?: "default" | "academy";
+  reviewPromotionRequests?: boolean;
 };
 
 function initialRosterFilters() {
@@ -179,6 +181,7 @@ export function TeacherAcademyRoster({
   onAnnouncement,
   toolbarLeading,
   toolbarLayout = "default",
+  reviewPromotionRequests = false,
 }: TeacherAcademyRosterProps) {
   const initial = useMemo(initialRosterFilters, []);
   const [search, setSearch] = useState(initial.search);
@@ -388,6 +391,9 @@ export function TeacherAcademyRoster({
         tabIndex={toolbarLayout === "academy" && toolbarLeading ? 0 : undefined}
         className="space-y-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
       >
+        {kind === "active_teacher" && reviewPromotionRequests ? (
+          <TeacherPromotionRequests onAnnouncement={onAnnouncement} />
+        ) : null}
         {teachers.isLoading ? <TeacherCardGridSkeleton count={perPage} /> : null}
         {teachers.error ? (
           <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">

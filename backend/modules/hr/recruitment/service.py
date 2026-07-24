@@ -721,11 +721,13 @@ def list_decision_queue(
     *,
     page: int = 1,
     per_page: int = 25,
+    promotion_only: bool = False,
 ) -> dict[str, Any]:
     return candidate_service.list_decision_queue(
         user,
         page=page,
         per_page=per_page,
+        promotion_only=promotion_only,
         dependencies=_candidate_dependencies(),
     )
 

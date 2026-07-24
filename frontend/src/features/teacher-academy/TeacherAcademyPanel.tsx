@@ -807,6 +807,7 @@ export function TeacherAcademyPanel({
                 />
               )}
               toolbarLayout="academy"
+              reviewPromotionRequests={activeView === "active_teachers"}
               onOpenTeacher={openCanonicalRosterTeacher}
               onRemoved={(teacher) => {
                 onAcademyChange(academyTeachers.filter((row) => asNumber(row.id) !== teacher.record_id));

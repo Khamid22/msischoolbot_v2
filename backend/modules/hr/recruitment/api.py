@@ -239,6 +239,7 @@ def close_teacher_handoff(
 def decision_queue(
     page: Annotated[int, Query(ge=1)] = 1,
     per_page: Annotated[int, Query(ge=1, le=100)] = 25,
+    promotion_only: Annotated[bool, Query()] = False,
     user: CurrentUser = Depends(require_role("academic_director")),
 ):
     return api_success(
@@ -247,6 +248,7 @@ def decision_queue(
             user,
             page=page,
             per_page=per_page,
+            promotion_only=promotion_only,
         )
     )
 

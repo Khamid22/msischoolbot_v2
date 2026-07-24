@@ -704,31 +704,46 @@ def list_decision_queue_rows(
     conn: Any,
     *,
     account_id: int,
+    promotion_only: bool = False,
     limit: int = 25,
     offset: int = 0,
 ) -> tuple[list[Any], int]:
-    visibility = """
-        EXISTS (
-            SELECT 1
-            FROM msi_v2.teacher_candidate_assignments queue_assignment
-            WHERE queue_assignment.candidate_id = candidate.id
-              AND queue_assignment.assignee_account_id = %s
-              AND queue_assignment.status = 'active'
-        )
-        OR EXISTS (
-            SELECT 1
-            FROM msi_v2.teacher_candidate_hire_approvals queue_visibility
-            WHERE queue_visibility.candidate_id = candidate.id
-              AND queue_visibility.status IN ('requested', 'approved')
-        )
-    """
+    if promotion_only:
+        visibility = """
+            candidate.status = 'teacher_academy'
+            AND EXISTS (
+                SELECT 1
+                FROM msi_v2.teacher_candidate_hire_approvals queue_visibility
+                WHERE queue_visibility.candidate_id = candidate.id
+                  AND queue_visibility.requested_outcome = 'active_teacher'
+                  AND queue_visibility.status IN ('requested', 'approved')
+            )
+        """
+        visibility_params: tuple[Any, ...] = ()
+    else:
+        visibility = """
+            EXISTS (
+                SELECT 1
+                FROM msi_v2.teacher_candidate_assignments queue_assignment
+                WHERE queue_assignment.candidate_id = candidate.id
+                  AND queue_assignment.assignee_account_id = %s
+                  AND queue_assignment.status = 'active'
+            )
+            OR EXISTS (
+                SELECT 1
+                FROM msi_v2.teacher_candidate_hire_approvals queue_visibility
+                WHERE queue_visibility.candidate_id = candidate.id
+                  AND queue_visibility.status IN ('requested', 'approved')
+            )
+        """
+        visibility_params = (int(account_id),)
     total_row = conn.execute(
         f"""
         SELECT count(*) AS total
         FROM msi_v2.teacher_candidates candidate
         WHERE candidate.status <> 'trash_bin' AND ({visibility})
         """,
-        (int(account_id),),
+        visibility_params or None,
     ).fetchone()
     rows = conn.execute(
         f"""
@@ -744,7 +759,7 @@ def list_decision_queue_rows(
                  candidate.id DESC
         LIMIT %s OFFSET %s
         """,
-        (int(account_id), int(limit), int(offset)),
+        (*visibility_params, int(limit), int(offset)),
     ).fetchall()
     return rows, int(total_row["total"] or 0) if total_row else 0
 

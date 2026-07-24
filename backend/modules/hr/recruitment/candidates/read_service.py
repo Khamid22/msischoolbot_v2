@@ -379,6 +379,7 @@ def list_decision_queue(
     *,
     page: int = 1,
     per_page: int = 25,
+    promotion_only: bool = False,
     dependencies: CandidateReadDependencies,
 ) -> dict[str, Any]:
     if user.role != "academic_director" or not user.account_id:
@@ -392,6 +393,7 @@ def list_decision_queue(
         rows, total = repository.list_decision_queue_rows(
             conn,
             account_id=int(user.account_id),
+            promotion_only=promotion_only,
             limit=safe_per_page,
             offset=(safe_page - 1) * safe_per_page,
         )
