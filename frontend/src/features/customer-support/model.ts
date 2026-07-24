@@ -104,6 +104,18 @@ export type StudentParentLink = {
   linked_at?: string;
 };
 
+export type ParentInviteSummary = {
+  id: number;
+  status: "pending" | "consumed" | "expired" | "revoked" | string;
+  created_at: string;
+  expires_at?: string | null;
+  used_at?: string | null;
+  used_count: number;
+  max_uses: number;
+  used_by_parent_id?: number | null;
+  used_by_parent_name?: string;
+};
+
 export type PaymentState = "paid" | "due" | "debt" | "upcoming" | "voided";
 
 export type PaymentRecord = {
@@ -154,6 +166,7 @@ export type StudentDetail = {
   profile: StudentProfile;
   academic: StudentEnrollment[];
   parents: StudentParentLink[];
+  parentInvites: ParentInviteSummary[];
   payments: PaymentPayload;
   activity: SupportAuditEvent[];
 };

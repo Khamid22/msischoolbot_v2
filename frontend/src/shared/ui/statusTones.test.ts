@@ -16,6 +16,10 @@ const requiredStatuses = [
   "Published",
   "Missing",
   "Trash Bin",
+  "Linked",
+  "Pending",
+  "Expired",
+  "Unlinked",
 ];
 
 describe("statusToneMap", () => {
@@ -44,6 +48,13 @@ describe("statusLabel", () => {
 
   it("passes unknown statuses through untouched", () => {
     assert.equal(statusLabel("Custom Thing"), "Custom Thing");
+  });
+
+  it("uses support-friendly labels for completed and replaced invitations", () => {
+    assert.equal(statusTone("consumed"), "info");
+    assert.equal(statusLabel("consumed"), "Used");
+    assert.equal(statusTone("revoked"), "danger");
+    assert.equal(statusLabel("revoked"), "Replaced");
   });
 });
 

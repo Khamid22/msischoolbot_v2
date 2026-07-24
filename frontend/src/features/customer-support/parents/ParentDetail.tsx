@@ -1,4 +1,4 @@
-import { Archive, Edit3, GraduationCap, Link2, RefreshCw, ShieldCheck, Unlink, UserRound } from "lucide-react";
+import { Archive, Edit3, ExternalLink, Link2, RefreshCw, ShieldCheck, Unlink, UserRound, UsersRound } from "lucide-react";
 import type { ParentDetail as ParentDetailModel, ParentStudentLink } from "@/features/customer-support/model";
 import { ActivityTimeline } from "@/features/customer-support/shared/ActivityTimeline";
 import { dangerButton, DetailSection, Field, formatDate, money, primaryButton, secondaryButton } from "@/features/customer-support/shared/ui";
@@ -61,8 +61,8 @@ export function ParentDetail({
       </DetailSection>
 
       <DetailSection
-        title="Linked students"
-        icon={<GraduationCap className="h-4 w-4" aria-hidden="true" />}
+        title="Family"
+        icon={<UsersRound className="h-4 w-4" aria-hidden="true" />}
         action={(
           <button type="button" onClick={onLink} className={secondaryButton}>
             <Link2 className="h-4 w-4" aria-hidden="true" />
@@ -72,9 +72,13 @@ export function ParentDetail({
       >
         <div className="mb-3 flex flex-wrap gap-2">
           <span className="rounded-lg bg-muted px-3 py-2 text-xs font-black text-foreground">
-            {detail.children.length} visible {detail.children.length === 1 ? "student" : "students"}
+            {detail.children.length} linked {detail.children.length === 1 ? "student" : "students"}
           </span>
-          <span className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-black text-amber-800">Outstanding {money(outstanding)}</span>
+          {outstanding > 0 ? (
+            <span className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-black text-amber-800">Outstanding {money(outstanding)}</span>
+          ) : (
+            <span className="rounded-lg border border-success/25 bg-success/10 px-3 py-2 text-xs font-black text-success">No outstanding balance</span>
+          )}
         </div>
         {detail.hiddenChildCount > 0 ? (
           <p className="mb-3 rounded-lg border border-border bg-muted px-3 py-2 text-xs font-bold text-muted-foreground">
@@ -88,22 +92,41 @@ export function ParentDetail({
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="break-words text-sm font-black text-foreground">{student.full_name}</p>
-                    <StatusBadge status={student.status} className="text-[0.625rem]" />
+                    <StatusBadge status="linked" className="text-[0.625rem]" />
                   </div>
                   <p className="mt-1 break-words text-xs font-semibold text-muted-foreground">
-                    {student.student_code} · {student.school_name} · Due {money(student.outstanding)}
+                    {student.student_code} · {student.school_name}
                   </p>
-                  {student.relationship ? <p className="mt-2 text-xs font-bold capitalize text-muted-foreground">{student.relationship}</p> : null}
+                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-bold text-muted-foreground">
+                    {student.relationship ? <span className="capitalize">{student.relationship}</span> : null}
+                    {student.linked_at ? <span>Linked {formatDate(student.linked_at)}</span> : null}
+                    <span>Student {student.status}</span>
+                    {student.outstanding > 0 ? <span className="text-amber-700">Due {money(student.outstanding)}</span> : null}
+                  </div>
                 </div>
-                <button type="button" onClick={() => onUnlink(student)} className={dangerButton}>
-                  <Unlink className="h-4 w-4" aria-hidden="true" />
-                  Unlink
-                </button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <a
+                    href={`/customer-support/students?recordId=${student.id}`}
+                    className={secondaryButton}
+                  >
+                    Open student
+                    <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                  </a>
+                  <button type="button" onClick={() => onUnlink(student)} className={dangerButton}>
+                    <Unlink className="h-4 w-4" aria-hidden="true" />
+                    Unlink
+                  </button>
+                </div>
               </article>
             ))}
           </div>
         ) : (
-          <p className="text-sm font-semibold text-muted-foreground">No visible linked students.</p>
+          <div className="rounded-lg border border-dashed border-border bg-muted/40 p-4">
+            <p className="text-sm font-black text-foreground">No linked students</p>
+            <p className="mt-1 text-sm font-semibold leading-6 text-muted-foreground">
+              Link an available student to make the family relationship visible to support staff.
+            </p>
+          </div>
         )}
       </DetailSection>
 

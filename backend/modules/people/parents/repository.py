@@ -547,6 +547,20 @@ def insert_parent_invite_row(
     )
 
 
+def revoke_pending_parent_invites(conn, *, student_db_id):
+    result = conn.execute(
+        """
+        UPDATE msi_v2.account_invites
+        SET status = 'revoked'
+        WHERE invite_type = 'parent'
+          AND student_id = %s
+          AND status = 'pending'
+        """,
+        (int(student_db_id),),
+    )
+    return max(0, int(result.rowcount or 0))
+
+
 def get_pending_parent_invite_payload(conn, token_hash, *, for_update=False):
     lock_clause = " FOR UPDATE OF invite" if for_update else ""
     return conn.execute(
@@ -617,6 +631,7 @@ __all__ = [
     "get_staff_db_id_for_admin_id",
     "get_student_v2_id_by_legacy_row",
     "insert_parent_invite_row",
+    "revoke_pending_parent_invites",
     "insert_parent_student_link",
     "link_parent_from_invite",
     "list_invite_parent_rows",

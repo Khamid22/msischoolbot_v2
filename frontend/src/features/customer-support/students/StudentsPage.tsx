@@ -1,4 +1,4 @@
-import { Banknote, Plus } from "lucide-react";
+import { Banknote, Plus, RefreshCw } from "lucide-react";
 import { useCallback, useState } from "react";
 import {
   sendSupport,
@@ -26,6 +26,7 @@ type StudentDialog =
   | { type: "edit" }
   | { type: "credentials"; title: string; result: StudentMutationResult["credentials"] }
   | { type: "invite"; result: ParentInviteResult }
+  | { type: "replaceInvite" }
   | { type: "reason"; action: "archive" | "reactivate" | "void"; title: string; payment?: PaymentRecord }
   | { type: "payment"; payment?: PaymentRecord }
   | null;
@@ -132,7 +133,10 @@ export function StudentsPage({
       () => sendSupport<ParentInviteResult>(`/students/${detail.profile.id}/parent-invites`, "POST", {
         expectedVersion: detail.profile.version,
       }, csrfToken),
-      (result) => setDialog({ type: "invite", result }),
+      (result) => {
+        controller.reloadDetail();
+        setDialog({ type: "invite", result });
+      },
       "Parent invitation created.",
     );
   }
@@ -228,7 +232,11 @@ export function StudentsPage({
               action: reactivate ? "reactivate" : "archive",
               title: reactivate ? "Reactivate student" : "Archive student",
             })}
-            onInvite={createInvite}
+            onInvite={() => {
+              const hasPendingInvite = (detail.parentInvites || []).some((invite) => invite.status === "pending");
+              if (hasPendingInvite) setDialog({ type: "replaceInvite" });
+              else createInvite();
+            }}
             onAddPayment={() => setDialog({ type: "payment" })}
             onEditPayment={(payment) => setDialog({ type: "payment", payment })}
             onSettle={(payment, paid) => setSettlementTarget({ payment, paid })}
@@ -272,6 +280,30 @@ export function StudentsPage({
           onCopy={copy}
           onClose={() => setDialog(null)}
         />
+      ) : null}
+      {dialog?.type === "replaceInvite" ? (
+        <Modal
+          title="Replace the pending invitation?"
+          subtitle="The existing invitation link will stop working immediately."
+          onClose={() => setDialog(null)}
+          size="sm"
+          mobileMode="fullscreen"
+        >
+          <ModalBody>
+            <div className="rounded-lg border border-warning/35 bg-warning/15 p-4 text-sm font-semibold leading-6 text-warning-foreground">
+              Continue only if the previous link was lost or sent to the wrong person. The new link will be shown once for copying.
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" className={secondaryButton} onClick={() => setDialog(null)}>Keep current invite</button>
+              <button type="button" disabled={saving} className={primaryButton} onClick={createInvite}>
+                <RefreshCw className={`h-4 w-4 ${saving ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
+                Replace invite
+              </button>
+            </div>
+          </ModalFooter>
+        </Modal>
       ) : null}
       {dialog?.type === "payment" && detail ? (
         <PaymentDialog

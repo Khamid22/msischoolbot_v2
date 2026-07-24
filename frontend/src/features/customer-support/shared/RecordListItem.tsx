@@ -1,4 +1,4 @@
-import { ChevronRight, GraduationCap, UsersRound } from "lucide-react";
+import { ChevronRight, GraduationCap, Link2, UsersRound } from "lucide-react";
 import type { SupportRecordSummary } from "@/features/customer-support/model";
 import { money } from "@/features/customer-support/shared/ui";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
@@ -13,9 +13,13 @@ export function RecordListItem({
   onSelect: () => void;
 }) {
   const Icon = item.kind === "student" ? GraduationCap : UsersRound;
-  const linkLabel = item.kind === "student"
-    ? `${item.linked_count} linked ${item.linked_count === 1 ? "parent" : "parents"}`
-    : `${item.linked_count} linked ${item.linked_count === 1 ? "student" : "students"}`;
+  const linkLabel = item.linked_count
+    ? item.kind === "student"
+      ? `${item.linked_count} ${item.linked_count === 1 ? "parent" : "parents"}`
+      : `${item.linked_count} ${item.linked_count === 1 ? "student" : "students"}`
+    : item.kind === "student"
+      ? "No linked parent"
+      : "No linked student";
 
   return (
     <button
@@ -36,7 +40,10 @@ export function RecordListItem({
         <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold text-muted-foreground">
           <span>{item.school_name}</span>
           {item.outstanding > 0 ? <span className="text-amber-700">Due {money(item.outstanding)}</span> : null}
-          <span>{linkLabel}</span>
+          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 ${item.linked_count ? "border-success/25 bg-success/10 text-success" : "border-warning/35 bg-warning/15 text-warning-foreground"}`}>
+            <Link2 className="h-3 w-3" aria-hidden="true" />
+            {linkLabel}
+          </span>
         </span>
       </span>
       <ChevronRight className="mt-2 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />

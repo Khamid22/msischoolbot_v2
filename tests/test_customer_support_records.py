@@ -204,6 +204,58 @@ def test_duplicate_parent_child_link_is_rejected_without_version_or_audit_mutati
     assert not conn.committed
 
 
+def test_customer_support_parent_invite_replaces_pending_link(monkeypatch):
+    class Connection:
+        committed = False
+
+        def commit(self):
+            self.committed = True
+
+    conn = Connection()
+
+    @contextmanager
+    def opened():
+        yield conn
+
+    scope = service.SchoolScope(True, (3,), ({"id": 3},), "")
+    invite_call = {}
+    monkeypatch.setattr(service, "_connect", opened)
+    monkeypatch.setattr(service, "load_scope", lambda connection, actor: scope)
+    monkeypatch.setattr(
+        repository,
+        "get_student_row",
+        lambda connection, student_id: {
+            "id": student_id,
+            "school_id": 3,
+            "version": 4,
+            "legacy_student_row_id": 77,
+        },
+    )
+    monkeypatch.setattr(
+        service,
+        "create_parent_invite_code",
+        lambda student_row_id, **kwargs: invite_call.update(
+            {"student_row_id": student_row_id, **kwargs}
+        )
+        or "new-code",
+    )
+    monkeypatch.setattr(service, "_audit", lambda *args, **kwargs: None)
+
+    result = service.create_parent_invite(
+        service.SupportActor(17, 41, "support"),
+        8,
+        expected_version=4,
+    )
+
+    assert result == {"inviteCode": "new-code", "studentId": 8}
+    assert invite_call == {
+        "student_row_id": 77,
+        "issued_by": 17,
+        "replace_pending": True,
+    }
+    assert conn.committed
+
+
 def test_versions_conflict_and_cursor_round_trip():
     item = {"display_name": "Zoë Example", "kind": "student", "id": 75}
     assert service._decode_cursor(service._encode_cursor(item)) == (
@@ -267,6 +319,8 @@ def test_frontend_contract_is_split_search_first_and_strongly_typed():
     records_hook = Path("frontend/src/features/customer-support/shared/useSupportRecords.ts").read_text()
     students = Path("frontend/src/features/customer-support/students/StudentsPage.tsx").read_text()
     parents = Path("frontend/src/features/customer-support/parents/ParentsPage.tsx").read_text()
+    student_detail = Path("frontend/src/features/customer-support/students/StudentDetail.tsx").read_text()
+    parent_detail = Path("frontend/src/features/customer-support/parents/ParentDetail.tsx").read_text()
     link_dialog = Path("frontend/src/features/customer-support/parents/LinkStudentDialog.tsx").read_text()
     model = Path("frontend/src/features/customer-support/model.ts").read_text()
     api = Path("frontend/src/features/customer-support/api.ts").read_text()
@@ -299,6 +353,11 @@ def test_frontend_contract_is_split_search_first_and_strongly_typed():
     assert "} while (cursor);" in link_dialog
     assert "excludedIds" not in link_dialog
     assert "/payments/${payment.id}/void" in students
+    assert "Replace the pending invitation?" in students
+    assert "Parent invitations" in student_detail
+    assert "/customer-support/parents?recordId=" in student_detail
+    assert 'title="Family"' in parent_detail
+    assert "/customer-support/students?recordId=" in parent_detail
     for type_name in (
         "SupportSchool",
         "SupportRecordSummary",
@@ -307,6 +366,7 @@ def test_frontend_contract_is_split_search_first_and_strongly_typed():
         "StudentEnrollment",
         "ParentStudentLink",
         "StudentParentLink",
+        "ParentInviteSummary",
         "PaymentRecord",
         "PaymentTotals",
         "SupportAuditEvent",

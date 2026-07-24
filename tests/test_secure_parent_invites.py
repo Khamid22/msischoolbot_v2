@@ -43,6 +43,41 @@ def test_new_parent_invite_stores_only_a_sha256_digest(monkeypatch):
     assert raw_code not in captured.values()
 
 
+def test_replacing_parent_invite_revokes_pending_link_before_insert(monkeypatch):
+    connection = _Connection()
+    calls = []
+    monkeypatch.setattr(service, "_connect", lambda: _connected(connection))
+    monkeypatch.setattr(service.secrets, "token_urlsafe", lambda _size: "new-parent-code")
+    monkeypatch.setattr(
+        service.parent_repository,
+        "get_student_v2_id_by_legacy_row",
+        lambda _conn, _student_id: 41,
+    )
+    monkeypatch.setattr(
+        service.parent_repository,
+        "get_staff_db_id_for_admin_id",
+        lambda _conn, _staff_id: 9,
+    )
+    monkeypatch.setattr(
+        service.parent_repository,
+        "revoke_pending_parent_invites",
+        lambda _conn, **values: calls.append(("revoke", values["student_db_id"])),
+    )
+    monkeypatch.setattr(
+        service.parent_repository,
+        "insert_parent_invite_row",
+        lambda _conn, **values: calls.append(("insert", values["student_db_id"])),
+    )
+
+    service.create_parent_invite_code(
+        7,
+        issued_by=9,
+        replace_pending=True,
+    )
+
+    assert calls == [("revoke", 41), ("insert", 41)]
+
+
 def test_parent_invite_claim_locks_links_provisions_and_consumes_once(monkeypatch):
     connection = _Connection()
     calls = []

@@ -383,6 +383,10 @@ def _student_detail(conn, scope: SchoolScope, student_id: int):
         total = present + absent + justified
         enrollment["attendanceRate"] = round(((present + justified) / total) * 100) if total else 0
     parents = [_public_row(row) for row in repository.list_student_parent_rows(conn, student_id)]
+    parent_invites = [
+        _public_row(row)
+        for row in repository.list_student_parent_invite_rows(conn, student_id)
+    ]
     payments = _payments_payload(repository.list_payment_rows(conn, student_id=student_id))
     activity = _activity(repository.list_audit_rows(
         conn, entity_types=["student", "student_account"], entity_id=student_id
@@ -392,6 +396,7 @@ def _student_detail(conn, scope: SchoolScope, student_id: int):
         "profile": _public_row(student),
         "academic": enrollments,
         "parents": parents,
+        "parentInvites": parent_invites,
         "payments": payments,
         "activity": activity,
     }
@@ -786,7 +791,11 @@ def create_parent_invite(
         student = _ensure_student_visible(conn, scope, student_id)
         _ensure_version(student["version"], expected_version)
         legacy_id = int(student["legacy_student_row_id"] or 0)
-    code = create_parent_invite_code(legacy_id, issued_by=actor.staff_id or 0)
+    code = create_parent_invite_code(
+        legacy_id,
+        issued_by=actor.staff_id or 0,
+        replace_pending=True,
+    )
     with _connect() as conn:
         scope = load_scope(conn, actor)
         current = _ensure_student_visible(conn, scope, student_id)

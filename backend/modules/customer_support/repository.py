@@ -318,6 +318,36 @@ def list_student_parent_rows(conn, student_id: int):
     ).fetchall()
 
 
+def list_student_parent_invite_rows(conn, student_id: int, limit: int = 10):
+    return conn.execute(
+        """
+        SELECT invite.id,
+               CASE
+                   WHEN invite.status = 'pending'
+                        AND invite.used_count >= invite.max_uses THEN 'consumed'
+                   WHEN invite.status = 'pending'
+                        AND invite.expires_at IS NOT NULL
+                        AND invite.expires_at <= now() THEN 'expired'
+                   ELSE invite.status
+               END AS status,
+               invite.created_at,
+               invite.expires_at,
+               invite.used_at,
+               invite.used_count,
+               invite.max_uses,
+               invite.used_by_parent_id,
+               COALESCE(parent.display_name, '') AS used_by_parent_name
+        FROM msi_v2.account_invites invite
+        LEFT JOIN msi_v2.parents parent ON parent.id = invite.used_by_parent_id
+        WHERE invite.invite_type = 'parent'
+          AND invite.student_id = %s
+        ORDER BY invite.created_at DESC, invite.id DESC
+        LIMIT %s
+        """,
+        (int(student_id), max(1, min(int(limit or 10), 25))),
+    ).fetchall()
+
+
 def get_parent_row(conn, parent_id: int):
     return conn.execute(
         """

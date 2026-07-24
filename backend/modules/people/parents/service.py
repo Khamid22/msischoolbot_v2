@@ -318,7 +318,13 @@ def _invite_code_hash(code):
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest() if normalized else ""
 
 
-def create_parent_invite_code(student_row_id, issued_by=0, *, expires_days=14):
+def create_parent_invite_code(
+    student_row_id,
+    issued_by=0,
+    *,
+    expires_days=14,
+    replace_pending=False,
+):
     student_row_id = int(student_row_id or 0)
     issued_by = int(issued_by or 0) or None
     if student_row_id <= 0:
@@ -332,6 +338,11 @@ def create_parent_invite_code(student_row_id, issued_by=0, *, expires_days=14):
         for _ in range(5):
             code = secrets.token_urlsafe(9).rstrip("=")
             try:
+                if replace_pending:
+                    parent_repository.revoke_pending_parent_invites(
+                        conn,
+                        student_db_id=student_db_id,
+                    )
                 parent_repository.insert_parent_invite_row(
                     conn,
                     token_hash=_invite_code_hash(code),
