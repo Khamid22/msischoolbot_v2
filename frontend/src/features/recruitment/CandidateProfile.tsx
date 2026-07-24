@@ -1641,7 +1641,7 @@ function ActionFields({
         <div className="grid gap-2">
           <p className="rounded-lg bg-muted/50 p-3 text-sm">
             {action.status === "approved"
-              ? `${stageLabels[text(action.approval.requested_outcome)]} will be approved for future CEO finalization. The candidate will not be activated yet.`
+              ? `${stageLabels[text(action.approval.requested_outcome)]} will be confirmed and activated immediately.`
               : `${stageLabels[text(action.approval.requested_outcome)]} approval will be returned to HR.`}
           </p>
           <label className="text-xs font-semibold">
@@ -1651,7 +1651,7 @@ function ActionFields({
               required={action.status === "returned"}
               defaultValue={
                 action.status === "approved"
-                  ? "Approved by Academic Director for CEO review."
+                  ? "Confirmed and activated by Academic Director."
                   : ""
               }
               className={`${fieldClass} mt-1 min-h-24`}
@@ -3158,29 +3158,41 @@ export function CandidateProfile({
             >
               <div className="space-y-2">
                 {(candidate.approvals || []).map((item) => {
-                  const reviewItems: ActionMenuItem[] =
-                    !permissions?.can_review_approval
-                      ? []
-                      : item.status === "requested"
+                  const reviewItems: ActionMenuItem[] = !permissions?.can_review_approval
+                    ? []
+                    : item.status === "requested"
+                      ? [
+                          {
+                            key: "approve",
+                            label: "Confirm and activate",
+                            onClick: () =>
+                              setAction({
+                                kind: "review_approval",
+                                approval: item,
+                                status: "approved",
+                              }),
+                          },
+                          {
+                            key: "return",
+                            label: "Return with comment",
+                            onClick: () =>
+                              setAction({
+                                kind: "review_approval",
+                                approval: item,
+                                status: "returned",
+                              }),
+                          },
+                        ]
+                      : item.status === "approved"
                         ? [
                             {
-                              key: "approve",
-                              label: "Approve for CEO review",
+                              key: "complete",
+                              label: "Complete promotion",
                               onClick: () =>
                                 setAction({
                                   kind: "review_approval",
                                   approval: item,
                                   status: "approved",
-                                }),
-                            },
-                            {
-                              key: "return",
-                              label: "Return with comment",
-                              onClick: () =>
-                                setAction({
-                                  kind: "review_approval",
-                                  approval: item,
-                                  status: "returned",
                                 }),
                             },
                           ]

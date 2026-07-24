@@ -84,7 +84,7 @@ export function TeacherPromotionRequests({
       setRejectionReason("");
       onAnnouncement(
         variables.status === "approved"
-          ? result.message || "Promotion confirmed. CEO finalization remains pending."
+          ? result.message || "Promotion confirmed. The teacher is now active."
           : "Promotion request rejected and returned to HR.",
         "success",
       );
@@ -115,7 +115,11 @@ export function TeacherPromotionRequests({
   const submitReview = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const approval = selection?.candidate.actionable_approval;
-    if (!selection || !approval || approval.status !== "requested") return;
+    if (
+      !selection
+      || !approval
+      || !["requested", "approved"].includes(approval.status)
+    ) return;
     const reason = rejectionReason.trim();
     if (selection.action === "reject" && !reason) return;
     review.mutate({
@@ -123,25 +127,17 @@ export function TeacherPromotionRequests({
       approvalId: approval.id,
       status: selection.action === "confirm" ? "approved" : "returned",
       reviewComment: selection.action === "confirm"
-        ? "Confirmed by Academic Director for CEO review."
+        ? "Confirmed and activated by Academic Director."
         : reason,
     });
   };
 
   const items = promotions.data?.items || [];
-  const pendingCount = items.filter(
-    (candidate) => candidate.actionable_approval?.status === "requested",
-  ).length;
 
   const actionControls = (candidate: RecruitmentCandidate) => {
     const approval = candidate.actionable_approval;
-    if (!approval || approval.status !== "requested") {
-      return (
-        <span className="text-xs font-semibold text-muted-foreground">
-          Waiting for CEO finalization
-        </span>
-      );
-    }
+    if (!approval) return null;
+    const wasPreviouslyApproved = approval.status === "approved";
     return (
       <div className="flex flex-wrap gap-2">
         <button
@@ -151,17 +147,19 @@ export function TeacherPromotionRequests({
           className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
         >
           <Check className="h-4 w-4" aria-hidden="true" />
-          Confirm
+          {wasPreviouslyApproved ? "Complete promotion" : "Confirm"}
         </button>
-        <button
-          type="button"
-          onClick={() => openReview(candidate, "reject")}
-          disabled={review.isPending}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-destructive/35 bg-card px-3 text-sm font-bold text-destructive transition-colors hover:bg-destructive/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/35 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
-        >
-          <X className="h-4 w-4" aria-hidden="true" />
-          Reject
-        </button>
+        {!wasPreviouslyApproved ? (
+          <button
+            type="button"
+            onClick={() => openReview(candidate, "reject")}
+            disabled={review.isPending}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-destructive/35 bg-card px-3 text-sm font-bold text-destructive transition-colors hover:bg-destructive/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/35 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+            Reject
+          </button>
+        ) : null}
       </div>
     );
   };
@@ -190,7 +188,9 @@ export function TeacherPromotionRequests({
             </div>
           </div>
           <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black tabular-nums text-primary">
-            {promotions.isLoading ? "Loading…" : `${pendingCount} pending`}
+            {promotions.isLoading
+              ? "Loading…"
+              : `${items.length} ${items.length === 1 ? "action" : "actions"}`}
           </span>
         </div>
 
@@ -279,7 +279,7 @@ export function TeacherPromotionRequests({
                             status={isConfirmed ? "approved" : "requested"}
                             tone={isConfirmed ? "success" : "warning"}
                           >
-                            {isConfirmed ? "Confirmed · Awaiting CEO" : "Needs review"}
+                            {isConfirmed ? "Ready to activate" : "Needs review"}
                           </StatusBadge>
                         </td>
                         <td className="px-3 py-3">{actionControls(candidate)}</td>
@@ -316,7 +316,7 @@ export function TeacherPromotionRequests({
                         status={isConfirmed ? "approved" : "requested"}
                         tone={isConfirmed ? "success" : "warning"}
                       >
-                        {isConfirmed ? "Awaiting CEO" : "Needs review"}
+                        {isConfirmed ? "Ready to activate" : "Needs review"}
                       </StatusBadge>
                     </div>
                     <div className="mt-2 rounded-lg bg-muted/55 p-3">
@@ -338,7 +338,13 @@ export function TeacherPromotionRequests({
 
       <Modal
         open={Boolean(selection)}
-        title={selection?.action === "confirm" ? "Confirm promotion" : "Reject promotion request"}
+        title={
+          selection?.action === "confirm"
+            ? selection.candidate.actionable_approval?.status === "approved"
+              ? "Complete promotion"
+              : "Confirm promotion"
+            : "Reject promotion request"
+        }
         subtitle={selection?.candidate.full_name}
         onClose={closeReview}
         closeOnOutsideClick={!review.isPending}
@@ -372,8 +378,8 @@ export function TeacherPromotionRequests({
               <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
                 <ClipboardCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
                 <p className="text-sm leading-6 text-foreground">
-                  This records Academic Director approval. The teacher will remain awaiting CEO
-                  finalization and is not activated yet.
+                  This immediately moves the teacher from Teacher Academy to Active Teachers. No
+                  additional approval step is required.
                 </p>
               </div>
             )}
@@ -414,7 +420,11 @@ export function TeacherPromotionRequests({
                 ) : (
                   <Check className="h-4 w-4" aria-hidden="true" />
                 )}
-                {selection?.action === "reject" ? "Reject request" : "Confirm promotion"}
+                {selection?.action === "reject"
+                  ? "Reject request"
+                  : selection?.candidate.actionable_approval?.status === "approved"
+                    ? "Activate teacher"
+                    : "Confirm and activate"}
               </button>
             </div>
           </ModalFooter>

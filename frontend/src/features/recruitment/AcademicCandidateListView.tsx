@@ -667,7 +667,7 @@ export function AcademicCandidateListView({
                           {role === "academic_director" &&
                           approval?.status === "approved" ? (
                             <span className="rounded-full border border-blue-300 bg-blue-50 px-2 py-1 text-[0.6875rem] font-semibold text-blue-700 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-200">
-                              Awaiting CEO
+                              Ready to activate
                             </span>
                           ) : null}
                         </div>
@@ -784,7 +784,7 @@ export function AcademicCandidateListView({
                   {role === "academic_director" &&
                   approval?.status === "approved" ? (
                     <p className="mt-2 rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-center text-xs font-semibold text-blue-700 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-200">
-                      Awaiting CEO finalization
+                      Ready to activate in Active Teachers
                     </p>
                   ) : null}
                 </article>

@@ -163,39 +163,134 @@ def review_approval(
                 "Teacher Academy placement is finalized directly by HR.",
                 status_code=409,
             )
-        if _text(approval["status"]) != "requested":
+        approval_status = _text(approval["status"])
+        is_legacy_approved_promotion = (
+            normalized_status == "approved" and approval_status == "approved"
+        )
+        if approval_status != "requested" and not is_legacy_approved_promotion:
             raise RecruitmentError(
                 "Approval request is no longer pending.",
                 status_code=409,
             )
-        if not repository.review_approval(
-            conn,
-            candidate_id=int(candidate_id),
-            approval_id=int(approval_id),
-            status=normalized_status,
-            comment=normalized_comment,
-            actor_account_id=_actor_account(user),
-            now=now,
-        ):
-            raise RecruitmentError(
-                "Approval request was not found or is no longer pending.",
-                status_code=409,
+        if approval_status == "requested":
+            if not repository.review_approval(
+                conn,
+                candidate_id=int(candidate_id),
+                approval_id=int(approval_id),
+                status=normalized_status,
+                comment=normalized_comment,
+                actor_account_id=_actor_account(user),
+                now=now,
+            ):
+                raise RecruitmentError(
+                    "Approval request was not found or is no longer pending.",
+                    status_code=409,
+                )
+            repository.insert_audit(
+                conn,
+                candidate_id=int(candidate_id),
+                event_type=f"candidate.hire_approval_{normalized_status}",
+                detail={
+                    "approval_id": int(approval_id),
+                    "comment": normalized_comment,
+                },
+                actor_account_id=_actor_account(user),
+                actor_staff_id=_actor_staff(user),
+                now=now,
             )
-        repository.touch_candidate(
-            conn,
-            candidate_id=int(candidate_id),
-            actor_account_id=_actor_account(user),
-            now=now,
-        )
-        repository.insert_audit(
-            conn,
-            candidate_id=int(candidate_id),
-            event_type=f"candidate.hire_approval_{normalized_status}",
-            detail={"approval_id": int(approval_id), "comment": normalized_comment},
-            actor_account_id=_actor_account(user),
-            actor_staff_id=_actor_staff(user),
-            now=now,
-        )
+        if normalized_status == "returned":
+            repository.touch_candidate(
+                conn,
+                candidate_id=int(candidate_id),
+                actor_account_id=_actor_account(user),
+                now=now,
+            )
+        else:
+            candidate = dependencies.lock_candidate(conn, int(candidate_id))
+            if not candidate:
+                raise RecruitmentError("Candidate was not found.", status_code=404)
+            academy_promotion = (
+                _text(candidate["status"]) == "teacher_academy"
+                and int(candidate.get("academy_teacher_id") or 0) > 0
+            )
+            if not academy_promotion:
+                evaluation_state = repository.candidate_evaluation_state(
+                    conn, candidate_id=int(candidate_id)
+                )
+                if _text(candidate["status"]) != "under_review" or not all(
+                    bool(evaluation_state[key])
+                    for key in (
+                        "interview_passed",
+                        "demo_passed",
+                        "subject_test_passed",
+                    )
+                ):
+                    raise RecruitmentError(
+                        "All recruitment evaluations must pass before Active Teacher promotion.",
+                        status_code=409,
+                    )
+            repository.ensure_active_teacher_intake(
+                conn,
+                candidate=candidate,
+                now=now,
+            )
+            decision_comment = (
+                normalized_comment
+                or "Confirmed and activated by Academic Director."
+            )
+            if not repository.update_candidate_stage(
+                conn,
+                candidate_id=int(candidate_id),
+                stage="active_teacher",
+                expected_version=int(candidate["version"]),
+                actor_account_id=_actor_account(user),
+                now=now,
+                comment=decision_comment,
+                transition_source="manual",
+            ):
+                raise RecruitmentError(
+                    "This candidate changed elsewhere. Refresh and try again.",
+                    status_code=409,
+                )
+            decision_values = {
+                "decision": "active_teacher",
+                "rejection_reason": "",
+                "withdrawal_reason": "",
+                "reason_detail": decision_comment,
+                "origin_stage": _text(candidate["status"]),
+                "follow_up_at": "",
+                "approval_id": int(approval_id),
+            }
+            decision_id = repository.insert_final_decision(
+                conn,
+                candidate_id=int(candidate_id),
+                values=decision_values,
+                actor_account_id=_actor_account(user),
+                actor_login=user.login,
+                now=now,
+            )
+            repository.consume_approval(
+                conn,
+                approval_id=int(approval_id),
+                now=now,
+            )
+            repository.insert_audit(
+                conn,
+                candidate_id=int(candidate_id),
+                event_type="candidate.final_decision_made",
+                detail={
+                    "decision_id": decision_id,
+                    "decision": "active_teacher",
+                    "rejection_reason": "",
+                    "withdrawal_reason": "",
+                    "reason_detail": decision_comment,
+                    "origin_stage": _text(candidate["status"]),
+                    "approval_id": int(approval_id),
+                },
+                actor_account_id=_actor_account(user),
+                actor_staff_id=_actor_staff(user),
+                now=now,
+            )
         dependencies.sync_next_actions(
             conn,
             candidate_id=int(candidate_id),

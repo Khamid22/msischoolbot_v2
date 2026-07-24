@@ -1098,7 +1098,7 @@ def review_approval(
         review_comment=payload.review_comment,
     )
     message = (
-        "Academic approval recorded. CEO approval remains pending."
+        "Promotion confirmed. The teacher is now active."
         if payload.status == "approved"
         else "Approval request returned."
     )

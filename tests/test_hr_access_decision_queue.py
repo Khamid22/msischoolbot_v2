@@ -503,9 +503,9 @@ def _patch_approval_transaction(monkeypatch, *, approval_status: str = "requeste
         "telegram_username": "ada",
         "subject_id": 3,
         "applied_position": "Math Teacher",
-        "status": "under_review",
+        "status": "teacher_academy",
         "version": 4,
-        "academy_teacher_id": None,
+        "academy_teacher_id": 31,
         "active_teacher_id": None,
     }
     approval = {
@@ -559,11 +559,15 @@ def _patch_approval_transaction(monkeypatch, *, approval_status: str = "requeste
         "consume_approval",
         lambda *_args, **_kwargs: events.append(("consumed", _kwargs["approval_id"])),
     )
-    monkeypatch.setattr(service, "get_candidate", lambda *_args: {"id": 8, "status": "under_review"})
+    monkeypatch.setattr(
+        service,
+        "get_candidate",
+        lambda *_args: {"id": 8, "status": "active_teacher"},
+    )
     return conn, events, candidate, approval
 
 
-def test_academic_director_approval_records_review_without_finalizing(monkeypatch):
+def test_academic_director_approval_immediately_activates_teacher(monkeypatch):
     conn, events, _candidate, _approval = _patch_approval_transaction(monkeypatch)
 
     result = service.review_approval(
@@ -574,14 +578,38 @@ def test_academic_director_approval_records_review_without_finalizing(monkeypatc
         review_comment="Academic review complete.",
     )
 
-    assert result["status"] == "under_review"
+    assert result["status"] == "active_teacher"
     assert ("approved", "approved") in events
-    assert ("touched", 8) in events
+    assert ("intake", 77) in events
+    assert ("stage", "active_teacher") in events
+    assert ("consumed", 9) in events
+    assert any(event == "decision" for event, _detail in events)
     assert any(event == "candidate.hire_approval_approved" for event, _detail in events)
-    assert not any(
-        event in {"intake", "academy", "stage", "decision", "consumed"}
-        for event, _detail in events
+    assert any(event == "candidate.final_decision_made" for event, _detail in events)
+    assert ("touched", 8) not in events
+    assert conn.commits == 1
+
+
+def test_legacy_approved_promotion_can_be_completed_without_ceo(monkeypatch):
+    conn, events, _candidate, _approval = _patch_approval_transaction(
+        monkeypatch,
+        approval_status="approved",
     )
+
+    result = service.review_approval(
+        _user(),
+        8,
+        9,
+        status="approved",
+        review_comment="Complete the existing promotion.",
+    )
+
+    assert result["status"] == "active_teacher"
+    assert ("approved", "approved") not in events
+    assert ("intake", 77) in events
+    assert ("stage", "active_teacher") in events
+    assert ("consumed", 9) in events
+    assert any(event == "candidate.final_decision_made" for event, _detail in events)
     assert conn.commits == 1
 
 
@@ -603,7 +631,7 @@ def test_academic_director_cannot_review_legacy_academy_approval(monkeypatch):
     assert conn.commits == 0
 
 
-@pytest.mark.parametrize("approval_status", ["approved", "consumed", "returned", "revoked"])
+@pytest.mark.parametrize("approval_status", ["consumed", "returned", "revoked"])
 def test_non_pending_approvals_conflict(monkeypatch, approval_status):
     _patch_approval_transaction(monkeypatch, approval_status=approval_status)
 

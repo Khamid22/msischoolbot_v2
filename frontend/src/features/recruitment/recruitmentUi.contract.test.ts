@@ -719,11 +719,13 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(promotionRequests, /promotion_only=true/);
     assert.match(promotionRequests, /<ResponsiveTable/);
     assert.match(promotionRequests, /<MobileCardList/);
-    assert.match(promotionRequests, />\s*Confirm\s*</);
+    assert.match(promotionRequests, /"Confirm"/);
     assert.match(promotionRequests, />\s*Reject\s*</);
     assert.match(promotionRequests, /status: selection\.action === "confirm" \? "approved" : "returned"/);
     assert.match(promotionRequests, /A reason is required|Reason for rejection/);
-    assert.match(promotionRequests, /Awaiting CEO/);
+    assert.match(promotionRequests, /Complete promotion/);
+    assert.match(promotionRequests, /Confirm and activate/);
+    assert.doesNotMatch(promotionRequests, /Awaiting CEO|CEO finalization/);
     assert.match(promotionRequests, /approval-requests\/\$\{approvalId\}\/review/);
     assert.match(academyPanel, /<TeacherAcademyRoster/);
     assert.match(academyPanel, /reviewPromotionRequests=\{activeView === "active_teachers"\}/);
@@ -779,7 +781,8 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(candidates, /setPage\(1\)/);
     assert.match(candidates, /"evaluations"/);
     assert.match(candidates, /Approval requested|Review approval/);
-    assert.match(candidates, /Awaiting CEO/);
+    assert.match(candidates, /Ready to activate/);
+    assert.doesNotMatch(candidates, /Awaiting CEO|CEO finalization/);
     assert.doesNotMatch(candidates, /Finalize approved request/);
     // The compatibility API consumer remains in source even though the page is no longer linked.
     assert.match(decisions, /\/decision-queue\?page=/);
