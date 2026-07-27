@@ -33,6 +33,8 @@ export interface RoleWorkspaceShellProps<Key extends string = string> {
   maxWidthClass?: string;
   sectionClassName?: string;
   mobileNavigationMode?: MobileNavigationMode;
+  mobileNavVariant?: "bar" | "floating";
+  mobilePrimaryKey?: Key;
   desktopSidebarMode?: DesktopSidebarMode;
   workspaceBackLink?: WorkspaceBackLink;
   profileHref?: string;
@@ -61,6 +63,8 @@ export function RoleWorkspaceShell<Key extends string = string>({
   maxWidthClass = "max-w-[var(--workspace-content-max-width)]",
   sectionClassName = "gap-5",
   mobileNavigationMode = "auto",
+  mobileNavVariant = "bar",
+  mobilePrimaryKey,
   desktopSidebarMode = "fixed",
   workspaceBackLink,
   profileHref,
@@ -156,6 +160,8 @@ export function RoleWorkspaceShell<Key extends string = string>({
           active={active}
           items={mobileItems}
           label={mobileNavLabel || `${roleLabel} mobile navigation`}
+          variant={mobileNavVariant}
+          primaryKey={mobilePrimaryKey}
         />
       ) : null}
 

@@ -8,6 +8,9 @@ from backend.modules.people.customer_support.scope import CustomerSupportScopeRe
 from backend.modules.people.customer_support.teachers.queries import (
     CustomerSupportTeacherQueries,
 )
+from backend.modules.people.customer_support.tickets.use_cases import (
+    CustomerSupportTickets,
+)
 
 
 def build_customer_support_teacher_queries(
@@ -19,4 +22,16 @@ def build_customer_support_teacher_queries(
     )
 
 
-__all__ = ["build_customer_support_teacher_queries"]
+def build_customer_support_tickets(
+    container: AppContainer,
+) -> CustomerSupportTickets:
+    return CustomerSupportTickets(
+        unit_of_work_factory=container.unit_of_work_factory,
+        scope_resolver=CustomerSupportScopeResolver(container.unit_of_work_factory),
+    )
+
+
+__all__ = [
+    "build_customer_support_teacher_queries",
+    "build_customer_support_tickets",
+]

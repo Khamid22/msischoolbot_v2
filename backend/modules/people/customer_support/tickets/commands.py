@@ -12,7 +12,7 @@ from backend.modules.domains.support_cases.tickets.contracts import TicketStatus
 @dataclass(frozen=True)
 class AssignTicketCommand:
     ticket_id: int
-    assigned_account_id: int | None
+    assigned_staff_id: int | None
 
 
 @dataclass(frozen=True)

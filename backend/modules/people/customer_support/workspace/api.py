@@ -25,6 +25,9 @@ from backend.modules.people.customer_support.schemas import (
 from backend.modules.people.customer_support.workspace.teachers_api import (
     router as teachers_router,
 )
+from backend.modules.people.customer_support.workspace.tickets_api import (
+    router as tickets_router,
+)
 
 
 router = APIRouter(
@@ -32,6 +35,7 @@ router = APIRouter(
     dependencies=[Depends(require_role("customer_support"))],
 )
 router.include_router(teachers_router)
+router.include_router(tickets_router)
 
 
 def _actor(user: CurrentUser) -> service.SupportActor:

@@ -20,7 +20,7 @@ class TicketQueueQuery:
     school_id: int | None = None
     status: TicketStatus | None = None
     category: TicketCategory | None = None
-    assigned_account_id: int | None = None
+    assigned_staff_id: int | None = None
     is_unassigned: bool = False
     cursor: str | None = None
     page_size: int = DEFAULT_PAGE_SIZE
@@ -37,8 +37,8 @@ class TicketQueueItem:
     category: TicketCategory
     status: TicketStatus
     requester_name: str
-    assigned_account_id: int | None
-    assigned_account_name: str
+    assigned_staff_id: int | None
+    assigned_staff_name: str
     reply_count: int
     created_at: datetime
     updated_at: datetime

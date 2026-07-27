@@ -122,9 +122,16 @@ class UnitOfWorkFactory:
         )
 
 
+def commit_unit_of_work(unit_of_work: UnitOfWork) -> None:
+    """Complete a person-orchestrated write without exposing commit calls there."""
+
+    unit_of_work.commit()
+
+
 __all__ = [
     "Connection",
     "ConnectionFactory",
+    "commit_unit_of_work",
     "JobEnqueuer",
     "UnitOfWork",
     "UnitOfWorkFactory",

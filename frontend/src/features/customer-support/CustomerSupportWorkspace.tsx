@@ -3,9 +3,9 @@ import type { SupportWorkspaceView } from "@/features/customer-support/model";
 import { ParentsPage } from "@/features/customer-support/parents/ParentsPage";
 import { DashboardPlaceholder } from "@/features/customer-support/placeholders/DashboardPlaceholder";
 import { PaymentsPlaceholder } from "@/features/customer-support/placeholders/PaymentsPlaceholder";
-import { TicketsPlaceholder } from "@/features/customer-support/placeholders/TicketsPlaceholder";
 import { StudentsPage } from "@/features/customer-support/students/StudentsPage";
 import { TeachersPage } from "@/features/customer-support/teachers/TeachersPage";
+import { TicketsPage } from "@/features/customer-support/tickets/TicketsPage";
 import { RoleWorkspaceShell } from "@/shared/ui/RoleWorkspaceShell";
 
 type Props = {
@@ -64,7 +64,7 @@ export default function CustomerSupportWorkspace({
       ) : activeView === "teachers" ? (
         <TeachersPage key="teachers" {...pageProps} />
       ) : activeView === "tickets" ? (
-        <TicketsPlaceholder key="tickets" {...pageProps} />
+        <TicketsPage key="tickets" {...pageProps} csrfToken={csrfToken} />
       ) : (
         <DashboardPlaceholder key="dashboard" {...pageProps} />
       )}

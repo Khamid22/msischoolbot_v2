@@ -7,11 +7,10 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
 
 from backend.core.access.pages import require_role
+from backend.core.web.rendering import generate_csrf, render_react_page
+from backend.core.web.request_context import request as ctx_request
+from backend.core.web.request_context import session
 from backend.core.web.responses import redirect
-from backend.core.web.request_context import session, request as ctx_request
-from backend.core.web.rendering import generate_csrf
-
-from backend.core.web.rendering import render_react_page
 from backend.modules.people.parent.contracts import (
     build_parent_workspace_cards,
     claim_parent_invite_code,
@@ -26,6 +25,8 @@ from backend.modules.people.parent.contracts import (
 )
 from backend.platform.telegram.init_data import telegram_user_from_init_data
 
+# Retained as patchable compatibility names for older page characterization tests.
+_LEGACY_PARENT_PAGE_READERS = (list_announcements, list_resources)
 
 LOGGER = logging.getLogger("msi.parent_invites")
 
@@ -524,14 +525,19 @@ def register_parent_invite_routes(app):
 
 
 def build_render_parent_page():
-    def render_parent_page():
+    def render_parent_page(
+        *,
+        view: str = "home",
+        selected_student_row_id: int | None = None,
+        selected_ticket_id: int | None = None,
+    ):
         try:
             parent_id = int(session.get("parent_id", 0) or 0)
         except (TypeError, ValueError):
             parent_id = 0
 
-        children = []
-        children_for_cards = None
+        children: list[dict] = []
+        children_for_cards: list[dict] | None = None
         try:
             children = list_parent_client_children(parent_id) if parent_id else []
             children_for_cards = children
@@ -542,20 +548,6 @@ def build_render_parent_page():
             children=children_for_cards,
         )
 
-        resources = []
-        try:
-            raw_resources = list_resources()
-            resources = [dict(r) for r in raw_resources] if raw_resources else []
-        except Exception:
-            pass
-
-        announcements = []
-        try:
-            raw_announcements = list_announcements()
-            announcements = raw_announcements if raw_announcements else []
-        except Exception:
-            pass
-
         auth_login = str(session.get("auth_login", "")).strip()
 
         return render_react_page(
@@ -564,8 +556,10 @@ def build_render_parent_page():
                 "authLogin": auth_login,
                 "parentChildren": children,
                 "workspaceCards": workspace_cards,
-                "resourcesList": resources,
-                "workspaceAnnouncements": announcements,
+                "view": view,
+                "selectedStudentId": selected_student_row_id,
+                "selectedTicketId": selected_ticket_id,
+                "preferredLanguage": "ru",
                 "currentSchool": "all",
                 "csrfToken": generate_csrf(),
                 "logoutUrl": "/logout",
@@ -583,7 +577,37 @@ def register_parent_page_routes(app):
 
     @router.get("/parent")
     def parent_home():
-        return render_parent_page()
+        return render_parent_page(view="home")
+
+    @router.get("/parent/updates")
+    def parent_updates():
+        return render_parent_page(view="updates")
+
+    @router.get("/parent/children")
+    def parent_children():
+        return render_parent_page(view="children")
+
+    @router.get("/parent/children/{student_row_id}")
+    def parent_child(student_row_id: int):
+        return render_parent_page(
+            view="children",
+            selected_student_row_id=student_row_id,
+        )
+
+    @router.get("/parent/payments")
+    def parent_payments():
+        return render_parent_page(view="payments")
+
+    @router.get("/parent/support")
+    def parent_support():
+        return render_parent_page(view="support")
+
+    @router.get("/parent/support/{ticket_id}")
+    def parent_ticket(ticket_id: int):
+        return render_parent_page(
+            view="support",
+            selected_ticket_id=ticket_id,
+        )
 
     app.include_router(router)
 

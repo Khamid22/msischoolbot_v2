@@ -10,6 +10,10 @@ from backend.modules.domains.parent_relationships.contracts import (
     parent_can_access_student,
     resolve_parent_child_dashboard,
 )
+from backend.modules.domains.support_cases.tickets.contracts import (
+    TicketLifecycleError,
+    TicketNotFoundError,
+)
 from backend.modules.people.parent.cards import build_parent_workspace_cards
 from backend.modules.people.parent.module import PERSON_MODULE
 
@@ -24,5 +28,7 @@ __all__ = [
     "parent_can_access_student",
     "resolve_parent_child_dashboard",
     "set_account_session",
+    "TicketLifecycleError",
+    "TicketNotFoundError",
     "url_for",
 ]

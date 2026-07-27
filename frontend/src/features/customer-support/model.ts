@@ -200,6 +200,45 @@ export type SupportContext = {
   };
 };
 
+export type SupportTicketStatus = "new" | "in_progress" | "escalated" | "resolved";
+
+export type SupportTicketQueueItem = {
+  ticketId: number;
+  parentId: number;
+  studentId: number | null;
+  schoolId: number;
+  schoolName: string;
+  topic: string;
+  category: string;
+  status: SupportTicketStatus;
+  requesterName: string;
+  assignedStaffId: number | null;
+  assignedStaffName: string;
+  replyCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SupportTicketMessage = {
+  messageId: number;
+  authorType: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+};
+
+export type SupportTicketQueue = {
+  items: SupportTicketQueueItem[];
+  nextCursor: string | null;
+  total: number | null;
+  actorStaffId: number | null;
+};
+
+export type SupportTicketDetail = {
+  ticket: SupportTicketQueueItem;
+  messages: SupportTicketMessage[];
+};
+
 export type SearchPayload = {
   items: SupportRecordSummary[];
   nextCursor?: string | null;

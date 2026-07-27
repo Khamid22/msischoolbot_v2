@@ -426,8 +426,26 @@ def get_parent_child_row(conn, parent_id, student_row_id):
 
 def get_parent_exists_row(conn, parent_id):
     return conn.execute(
-        "SELECT id FROM msi_v2.parents WHERE id = %s",
+        """
+        SELECT id, display_name, preferred_language, status
+        FROM msi_v2.parents
+        WHERE id = %s
+        """,
         (int(parent_id),),
+    ).fetchone()
+
+
+def update_parent_preferred_language(conn, parent_id, preferred_language):
+    return conn.execute(
+        """
+        UPDATE msi_v2.parents
+        SET preferred_language = %s,
+            updated_at = now()
+        WHERE id = %s
+          AND status = 'active'
+        RETURNING id, preferred_language
+        """,
+        (str(preferred_language), int(parent_id)),
     ).fetchone()
 
 
@@ -641,6 +659,7 @@ __all__ = [
     "insert_parent_invite_row",
     "revoke_pending_parent_invites",
     "insert_parent_student_link",
+    "update_parent_preferred_language",
     "link_parent_from_invite",
     "list_invite_parent_rows",
     "list_parent_client_child_rows",

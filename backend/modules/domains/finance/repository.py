@@ -30,7 +30,7 @@ def _payment_select():
 
 def list_student_payment_rows(conn, student_row_id):
     return conn.execute(
-        """
+        f"""
         SELECT {_payment_select()}
         FROM msi_v2.payments p
         JOIN msi_v2.students st ON st.id = p.student_id
@@ -46,7 +46,7 @@ def list_student_payment_rows(conn, student_row_id):
 
 def get_student_payment_row(conn, payment_id):
     return conn.execute(
-        """
+        f"""
         SELECT {_payment_select()}
         FROM msi_v2.payments p
         JOIN msi_v2.students st ON st.id = p.student_id

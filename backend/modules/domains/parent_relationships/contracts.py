@@ -25,6 +25,13 @@ class CreateParentInviteResult:
     canonical_student_id: int
 
 
+@dataclass(frozen=True)
+class ParentPreference:
+    parent_id: int
+    display_name: str
+    preferred_language: str
+
+
 def _token_hash(invite_code: str) -> str:
     return hashlib.sha256(invite_code.encode("utf-8")).hexdigest()
 
@@ -66,6 +73,48 @@ def create_parent_invite(
                 canonical_student_id=student_id,
             )
     raise RuntimeError("Could not generate a unique parent invite code")
+
+
+def parent_can_access_student_on_connection(
+    conn: Connection,
+    *,
+    parent_id: int,
+    student_row_id: int,
+) -> bool:
+    return bool(repository.get_parent_child_link(conn, parent_id, student_row_id))
+
+
+def get_parent_preference(
+    conn: Connection,
+    *,
+    parent_id: int,
+) -> ParentPreference | None:
+    row = repository.get_parent_exists_row(conn, parent_id)
+    if row is None or str(row["status"] or "").strip().casefold() != "active":
+        return None
+    return ParentPreference(
+        parent_id=int(row["id"]),
+        display_name=str(row["display_name"] or "").strip(),
+        preferred_language=str(row["preferred_language"] or "ru").strip().casefold(),
+    )
+
+
+def set_parent_preferred_language(
+    conn: Connection,
+    *,
+    parent_id: int,
+    preferred_language: str,
+) -> ParentPreference:
+    language = str(preferred_language or "").strip().casefold()
+    if language not in {"ru", "uz"}:
+        raise ValueError("Preferred language must be either 'ru' or 'uz'.")
+    row = repository.update_parent_preferred_language(conn, parent_id, language)
+    if row is None:
+        raise ValueError("Parent account was not found.")
+    preference = get_parent_preference(conn, parent_id=parent_id)
+    if preference is None:
+        raise ValueError("Parent account was not found.")
+    return preference
 
 
 def claim_parent_invite_code(*args, **kwargs):
@@ -113,6 +162,7 @@ def resolve_parent_child_dashboard(*args, **kwargs):
 __all__ = [
     "CreateParentInviteCommand",
     "CreateParentInviteResult",
+    "ParentPreference",
     "claim_parent_invite_code",
     "create_parent_invite",
     "list_parent_client_children",
@@ -120,5 +170,8 @@ __all__ = [
     "parent_account_exists",
     "parent_can_access_dashboard",
     "parent_can_access_student",
+    "parent_can_access_student_on_connection",
+    "get_parent_preference",
     "resolve_parent_child_dashboard",
+    "set_parent_preferred_language",
 ]

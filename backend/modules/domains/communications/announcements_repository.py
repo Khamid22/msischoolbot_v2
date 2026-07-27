@@ -20,6 +20,24 @@ def list_announcement_rows(conn, include_drafts=True):
     ).fetchall()
 
 
+def list_published_announcement_rows_for_audience(conn, audience):
+    return conn.execute(
+        """
+        SELECT *, '' AS author, 0 AS views, '' AS scheduled_at
+        FROM msi_v2.announcements
+        WHERE status = 'published'
+          AND audience IN ('all', %s)
+          AND (published_at IS NULL OR published_at <= now())
+        ORDER BY pinned DESC,
+                 CASE priority WHEN 'urgent' THEN 0 WHEN 'important' THEN 1 ELSE 2 END,
+                 published_at DESC NULLS LAST,
+                 updated_at DESC,
+                 id DESC
+        """,
+        (str(audience or "").strip().casefold(),),
+    ).fetchall()
+
+
 def insert_announcement_row(
     conn,
     *,
@@ -109,5 +127,6 @@ __all__ = [
     "get_announcement_row",
     "insert_announcement_row",
     "list_announcement_rows",
+    "list_published_announcement_rows_for_audience",
     "update_announcement_row",
 ]

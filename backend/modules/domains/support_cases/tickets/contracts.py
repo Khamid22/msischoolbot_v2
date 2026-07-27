@@ -9,6 +9,21 @@ from backend.modules.domains.support_cases.tickets.domain_types import (
     TicketCategory,
     TicketStatus,
 )
+from backend.modules.domains.support_cases.tickets.transactional import (
+    TICKET_STATUS_RANK,
+    TicketData,
+    TicketLifecycleError,
+    TicketMessageData,
+    TicketNotFoundError,
+    create_parent_ticket,
+    get_parent_ticket,
+    get_support_ticket,
+    list_parent_tickets,
+    list_support_tickets,
+    reply_to_parent_ticket,
+    reply_to_support_ticket,
+    update_support_ticket,
+)
 
 
 class CreateTicketPayload(TypedDict):
@@ -123,9 +138,14 @@ __all__ = [
     "AddTicketReplyPayload",
     "CreateTicketPayload",
     "TicketCategory",
+    "TicketData",
+    "TicketLifecycleError",
+    "TicketMessageData",
+    "TicketNotFoundError",
     "TicketMessage",
     "TicketRecord",
     "TicketStatus",
+    "TICKET_STATUS_RANK",
     "UpdateTicketPayload",
     "add_complaint_reply",
     "add_ticket_reply",
@@ -137,4 +157,12 @@ __all__ = [
     "list_tickets",
     "update_complaint",
     "update_ticket",
+    "create_parent_ticket",
+    "get_parent_ticket",
+    "get_support_ticket",
+    "list_parent_tickets",
+    "list_support_tickets",
+    "reply_to_parent_ticket",
+    "reply_to_support_ticket",
+    "update_support_ticket",
 ]

@@ -7,6 +7,7 @@ include = [
     "backend/application/module_spec.py",
     "backend/application/modules.py",
     "backend/application/person_modules.py",
+    "backend/application/parent.py",
     "backend/application/security_middleware.py",
     "backend/application/worker.py",
     "backend/core/access/capabilities.py",
@@ -25,8 +26,11 @@ include = [
     "backend/modules/domains/recruitment/contracts.py",
     "backend/modules/domains/recruitment/domain_types.py",
     "backend/modules/domains/identity/contracts.py",
+    "backend/modules/domains/finance/repository.py",
+    "backend/modules/domains/communications/announcements_repository.py",
     "backend/modules/jobs/**/*.py",
     "backend/modules/domains/parent_relationships/contracts.py",
+    "backend/modules/domains/parent_relationships/repository.py",
     "backend/modules/domains/teacher_records/policies.py",
     "backend/modules/domains/teacher_records/support_queries.py",
     "backend/modules/domains/teacher_records/support_repository.py",
@@ -52,8 +56,15 @@ include = [
     "backend/modules/people/customer_support/policies.py",
     "backend/modules/people/customer_support/scope.py",
     "backend/modules/people/customer_support/workspace/teachers_api.py",
+    "backend/modules/people/customer_support/workspace/tickets_api.py",
+    "backend/modules/people/parent/commands.py",
+    "backend/modules/people/parent/policies.py",
+    "backend/modules/people/parent/queries.py",
+    "backend/modules/people/parent/schemas.py",
+    "backend/modules/people/parent/workspace/api.py",
     "backend/platform/telegram/polling_repository.py",
     "tests/integrations/test_outbox_postgres.py",
+    "tests/integrations/test_parent_support_postgres.py",
     "tests/test_expansion_architecture.py",
     "tests/test_outbox_jobs.py",
     "tests/test_people_scoped_architecture.py",
@@ -82,6 +93,8 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["N802", "N803", "N806"]
 "backend/modules/people/customer_support/workspace/teachers_api.py" = ["B008"]
+"backend/modules/people/customer_support/workspace/tickets_api.py" = ["B008"]
+"backend/modules/people/parent/workspace/api.py" = ["B008"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -91,6 +104,7 @@ files = [
     "backend/application/module_spec.py",
     "backend/application/modules.py",
     "backend/application/person_modules.py",
+    "backend/application/parent.py",
     "backend/application/security_middleware.py",
     "backend/application/worker.py",
     "backend/core/access/capabilities.py",
@@ -132,6 +146,12 @@ files = [
     "backend/modules/people/customer_support/policies.py",
     "backend/modules/people/customer_support/scope.py",
     "backend/modules/people/customer_support/workspace/teachers_api.py",
+    "backend/modules/people/customer_support/workspace/tickets_api.py",
+    "backend/modules/people/parent/commands.py",
+    "backend/modules/people/parent/policies.py",
+    "backend/modules/people/parent/queries.py",
+    "backend/modules/people/parent/schemas.py",
+    "backend/modules/people/parent/workspace/api.py",
     "backend/platform/telegram/polling_repository.py",
 ]
 follow_imports = "skip"

@@ -41,7 +41,8 @@ function isWorkspacePath(pathname: string) {
     pathname === "/head-of-departments" || pathname.startsWith("/head-of-departments/") ||
     pathname === "/hr-manager" || pathname.startsWith("/hr-manager/") ||
     pathname === "/customer-support" || pathname.startsWith("/customer-support/") ||
-    pathname.startsWith("/ceo/recruitment");
+    pathname.startsWith("/ceo/recruitment") ||
+    pathname === "/parent" || pathname.startsWith("/parent/");
 }
 
 class AppErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {

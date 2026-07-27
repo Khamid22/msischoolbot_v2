@@ -3,7 +3,9 @@ def _ticket_row_select():
         SELECT
             t.id,
             t.parent_id AS parent_admin_id,
+            COALESCE(st.id, 0) AS student_id,
             COALESCE(st.legacy_student_row_id, 0) AS student_row_id,
+            COALESCE(sch.id, 0) AS school_id,
             t.category,
             t.topic,
             COALESCE(opening.body, '') AS message,
@@ -11,7 +13,12 @@ def _ticket_row_select():
             COALESCE(latest_staff.body, '') AS reply,
             to_char(t.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
             to_char(t.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at,
+            to_char(
+                t.updated_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+            ) AS cursor_updated_at,
             COALESCE(to_char(t.resolved_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '') AS resolved_at,
+            t.assigned_to_staff_id,
             COALESCE(assigned.login, assigned.display_name, '') AS assigned_to,
             COALESCE(p.display_name, '') AS parent_login,
             COALESCE(p.display_name, '') AS parent_display_name,
@@ -79,6 +86,121 @@ def get_parent_complaint_row(conn, complaint_id):
         """,
         (int(complaint_id),),
     ).fetchone()
+
+
+def get_parent_ticket_row(
+    conn,
+    *,
+    ticket_id,
+    parent_id,
+    for_update=False,
+):
+    lock_clause = " FOR UPDATE OF t" if for_update else ""
+    return conn.execute(
+        f"""
+        {_ticket_row_select()}
+        WHERE t.id = %s
+          AND t.parent_id = %s
+        {lock_clause}
+        """,
+        (int(ticket_id), int(parent_id)),
+    ).fetchone()
+
+
+def get_ticket_row(conn, *, ticket_id, for_update=False):
+    lock_clause = " FOR UPDATE OF t" if for_update else ""
+    return conn.execute(
+        f"""
+        {_ticket_row_select()}
+        WHERE t.id = %s
+        {lock_clause}
+        """,
+        (int(ticket_id),),
+    ).fetchone()
+
+
+def list_support_ticket_rows(
+    conn,
+    *,
+    search_text,
+    selected_school_id,
+    allowed_school_ids,
+    all_schools,
+    status,
+    category,
+    assigned_staff_id,
+    is_unassigned,
+    cursor_status_rank,
+    cursor_updated_at,
+    cursor_id,
+    limit,
+):
+    status_rank = """
+        CASE t.status
+            WHEN 'new' THEN 0
+            WHEN 'escalated' THEN 1
+            WHEN 'in_progress' THEN 2
+            WHEN 'resolved' THEN 3
+            ELSE 4
+        END
+    """
+    search_pattern = f"%{str(search_text or '').strip()}%"
+    return conn.execute(
+        f"""
+        {_ticket_row_select()}
+        WHERE (%s OR sch.id = ANY(%s::bigint[]))
+          AND (%s::bigint IS NULL OR sch.id = %s)
+          AND (%s = '' OR t.status = %s)
+          AND (%s = '' OR t.category = %s)
+          AND (%s::bigint IS NULL OR t.assigned_to_staff_id = %s)
+          AND (NOT %s OR t.assigned_to_staff_id IS NULL)
+          AND (
+                %s = ''
+                OR t.topic ILIKE %s
+                OR p.display_name ILIKE %s
+                OR st.full_name ILIKE %s
+                OR st.student_code ILIKE %s
+          )
+          AND (
+                %s = ''
+                OR {status_rank} > %s
+                OR (
+                    {status_rank} = %s
+                    AND (
+                        t.updated_at < %s::timestamptz
+                        OR (t.updated_at = %s::timestamptz AND t.id < %s)
+                    )
+                )
+          )
+        ORDER BY {status_rank}, t.updated_at DESC, t.id DESC
+        LIMIT %s
+        """,
+        (
+            bool(all_schools),
+            list(allowed_school_ids),
+            selected_school_id,
+            selected_school_id,
+            str(status or ""),
+            str(status or ""),
+            str(category or ""),
+            str(category or ""),
+            assigned_staff_id,
+            assigned_staff_id,
+            bool(is_unassigned),
+            str(search_text or "").strip(),
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            search_pattern,
+            str(cursor_updated_at or ""),
+            int(cursor_status_rank),
+            int(cursor_status_rank),
+            str(cursor_updated_at or ""),
+            str(cursor_updated_at or ""),
+            int(cursor_id),
+            int(limit),
+        ),
+    ).fetchall()
 
 
 def _resolve_student_v2_id(conn, student_row_id):
@@ -272,6 +394,66 @@ def insert_complaint_message_row(
     ).fetchone()
 
 
+def insert_staff_ticket_message_row(
+    conn,
+    *,
+    ticket_id,
+    author_type,
+    staff_id,
+    body,
+    created_at,
+):
+    return conn.execute(
+        """
+        INSERT INTO msi_v2.ticket_messages (
+            ticket_id,
+            author_type,
+            author_staff_id,
+            body,
+            created_at
+        )
+        VALUES (%s, %s, %s, %s, %s)
+        RETURNING id
+        """,
+        (
+            int(ticket_id),
+            _author_type(author_type),
+            int(staff_id),
+            str(body or "").strip(),
+            created_at,
+        ),
+    ).fetchone()
+
+
+def update_ticket_state_row(
+    conn,
+    *,
+    ticket_id,
+    status,
+    assigned_staff_id,
+    resolved_at,
+    updated_at,
+):
+    return conn.execute(
+        """
+        UPDATE msi_v2.support_tickets
+        SET status = %s,
+            assigned_to_staff_id = %s,
+            resolved_at = %s,
+            updated_at = %s
+        WHERE id = %s
+        RETURNING id
+        """,
+        (
+            str(status),
+            int(assigned_staff_id) if assigned_staff_id else None,
+            resolved_at,
+            updated_at,
+            int(ticket_id),
+        ),
+    ).fetchone()
+
+
 def count_complaints_by_parent(conn):
     """Map of parent_id -> {total, open} ticket counts (open = not resolved)."""
     return conn.execute(
@@ -290,9 +472,14 @@ def count_complaints_by_parent(conn):
 __all__ = [
     "count_complaints_by_parent",
     "get_parent_complaint_row",
+    "get_parent_ticket_row",
+    "get_ticket_row",
     "insert_complaint_message_row",
     "insert_parent_complaint_row",
+    "insert_staff_ticket_message_row",
     "list_complaint_message_rows",
     "list_parent_complaint_rows",
+    "list_support_ticket_rows",
     "update_parent_complaint_row",
+    "update_ticket_state_row",
 ]

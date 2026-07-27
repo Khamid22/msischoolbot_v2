@@ -2,6 +2,8 @@
 
 from backend.modules.domains.support_cases.tickets.contracts import (
     TicketCategory,
+    TicketLifecycleError,
+    TicketNotFoundError,
     TicketStatus,
 )
 from backend.modules.people.customer_support.tickets.commands import (
@@ -27,6 +29,8 @@ __all__ = [
     "CustomerSupportTicketQueries",
     "ReplyToTicketCommand",
     "TicketCategory",
+    "TicketLifecycleError",
+    "TicketNotFoundError",
     "TicketDetailResult",
     "TicketMessageResult",
     "TicketMutationResult",
