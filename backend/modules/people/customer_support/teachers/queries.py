@@ -1,4 +1,4 @@
-"""Typed, read-only boundary for Customer Support teacher lookup."""
+"""Typed, read-only boundary for Customer Support Active Teacher lookup."""
 
 from __future__ import annotations
 

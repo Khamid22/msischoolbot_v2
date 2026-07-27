@@ -1,4 +1,4 @@
-"""SQL for the school-scoped Teacher Support directory."""
+"""SQL for the school-scoped Active Teacher Support directory."""
 
 from __future__ import annotations
 
@@ -105,6 +105,7 @@ _TEACHER_SUPPORT_CTE = """
               AND teacher_subject.status = 'active'
               AND subject.status = 'active'
         ) subjects ON true
+        WHERE lower(btrim(teacher.status)) = 'active'
     )
 """
 

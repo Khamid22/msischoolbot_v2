@@ -162,3 +162,30 @@ def test_teacher_detail_is_scoped_and_not_found_is_explicit(monkeypatch):
 
     with pytest.raises(TeacherSupportNotFoundError):
         reader.get_teacher(school_scope=scope, teacher_id=99)
+
+
+def test_teacher_support_repository_reads_only_active_teachers():
+    connection = _Connection()
+
+    support_repository.search_teacher_support_rows(
+        connection,
+        search_text="",
+        status="all",
+        selected_school_id=None,
+        allowed_school_ids=(),
+        all_schools=True,
+        cursor_name="",
+        cursor_id=0,
+        limit=26,
+    )
+    support_repository.get_teacher_support_row(
+        connection,
+        teacher_id=14,
+        allowed_school_ids=(),
+        all_schools=True,
+    )
+
+    assert len(connection.statements) == 2
+    for statement in connection.statements:
+        assert "lower(btrim(teacher.status)) = 'active'" in statement
+        assert "msi_v2.academy_teachers" not in statement

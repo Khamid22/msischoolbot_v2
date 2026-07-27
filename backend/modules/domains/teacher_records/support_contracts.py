@@ -1,4 +1,4 @@
-"""School-scoped teacher records exposed to support orchestrators."""
+"""School-scoped Active Teacher records exposed to support orchestrators."""
 
 from __future__ import annotations
 
