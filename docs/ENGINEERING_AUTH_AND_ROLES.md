@@ -26,10 +26,10 @@ The role profile proves which business entity the account represents. An account
 
 Canonical password and Telegram code lives in:
 
-- `backend/modules/identity/service.py`
-- `backend/modules/identity/repository.py`
-- `backend/modules/identity/telegram_auth.py`
-- `backend/modules/identity/api.py`
+- `backend/modules/domains/identity/service.py`
+- `backend/modules/domains/identity/repository.py`
+- `backend/modules/domains/identity/telegram_auth.py`
+- `backend/modules/domains/identity/api.py`
 
 The former `backend/identity/account_auth.py`, `account_telegram_auth.py`, `parent_accounts.py`, `parent_invites.py`, and `telegram_links.py` facades have been removed.
 

@@ -7,8 +7,8 @@ from base64 import b64encode
 from itsdangerous import TimestampSigner
 from werkzeug.security import check_password_hash
 
-from backend.modules.people.staff import service as staff_registration
-from backend.modules.people.staff import repository as staff_repository
+from backend.modules.domains.identity import staff_accounts as staff_registration
+from backend.modules.domains.identity import staff_repository
 
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}
@@ -278,7 +278,7 @@ def test_disabled_head_of_department_password_cannot_be_reset(monkeypatch):
 
 
 def test_academic_director_can_create_hod_account_route(client, monkeypatch):
-    import backend.workspaces.academic_director.api as academic_director_api
+    import backend.modules.people.academic_director.workspace.api as academic_director_api
 
     monkeypatch.setattr(
         academic_director_api,
@@ -331,7 +331,7 @@ def test_academic_director_can_create_hod_account_route(client, monkeypatch):
 
 
 def test_academic_director_can_reset_hod_password_and_receives_it_once(client, monkeypatch):
-    import backend.workspaces.academic_director.api as academic_director_api
+    import backend.modules.people.academic_director.workspace.api as academic_director_api
 
     captured = {}
 
@@ -378,7 +378,7 @@ def test_academic_director_can_reset_hod_password_and_receives_it_once(client, m
 
 
 def test_head_of_department_cannot_reset_another_hod_password(client, monkeypatch):
-    import backend.workspaces.academic_director.api as academic_director_api
+    import backend.modules.people.academic_director.workspace.api as academic_director_api
 
     def should_not_reset(*args, **kwargs):
         raise AssertionError("role dependency must reject this request before password reset")
@@ -398,7 +398,7 @@ def test_head_of_department_cannot_reset_another_hod_password(client, monkeypatc
 
 
 def test_head_of_department_workspace_route_loads(client, monkeypatch):
-    import backend.workspaces.head_of_departments.page as hod_routes
+    import backend.modules.people.head_of_department.workspace.page as hod_routes
 
     monkeypatch.setattr(
         hod_routes,
@@ -424,7 +424,7 @@ def test_head_of_department_workspace_route_loads(client, monkeypatch):
 
 
 def test_head_of_department_can_access_subject_scoped_academy_page(client, monkeypatch):
-    import backend.workspaces.head_of_departments.page as hod_routes
+    import backend.modules.people.head_of_department.workspace.page as hod_routes
 
     monkeypatch.setattr(
         hod_routes,
@@ -460,7 +460,7 @@ def test_head_of_department_can_access_subject_scoped_academy_page(client, monke
 
 
 def test_hod_out_of_scope_academy_assessment_is_denied(client, monkeypatch):
-    import backend.workspaces.head_of_departments.staff_records_api as hod_api_routes
+    import backend.modules.people.head_of_department.workspace.staff_records_api as hod_api_routes
 
     monkeypatch.setattr(hod_api_routes, "can_user_manage_academy_teacher", lambda user, teacher_id: False)
     _set_session(
@@ -484,7 +484,7 @@ def test_hod_out_of_scope_academy_assessment_is_denied(client, monkeypatch):
 
 
 def test_academy_assessment_route_accepts_lesson_assignment_id(client, monkeypatch):
-    import backend.modules.teacher_academy.responses as academy_api
+    import backend.modules.domains.teacher_academy.responses as academy_api
 
     captured = {}
 
@@ -512,7 +512,7 @@ def test_academy_assessment_route_accepts_lesson_assignment_id(client, monkeypat
 
 
 def test_hod_out_of_scope_academy_schedule_is_denied(client, monkeypatch):
-    import backend.workspaces.head_of_departments.staff_records_api as hod_api_routes
+    import backend.modules.people.head_of_department.workspace.staff_records_api as hod_api_routes
 
     monkeypatch.setattr(hod_api_routes, "can_user_manage_academy_assignment", lambda user, assignment_id: False)
     _set_session(
@@ -536,7 +536,7 @@ def test_hod_out_of_scope_academy_schedule_is_denied(client, monkeypatch):
 
 
 def test_hod_filters_academy_rows_by_assigned_subject():
-    from backend.modules.teacher_academy.policies import filter_rows_by_subject_scope
+    from backend.modules.domains.teacher_academy.policies import filter_rows_by_subject_scope
 
     rows = [
         {"id": 1, "subject_id": 5, "full_name": "Math Teacher"},

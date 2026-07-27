@@ -13,12 +13,15 @@ flowchart LR
     FastAPI[FastAPI]
     Modules[Independent business modules]
     DB[(PostgreSQL msi_v2)]
-    Bot[aiogram worker shell]
+    Worker[Durable outbox worker]
+    Bot[aiogram portal-entry process]
 
     React --> FastAPI
     Telegram --> FastAPI
     FastAPI --> Modules --> DB
-    Bot -. no inbound routers .-> Modules
+    FastAPI --> DB
+    DB --> Worker --> Modules
+    Bot --> FastAPI
 ```
 
 PostgreSQL is the only LMS data source. Google Sheets and Excel are not integrations. Telegram authentication and Mini App linking remain, but the retired bot-handler/Sheets architecture does not.
@@ -33,7 +36,10 @@ PostgreSQL is the only LMS data source. Google Sheets and Excel are not integrat
 - Parent invites are hash-only, expiring, single-use, and atomically consumed.
 - `students.id` is the internal student identity; legacy/public IDs are compatibility boundaries only.
 - Runtime SQL is module-owned; the old technical-layer trees are removed.
-- Runtime DDL is removed; Alembic repository head is `0028_remove_system_admin`.
+- Runtime DDL is removed; Alembic repository head is `0044_student_identifier_sequence`.
+- Fresh FastAPI instances are built by `create_app(settings, container)` and lifespan closes
+  application-owned pools and clients.
+- New writes use explicit Unit of Work boundaries and can enqueue durable work transactionally.
 - APIs are versioned under `/api/v1`; old role API namespaces are gone.
 - React uses server bootstrap payloads, role-owned pages, shared accessible UI, and explicit `Asia/Tashkent` time helpers.
 
@@ -55,7 +61,8 @@ The business roles own separate workspaces. Role checks do not replace object ch
 - physical schema name `msi_v2`;
 - selected legacy correlation and public dashboard ID columns;
 - Telegram-first parent accounts without password credentials;
-- an empty bot router registry until new inbound commands are product-approved and implemented.
+- compatibility facades for business modules whose callers have not yet moved to focused commands
+  and queries.
 
 ## Release Boundary
 

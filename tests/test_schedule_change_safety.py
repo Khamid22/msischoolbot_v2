@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from backend.modules.academics.timetable.service import (
+from backend.modules.domains.academics.timetable.service import (
     _resolve_course_launch_date,
     _select_schedule_change_lessons,
 )

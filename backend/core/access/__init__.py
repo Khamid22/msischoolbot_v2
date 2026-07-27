@@ -26,10 +26,30 @@ from backend.core.access.management_permissions import (
 )
 from backend.core.access.api import (
     CurrentUser,
+    get_actor_context,
     get_current_user,
     get_current_user_role,
     require_role,
     require_permission,
+)
+from backend.core.access.capabilities import (
+    access_defaults_for_role,
+    capabilities_for_role,
+    role_has_capability,
+)
+from backend.core.access.context import (
+    ActorContext,
+    SchoolScope,
+    actor_context_from_session,
+    resolve_actor_context,
+)
+from backend.core.access.domain_types import (
+    Capability,
+    Domain,
+    ObjectScope,
+    PersonType,
+    Role,
+    SchoolScopeMode,
 )
 
 __all__ = [
@@ -54,6 +74,20 @@ __all__ = [
     "ALL_PERMISSIONS",
     "role_has_permission",
     "CurrentUser",
+    "ActorContext",
+    "SchoolScope",
+    "Capability",
+    "Domain",
+    "ObjectScope",
+    "PersonType",
+    "Role",
+    "SchoolScopeMode",
+    "access_defaults_for_role",
+    "actor_context_from_session",
+    "resolve_actor_context",
+    "capabilities_for_role",
+    "role_has_capability",
+    "get_actor_context",
     "get_current_user",
     "get_current_user_role",
     "require_role",

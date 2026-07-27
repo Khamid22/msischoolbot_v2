@@ -1,4 +1,4 @@
-from backend.modules.people.teachers.service import subject_teacher_login_prefix
+from backend.modules.domains.teacher_records.service import subject_teacher_login_prefix
 
 
 def test_subject_teacher_login_prefix_examples():

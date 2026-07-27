@@ -29,8 +29,8 @@ core/
 
 Identity-owned password and session helpers live in:
 
-- `backend/modules/identity/passwords.py`
-- `backend/modules/identity/session.py`
+- `backend/modules/domains/identity/passwords.py`
+- `backend/modules/domains/identity/session.py`
 
 Dependency direction:
 

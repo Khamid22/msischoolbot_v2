@@ -29,7 +29,7 @@ def _set_session(client, data):
 
 
 def _patch_api_payload(monkeypatch):
-    import backend.modules.teacher_academy.responses as academy_api
+    import backend.modules.domains.teacher_academy.responses as academy_api
 
     monkeypatch.setattr(academy_api, "list_academy_teachers", lambda: [{"id": 91, "subject_id": 2}])
     monkeypatch.setattr(academy_api, "filter_academy_teachers_for_user", lambda rows, user: list(rows))
@@ -169,7 +169,7 @@ def test_academic_director_create_academy_teacher_uses_selected_lessons_and_safe
 
 
 def test_academic_director_can_reset_teacher_password_and_receives_it_once(client, monkeypatch):
-    import backend.workspaces.academic_director.staff_records_api as staff_records_api
+    import backend.modules.people.academic_director.workspace.staff_records_api as staff_records_api
 
     captured = {}
 
@@ -212,7 +212,7 @@ def test_academic_director_can_reset_teacher_password_and_receives_it_once(clien
 
 
 def test_head_of_department_cannot_reset_teacher_password(client, monkeypatch):
-    import backend.workspaces.academic_director.staff_records_api as staff_records_api
+    import backend.modules.people.academic_director.workspace.staff_records_api as staff_records_api
 
     def should_not_reset(*args, **kwargs):
         raise AssertionError("role dependency must reject this request before password reset")
@@ -232,7 +232,7 @@ def test_head_of_department_cannot_reset_teacher_password(client, monkeypatch):
 
 
 def test_hr_and_academic_director_can_safely_remove_a_teacher_from_academy(client, monkeypatch):
-    import backend.modules.hr.recruitment.api as recruitment_api
+    import backend.modules.domains.recruitment.api as recruitment_api
 
     calls = []
 
@@ -405,7 +405,7 @@ def test_academic_director_lessons_sync_route_calls_domain_service(client, monke
 
 
 def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monkeypatch):
-    import backend.workspaces.head_of_departments.staff_records_api as hod_api_routes
+    import backend.modules.people.head_of_department.workspace.staff_records_api as hod_api_routes
 
     academy_api = _patch_api_payload(monkeypatch)
     calls = {"update": 0}
@@ -449,7 +449,7 @@ def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monk
     ],
 )
 def test_hod_teacher_routes_enforce_subject_scope(client, monkeypatch, path, service_name, expected_key):
-    import backend.workspaces.head_of_departments.staff_records_api as hod_api_routes
+    import backend.modules.people.head_of_department.workspace.staff_records_api as hod_api_routes
 
     academy_api = _patch_api_payload(monkeypatch)
     calls = {}
@@ -490,7 +490,7 @@ def test_frontend_teacher_academy_uses_clean_role_routes_without_admin_action_fa
     routes_source = Path("frontend/src/shared/lib/routes.ts").read_text()
     api_routes_source = Path("frontend/src/shared/api/routes.ts").read_text()
     ad_page = Path("frontend/src/workspaces/academic_director/pages/TeacherAcademy.tsx").read_text()
-    hod_page = Path("frontend/src/workspaces/head_of_departments/pages/TeacherAcademy.tsx").read_text()
+    hod_page = Path("frontend/src/workspaces/head_of_department/pages/TeacherAcademy.tsx").read_text()
 
     assert "routes.academicDirectorTeacherAcademyCreate" in panel_source
     assert "routes.academicDirectorTeacherAcademyAssignmentUpdate" in panel_source

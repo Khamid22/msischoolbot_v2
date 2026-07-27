@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-
 LEGACY_IMPORT_ROOTS = [
     "backend.api",
     "backend.pages",
@@ -34,13 +33,13 @@ def test_required_modular_architecture_paths_exist():
     for path in [
         Path("backend/application/api.py"),
         Path("backend/application/registry.py"),
-        Path("backend/modules/identity/service.py"),
-        Path("backend/modules/organization/service.py"),
-        Path("backend/modules/academics/groups/service.py"),
-        Path("backend/modules/academics/timetable/service.py"),
-        Path("backend/modules/academics/gradebook/service.py"),
-        Path("backend/modules/teacher_academy/service.py"),
-        Path("backend/modules/people/students/service.py"),
+        Path("backend/modules/domains/identity/service.py"),
+        Path("backend/modules/domains/organization/service.py"),
+        Path("backend/modules/domains/academics/groups/service.py"),
+        Path("backend/modules/domains/academics/timetable/service.py"),
+        Path("backend/modules/domains/academics/gradebook/service.py"),
+        Path("backend/modules/domains/teacher_academy/service.py"),
+        Path("backend/modules/domains/student_records/service.py"),
         Path("frontend/src/shared/api/routes.ts"),
     ]:
         assert path.exists(), f"Expected modular architecture path: {path}"
@@ -71,13 +70,13 @@ def test_generated_database_caches_are_not_tracked():
 
 def test_module_repositories_are_canonical():
     expected = [
-        Path("backend/modules/communications/announcements_repository.py"),
-        Path("backend/modules/support/repository.py"),
-        Path("backend/modules/academics/timetable/office_hours_repository.py"),
-        Path("backend/modules/academics/resources/repository.py"),
-        Path("backend/modules/people/parents/repository.py"),
-        Path("backend/modules/finance/repository.py"),
-        Path("backend/modules/reporting/repository.py"),
+        Path("backend/modules/domains/communications/announcements_repository.py"),
+        Path("backend/modules/domains/support_cases/tickets/repository.py"),
+        Path("backend/modules/domains/academics/timetable/office_hours_repository.py"),
+        Path("backend/modules/domains/academics/resources/repository.py"),
+        Path("backend/modules/domains/parent_relationships/repository.py"),
+        Path("backend/modules/domains/finance/repository.py"),
+        Path("backend/modules/domains/reporting/repository.py"),
     ]
     assert all(path.exists() for path in expected)
 
@@ -94,9 +93,9 @@ def test_excel_is_not_an_lms_integration_or_upload_format():
 
 def test_main_starts_from_modular_accounts_and_core_config():
     main_source = Path("main.py").read_text()
-    assert "from backend.modules.identity.bootstrap import init_storage" in main_source
+    assert "from backend.modules.domains.identity.bootstrap import init_storage" in main_source
     assert "from backend.core.runtime.config import get_web_settings" in main_source
-    assert callable(importlib.import_module("backend.modules.identity.bootstrap").init_storage)
+    assert callable(importlib.import_module("backend.modules.domains.identity.bootstrap").init_storage)
 
 
 def test_demo_authentication_bypass_is_removed():

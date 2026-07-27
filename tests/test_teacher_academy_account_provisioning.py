@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.modules.teacher_academy import account_provisioning
+from backend.modules.domains.teacher_academy import account_provisioning
 
 
 class _Rows:

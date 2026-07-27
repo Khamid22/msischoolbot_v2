@@ -126,7 +126,7 @@ def _dashboard_context(student_id=321):
 
 
 def _patch_student_home(monkeypatch):
-    import backend.workspaces.student.page as student_page
+    import backend.modules.people.student.workspace.page as student_page
 
     monkeypatch.setattr(
         student_page,
@@ -142,7 +142,7 @@ def _patch_student_home(monkeypatch):
 
 
 def _patch_valid_dashboard(monkeypatch, student_id=321):
-    import backend.workspaces.student.dashboard as dashboard_routes
+    import backend.modules.people.student.workspace.dashboard as dashboard_routes
 
     monkeypatch.setattr(
         dashboard_routes.payload_service,
@@ -195,7 +195,7 @@ def test_dashboard_renders_with_mocked_valid_payload(client, monkeypatch):
 
 
 def test_student_cannot_access_another_dashboard(client, monkeypatch):
-    import backend.modules.people.students.payload as payload_service
+    import backend.modules.people.student.payload as payload_service
 
     monkeypatch.setattr(
         payload_service,
@@ -212,7 +212,7 @@ def test_student_cannot_access_another_dashboard(client, monkeypatch):
 
 
 def test_teacher_role_cannot_open_student_dashboard(client, monkeypatch):
-    import backend.modules.people.students.payload as payload_service
+    import backend.modules.people.student.payload as payload_service
 
     monkeypatch.setattr(
         payload_service,
@@ -234,7 +234,7 @@ def test_teacher_role_cannot_open_student_dashboard(client, monkeypatch):
 
 
 def test_parent_child_dashboard_redirects_to_public_dashboard(client, monkeypatch):
-    import backend.workspaces.parent.page as parent_routes
+    import backend.modules.people.parent.workspace.page as parent_routes
 
     monkeypatch.setattr(parent_routes, "parent_can_access_student", lambda parent_id, student_row_id: True)
     monkeypatch.setattr(
@@ -261,7 +261,7 @@ def test_parent_child_dashboard_redirects_to_public_dashboard(client, monkeypatc
 
 
 def test_unlinked_parent_child_dashboard_returns_access_denied(client, monkeypatch):
-    import backend.workspaces.parent.page as parent_routes
+    import backend.modules.people.parent.workspace.page as parent_routes
 
     monkeypatch.setattr(parent_routes, "parent_can_access_student", lambda parent_id, student_row_id: False)
     _set_session(client, {"auth_role": "parent", "auth_login": "parent@example", "parent_id": 50})
@@ -274,8 +274,8 @@ def test_unlinked_parent_child_dashboard_returns_access_denied(client, monkeypat
 
 
 def test_parent_direct_dashboard_access_uses_parent_validation(client, monkeypatch):
-    import backend.workspaces.student.dashboard as dashboard_routes
-    import backend.modules.people.students.payload as payload_service
+    import backend.modules.people.student.workspace.dashboard as dashboard_routes
+    import backend.modules.people.student.payload as payload_service
 
     calls = []
     monkeypatch.setattr(

@@ -1,9 +1,9 @@
 from datetime import date, time
 from pathlib import Path
 
-from backend.modules.academics.calendar import service as calendar_closures
-from backend.modules.academics.gradebook.window import _gradebook_lesson_window
-from backend.modules.academics.calendar.scheduling import generate_teaching_dates
+from backend.modules.domains.academics.calendar import service as calendar_closures
+from backend.modules.domains.academics.gradebook.window import _gradebook_lesson_window
+from backend.modules.domains.academics.calendar.scheduling import generate_teaching_dates
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -119,7 +119,7 @@ def test_closure_migration_is_auditable_and_never_deletes_academic_records():
 
 
 def test_academic_director_exposes_preview_create_list_and_unlock_routes():
-    route_source = source("backend/workspaces/academic_director/academics_api.py")
+    route_source = source("backend/modules/people/academic_director/workspace/academics_api.py")
     assert '"/calendar-closures"' in route_source
     assert '"/calendar-closures/preview"' in route_source
     assert '"/calendar-closures/{closure_id}/unlock"' in route_source
@@ -127,14 +127,14 @@ def test_academic_director_exposes_preview_create_list_and_unlock_routes():
 
 
 def test_all_timetable_mutations_share_closure_aware_date_generation():
-    service = source("backend/modules/academics/timetable/service.py")
+    service = source("backend/modules/domains/academics/timetable/service.py")
     operations = "\n".join(
         [
-            source("backend/modules/academics/timetable/operations.py"),
-            source("backend/modules/academics/lessons/service.py"),
+            source("backend/modules/domains/academics/timetable/operations.py"),
+            source("backend/modules/domains/academics/lessons/service.py"),
         ]
     )
-    closure_service = source("backend/modules/academics/calendar/service.py")
+    closure_service = source("backend/modules/domains/academics/calendar/service.py")
 
     assert "generate_teaching_dates(" in service
     assert "list_effective_group_closures(" in service

@@ -7,7 +7,7 @@ from base64 import b64encode
 import pytest
 from itsdangerous import TimestampSigner
 
-from backend.modules.people.parents.cards import build_parent_workspace_cards
+from backend.modules.people.parent.cards import build_parent_workspace_cards
 
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}
@@ -80,7 +80,7 @@ def _parent_children():
 
 
 def _patch_parent_dependencies(monkeypatch, children):
-    import backend.workspaces.parent.page as parent_routes
+    import backend.modules.people.parent.workspace.page as parent_routes
 
     if isinstance(children, Exception):
         def raise_children(parent_id):

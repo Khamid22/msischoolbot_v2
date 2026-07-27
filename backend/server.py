@@ -1,391 +1,69 @@
 import logging
 import os
-import re
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
-from starlette.exceptions import HTTPException
-from fastapi.responses import JSONResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from starlette.middleware.sessions import SessionMiddleware
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
-from backend.core.runtime.rate_limit import limiter
-from backend.core.web.error_pages import internal_server_error_page
-from backend.core.runtime.observability import RequestMetricsMiddleware, configure_error_reporting
+from starlette.exceptions import HTTPException
+from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import Response
 
-from fastapi import Depends
-from backend.core.web.request_context import RequestContextMiddleware, prime_body_state
-from backend.core.access.pages import install_guard_handler
-from backend.core.access.roles import is_valid_role, normalize_role, role_display_name
-from backend.core.runtime.config import get_web_settings
+from backend.application.container import AppContainer
 from backend.application.registry import register_application_pages
+from backend.application.security_middleware import AuthAndSecurityMiddleware
+from backend.core.access.pages import install_guard_handler
+from backend.core.access.roles import normalize_role, role_display_name
+from backend.core.runtime.config import AppSettings, get_app_settings, get_web_settings
+from backend.core.runtime.observability import (
+    RequestMetricsMiddleware,
+    configure_error_reporting,
+)
+from backend.core.web.error_pages import internal_server_error_page
+from backend.core.web.request_context import RequestContextMiddleware, prime_body_state
 
 _BACKEND_DIR = os.path.dirname(__file__)
 _STATIC_DIR = os.path.join(_BACKEND_DIR, "static")
 _REACT_DIR = os.path.join(_STATIC_DIR, "react")
 
-_CACHE_NO_STORE = "no-store, max-age=0"
-_CACHE_NO_CACHE_REVALIDATE = "no-cache, no-store, must-revalidate"
-_CACHE_LONG_IMMUTABLE = "public, max-age=31536000, immutable"
-_CACHE_STATIC_DEFAULT = "public, max-age=2592000, immutable"
-
-_HASHED_REACT_ASSET_FILE_RE = re.compile(r"-[A-Za-z0-9_-]{8,}\.(js|css)$")
-_VERSIONED_REACT_ENTRY_RE = re.compile(r"^/static/react/app\.(js|css)$")
-_VERSIONED_BUNDLE_RE = re.compile(r"^/static/js/bundles/[^/]+\.js$")
-
 LOGGER = logging.getLogger("msi.server")
 configure_error_reporting()
 
-def _resolve_cache_control_header(request_path: str, query_version: str = ""):
-    if request_path == "/" or request_path.startswith("/dashboard/"):
-        return _CACHE_NO_STORE
 
-    role_page_prefixes = (
-        "/academic-director",
-        "/academic_director",
-        "/ceo",
-        "/support",
-        "/customer-support",
-        "/parent",
-        "/student",
-        "/head-of-department",
-        "/head-of-departments",
-        "/hr-manager",
-        "/account",
-    )
-    if request_path in role_page_prefixes or request_path.startswith(
-        tuple(f"{prefix}/" for prefix in role_page_prefixes)
-    ):
-        return _CACHE_NO_STORE
-
-    if request_path.startswith("/api/"):
-        return _CACHE_NO_STORE
-
-    if request_path.startswith("/static/react/"):
-        file_name = os.path.basename(request_path)
-        if file_name in {"manifest.json", "index.html"}:
-            return _CACHE_NO_CACHE_REVALIDATE
-        if _HASHED_REACT_ASSET_FILE_RE.search(file_name):
-            return _CACHE_LONG_IMMUTABLE
-        if query_version and _VERSIONED_REACT_ENTRY_RE.match(request_path):
-            return _CACHE_LONG_IMMUTABLE
-        return _CACHE_NO_STORE
-
-    if request_path.startswith("/static/js/bundles/"):
-        if query_version and _VERSIONED_BUNDLE_RE.match(request_path):
-            return _CACHE_LONG_IMMUTABLE
-        return _CACHE_NO_STORE
-
-    if request_path.startswith("/static/"):
-        return _CACHE_STATIC_DEFAULT
-
-    return None
-
-PUBLIC_PATHS = {
-    "/",
-    "/login",
-    "/auth/telegram",
-    # Signed handoff token, not ambient-cookie auth.
-    "/unauthorized",
-    "/manifest.webmanifest",
-    "/sw.js",
-    "/docs",
-    "/redoc",
-    "/openapi.json",
-    "/api/v1/system/status",
-    "/health/live",
-    "/health/ready",
-}
-_STATE_CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
-# Endpoints authenticated by a signed payload rather than the ambient session
-# cookie are exempt from the same-origin/CSRF check: a cross-site forgery gains
-# nothing because the request must itself carry a server-verified signature.
-# /auth/telegram only trusts HMAC-validated Telegram initData.
-_SAME_ORIGIN_EXEMPT_PATHS = {"/auth/telegram"}
-_PASSWORD_CHANGE_ALLOWED_PATHS = {
-    "/account/security",
-    "/logout",
-    "/auth/telegram",
-    "/login",
-}
-
-class AuthAndSecurityMiddleware:
-    def __init__(self, app):
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
-        request_obj = Request(scope, receive=receive)
-        path = request_obj.url.path
-        # 1. Reject cross-origin state changes (Same-Origin check). Applies to
-        # every mutating method on every path, including plain HTML form posts.
-        if request_obj.method in _STATE_CHANGING_METHODS and path not in _SAME_ORIGIN_EXEMPT_PATHS:
-            origin = request_obj.headers.get("Origin") or request_obj.headers.get("Referer") or ""
-            is_api = path.startswith("/api/")
-            if origin:
-                from urllib.parse import urlparse
-                host = request_obj.headers.get("host") or ""
-                host_name = host.split(":")[0] if ":" in host else host
-                origin_netloc = urlparse(origin).netloc
-                origin_name = origin_netloc.split(":")[0] if ":" in origin_netloc else origin_netloc
-                if origin_name != host_name:
-                    response = JSONResponse({"status": "error", "message": "Cross-origin request rejected."}, status_code=403)
-                    await response(scope, receive, send)
-                    return
-            elif is_api:
-                # No Origin/Referer on an XHR/JSON API call: require the
-                # XMLHttpRequest marker, which a cross-site page cannot set
-                # without a CORS preflight. Same-origin HTML form posts that omit
-                # both headers are allowed here because the SameSite=Lax session
-                # cookie already prevents a cross-site POST from carrying auth.
-                if request_obj.headers.get("X-Requested-With") != "XMLHttpRequest":
-                    response = JSONResponse({"status": "error", "message": "Cross-origin request rejected."}, status_code=403)
-                    await response(scope, receive, send)
-                    return
-
-        # 2. Authentication check
-        is_public = (
-            path in PUBLIC_PATHS
-            or path.startswith("/static/")
-            # Parent invite codes are random, hashed at rest, expiring, and
-            # atomically consumed. Logged-out parents must be able to claim one.
-            or path.startswith("/parent/invite/")
-        )
-
-        if not is_public:
-            raw_auth_role = request_obj.session.get("auth_role")
-            auth_role = normalize_role(raw_auth_role)
-            if not auth_role:
-                if raw_auth_role:
-                    requested_with = request_obj.headers.get("X-Requested-With") or ""
-                    is_xhr = requested_with == "XMLHttpRequest"
-                    if path.startswith("/api/") or is_xhr:
-                        response = JSONResponse({"status": "error", "message": "Invalid session role."}, status_code=403)
-                        await response(scope, receive, send)
-                        return
-                    response = RedirectResponse(url="/unauthorized", status_code=302)
-                    await response(scope, receive, send)
-                    return
-                requested_with = request_obj.headers.get("X-Requested-With") or ""
-                is_xhr = requested_with == "XMLHttpRequest"
-                if path.startswith("/api/") or is_xhr:
-                    response = JSONResponse({"status": "error", "message": "Authentication required."}, status_code=401)
-                    await response(scope, receive, send)
-                    return
-                response = RedirectResponse(url="/", status_code=302)
-                await response(scope, receive, send)
-                return
-            if not is_valid_role(auth_role):
-                requested_with = request_obj.headers.get("X-Requested-With") or ""
-                is_xhr = requested_with == "XMLHttpRequest"
-                if path.startswith("/api/") or is_xhr:
-                    response = JSONResponse({"status": "error", "message": "Invalid session role."}, status_code=403)
-                    await response(scope, receive, send)
-                    return
-                response = RedirectResponse(url="/unauthorized", status_code=302)
-                await response(scope, receive, send)
-                return
-
-            # Canonical account cookies are versioned. Password changes/resets,
-            # disabled accounts, and role changes invalidate every older signed
-            # cookie even though its HMAC remains cryptographically valid.
-            raw_account_id = request_obj.session.get("account_id")
-            app_state = getattr(scope.get("app"), "state", None)
-            account_validation_enabled = not bool(
-                app_state and getattr(app_state, "testing", False)
-            )
-            if raw_account_id and path != "/logout" and account_validation_enabled:
-                try:
-                    account_id = int(raw_account_id)
-                    cookie_version = int(request_obj.session.get("session_version") or 0)
-                except (TypeError, ValueError):
-                    account_id = 0
-                    cookie_version = 0
-                account = None
-                if account_id > 0 and cookie_version > 0:
-                    try:
-                        from backend.modules.identity.service import get_account_by_id
-
-                        account = get_account_by_id(account_id)
-                    except Exception:
-                        account = None
-                canonical_session_role = normalize_role(
-                    request_obj.session.get("canonical_role")
-                    or request_obj.session.get("account_role")
-                )
-                account_role = normalize_role(account.get("role")) if account else ""
-                account_valid = bool(
-                    account
-                    and account.get("status") == "active"
-                    and int(account.get("session_version") or 0) == cookie_version
-                    and account_role
-                    and account_role == canonical_session_role
-                )
-                if not account_valid:
-                    request_obj.session.clear()
-                    if path.startswith("/api/") or request_obj.headers.get("X-Requested-With") == "XMLHttpRequest":
-                        response = JSONResponse(
-                            {
-                                "status": "error",
-                                "message": "Your session expired. Please sign in again.",
-                                "code": "session_expired",
-                            },
-                            status_code=401,
-                        )
-                    else:
-                        response = RedirectResponse(url="/", status_code=302)
-                    await response(scope, receive, send)
-                    return
-                request_obj.session["must_change_password"] = bool(
-                    account.get("must_change_password")
-                )
-
-            # Accounts issued with login == password must choose a private
-            # password before using any workspace. Auth endpoints and logout
-            # remain available so the user can complete or abandon the flow.
-            password_change_required = bool(
-                request_obj.session.get("account_id")
-                and request_obj.session.get("must_change_password")
-            )
-            password_change_path_allowed = (
-                path in _PASSWORD_CHANGE_ALLOWED_PATHS
-                or path.startswith("/api/v1/auth/")
-                or path.startswith("/static/")
-            )
-            if password_change_required and not password_change_path_allowed:
-                if path.startswith("/api/") or request_obj.headers.get("X-Requested-With") == "XMLHttpRequest":
-                    response = JSONResponse(
-                        {
-                            "status": "error",
-                            "message": "Change your initial password to continue.",
-                            "code": "password_change_required",
-                        },
-                        status_code=428,
-                    )
-                else:
-                    response = RedirectResponse(url="/account/security", status_code=302)
-                await response(scope, receive, send)
-                return
-
-        async def send_wrapper(message):
-            if message["type"] == "http.response.start":
-                headers = list(message.get("headers", []))
-                header_names = {h[0].lower() for h in headers}
-
-                if b"x-content-type-options" not in header_names:
-                    headers.append((b"x-content-type-options", b"nosniff"))
-                if b"referrer-policy" not in header_names:
-                    headers.append((b"referrer-policy", b"strict-origin-when-cross-origin"))
-
-                cache_control = _resolve_cache_control_header(
-                    request_path=path,
-                    query_version=request_obj.query_params.get("v", ""),
-                )
-                if cache_control and b"cache-control" not in header_names:
-                    headers.append((b"cache-control", cache_control.encode("utf-8")))
-
-                message["headers"] = headers
-
-            await send(message)
-
-        await self.app(scope, receive, send_wrapper)
-
-# Instantiate FastAPI application
-app = FastAPI(
-    dependencies=[Depends(prime_body_state)],
-    title="MSI School API",
-    description="Backend API for MSI School Bot and Web portal management, serving multiple role-based dashboards.",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_tags=[
-        {"name": "identity", "description": "Authentication and user session management."},
-        {"name": "student", "description": "Student-specific views and dashboard APIs."},
-        {"name": "parent", "description": "Parent dashboard, student linked data access."},
-        {"name": "resources", "description": "Study materials, resources, and file management."},
-        {"name": "payments", "description": "Payment history, details, and billing APIs."},
-        {"name": "communication", "description": "Chats, system complaints, and messaging routes."},
-        {"name": "system", "description": "System diagnostics, health checks, and metadata utilities."},
-    ],
-)
-app.state.limiter = limiter
-
-
-app.name = "backend.server"
-app.static_folder = _STATIC_DIR
-app.backend_root_path = _BACKEND_DIR
-
-# Fail closed: a known/default signing key lets anyone forge a session cookie
-_secret_key = os.environ.get("APP_SECRET_KEY", os.environ.get("FLASK_SECRET_KEY", "")).strip()
-if not _secret_key:
-    if os.environ.get("APP_ENV", "").strip().lower() in {"dev", "development", "local"}:
-        _secret_key = "dev-only-insecure-key-do-not-use-in-prod"
-    else:
-        raise RuntimeError(
-            "APP_SECRET_KEY must be set. Generate one with: "
-            'python -c "import secrets; print(secrets.token_hex(32))"'
-        )
-
-# Register Starlette and Custom middlewares
-app.add_middleware(AuthAndSecurityMiddleware)
-app.add_middleware(RequestContextMiddleware)
-app.add_middleware(GZipMiddleware, minimum_size=512)
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=_secret_key,
-    session_cookie="session",
-    max_age=30 * 24 * 3600,  # 30 days
-    same_site=os.environ.get("SESSION_COOKIE_SAMESITE", "lax").lower(),
-    https_only=os.environ.get("SESSION_COOKIE_SECURE", "0").strip().lower() not in {"0", "false", "no", "off"},
-)
-app.add_middleware(RequestMetricsMiddleware)
-
-# Mount static files correctly
-app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
-
-# Expose settings
-settings = get_web_settings()
-
-_APP_BOOTSTRAPPED = False
-
-
-# Role-guard dependencies short-circuit by raising GuardResponse
-install_guard_handler(app)
-
-
-# Rate limiter exception handler
-@app.exception_handler(RateLimitExceeded)
-def handle_rate_limited(request_obj: Request, exc: RateLimitExceeded):
+def handle_rate_limited(
+    request_obj: Request,
+    _exc: RateLimitExceeded,
+) -> Response:
     message = "Too many attempts. Please wait a moment and try again."
     requested_with = request_obj.headers.get("X-Requested-With", "")
     is_xhr = requested_with == "XMLHttpRequest"
     if request_obj.url.path.startswith("/api/") or is_xhr:
         return JSONResponse({"status": "error", "message": message}, status_code=429)
-    from fastapi.responses import PlainTextResponse
     return PlainTextResponse(message, status_code=429)
 
 
-# HTTP exception handler
-@app.exception_handler(HTTPException)
-def handle_http_exception(request_obj: Request, exc: HTTPException):
+def handle_http_exception(request_obj: Request, exc: HTTPException) -> Response:
     requested_with = request_obj.headers.get("X-Requested-With", "")
     is_xhr = requested_with == "XMLHttpRequest"
     if request_obj.url.path.startswith("/api/") or is_xhr:
         if isinstance(exc.detail, dict):
-            return JSONResponse({"status": "error", **exc.detail}, status_code=exc.status_code)
-        return JSONResponse({"status": "error", "message": exc.detail}, status_code=exc.status_code)
+            return JSONResponse(
+                {"status": "error", **exc.detail},
+                status_code=exc.status_code,
+            )
+        return JSONResponse(
+            {"status": "error", "message": exc.detail},
+            status_code=exc.status_code,
+        )
     if exc.status_code in {401, 403}:
         return RedirectResponse(url="/", status_code=302)
-    from fastapi.responses import PlainTextResponse
     return PlainTextResponse(exc.detail, status_code=exc.status_code)
 
 
-# Global unexpected error handler
-@app.exception_handler(Exception)
-def handle_unexpected_error(request_obj: Request, exc: Exception):
+def handle_unexpected_error(request_obj: Request, exc: Exception) -> Response:
     request_id = str(
         getattr(getattr(request_obj, "state", None), "request_id", "") or ""
     )
@@ -412,8 +90,7 @@ def handle_unexpected_error(request_obj: Request, exc: Exception):
     return internal_server_error_page(request_id)
 
 
-@app.get("/unauthorized")
-def unauthorized_page(request_obj: Request):
+def unauthorized_page(request_obj: Request) -> Response:
     from backend.core.web.rendering import render_react_page
 
     auth_role = normalize_role(request_obj.session.get("auth_role"))
@@ -434,7 +111,81 @@ def unauthorized_page(request_obj: Request):
     )
 
 
-def _build_default_asset_version():
+_OPENAPI_TAGS = [
+    {"name": "identity", "description": "Authentication and user session management."},
+    {"name": "student", "description": "Student-specific views and dashboard APIs."},
+    {"name": "parent", "description": "Parent dashboard, student linked data access."},
+    {"name": "resources", "description": "Study materials, resources, and file management."},
+    {"name": "payments", "description": "Payment history, details, and billing APIs."},
+    {"name": "communication", "description": "Chats, system complaints, and messaging routes."},
+    {"name": "system", "description": "System diagnostics, health checks, and metadata utilities."},
+]
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    try:
+        yield
+    finally:
+        _app.state.container.close()
+
+
+def _create_base_app(
+    app_settings: AppSettings,
+    container: AppContainer,
+) -> FastAPI:
+    app_instance = FastAPI(
+        dependencies=[Depends(prime_body_state)],
+        title="MSI School API",
+        description=(
+            "Backend API for MSI School Bot and Web portal management, "
+            "serving multiple role-based dashboards."
+        ),
+        version="1.0.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_tags=_OPENAPI_TAGS,
+        lifespan=_lifespan,
+    )
+    app_instance.state.limiter = container.limiter
+    app_instance.state.settings = app_settings
+    app_instance.state.container = container
+    app_instance.name = "backend.server"
+    app_instance.static_folder = _STATIC_DIR
+    app_instance.backend_root_path = _BACKEND_DIR
+
+    app_instance.add_middleware(AuthAndSecurityMiddleware)
+    app_instance.add_middleware(RequestContextMiddleware)
+    app_instance.add_middleware(GZipMiddleware, minimum_size=512)
+    app_instance.add_middleware(
+        SessionMiddleware,
+        secret_key=app_settings.session.secret_key,
+        session_cookie=app_settings.session.cookie_name,
+        max_age=app_settings.session.max_age_seconds,
+        same_site=app_settings.session.same_site,
+        https_only=app_settings.session.https_only,
+    )
+    app_instance.add_middleware(RequestMetricsMiddleware)
+    app_instance.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+
+    install_guard_handler(app_instance)
+    app_instance.add_exception_handler(RateLimitExceeded, handle_rate_limited)
+    app_instance.add_exception_handler(HTTPException, handle_http_exception)
+    app_instance.add_exception_handler(Exception, handle_unexpected_error)
+    app_instance.add_api_route(
+        "/unauthorized",
+        unauthorized_page,
+        methods=["GET"],
+        include_in_schema=False,
+    )
+    return app_instance
+
+
+# Compatibility export used by the existing process wrappers.
+settings = get_web_settings()
+
+
+def _build_default_asset_version() -> str:
     candidate_paths = [
         os.path.join(_BACKEND_DIR, "core", "assets.py"),
         os.path.join(_BACKEND_DIR, "server.py"),
@@ -473,7 +224,7 @@ def _build_default_asset_version():
     return str(max(mtimes))
 
 
-_asset_version_override = os.environ.get("ASSET_VERSION", "").strip()
+_asset_version_override = settings.asset_version
 _ASSET_VERSION = (
     _asset_version_override
     if _asset_version_override and _asset_version_override != "1"
@@ -481,9 +232,8 @@ _ASSET_VERSION = (
 )
 
 
-def _bootstrap_app(app_instance):
-    global _APP_BOOTSTRAPPED
-    if _APP_BOOTSTRAPPED:
+def _bootstrap_app(app_instance: FastAPI) -> FastAPI:
+    if bool(getattr(app_instance.state, "msi_bootstrapped", False)):
         return app_instance
 
     # Set static asset dependencies in the rendering boundary.
@@ -495,12 +245,6 @@ def _bootstrap_app(app_instance):
     import backend.application.system_page as system_routes
     system_routes.STATIC_FOLDER = _STATIC_DIR
 
-    # Build small legacy Telegram helper bundles at startup. Some deploy
-    # environments start from source without generated bundle artifacts, and
-    # render_react_page still loads this helper when Telegram support is enabled.
-    from backend.core.web.assets import ensure_js_bundles
-    ensure_js_bundles(_STATIC_DIR)
-
     # Include system router
     from backend.application.system_page import router as system_router
     app_instance.include_router(system_router)
@@ -511,12 +255,19 @@ def _bootstrap_app(app_instance):
 
     register_application_pages(app_instance)
 
-    _APP_BOOTSTRAPPED = True
+    app_instance.state.msi_bootstrapped = True
     return app_instance
 
 
-def create_app():
-    return _bootstrap_app(app)
+def create_app(
+    settings: AppSettings | None = None,
+    container: AppContainer | None = None,
+) -> FastAPI:
+    """Create an isolated application instance for web, tests, or tooling."""
+
+    app_settings = settings or (container.settings if container else get_app_settings())
+    app_container = container or AppContainer.build(app_settings)
+    return _bootstrap_app(_create_base_app(app_settings, app_container))
 
 
 app = create_app()

@@ -6,28 +6,28 @@ Audience: engineers locating the owner of a change.
 
 | Change | Backend owner | Frontend owner |
 | --- | --- | --- |
-| account, password, session identity | `modules/identity` | `features/identity` |
-| school, subject, class | `modules/organization` | composed by academic workspaces |
-| student records | `modules/people/students` | `features/people/students` |
-| parent records and links | `modules/people/parents` | `features/people/parents` |
-| Customer Support record operations | `modules/customer_support` (scoped orchestration over People, Identity, Academic, and Finance contracts) | `workspaces/customer_support` |
-| teacher records | `modules/people/teachers` | `features/people/teachers` |
-| staff account registration | `modules/people/staff` | authorized workspace adapters |
-| Teacher Academy | `modules/teacher_academy` | `features/teacher-academy` |
-| teacher recruitment | `modules/hr/recruitment` | `features/recruitment` |
-| curriculum/program | `modules/academics/curriculum` | `features/academics` |
-| groups/enrollment | `modules/academics/groups` | `features/academics` |
-| schedules/reflow/office hours | `modules/academics/timetable` | `features/academics/timetable` |
-| lesson overrides | `modules/academics/lessons` | timetable details UI |
-| attendance | `modules/academics/attendance` | `features/academics/gradebook` |
-| homework/rewards/trends | `modules/academics/gradebook` | `features/academics/gradebook` |
-| exams | `modules/academics/assessments` | Gradebook exam view |
-| holiday closures | `modules/academics/calendar` | timetable closure UI |
-| learning resources | `modules/academics/resources` | `features/academics/resources` |
-| payments | `modules/finance` | `features/finance` |
-| complaints | `modules/support` | `features/support` |
-| announcements/chat | `modules/communications` | `features/communications` |
-| dashboards/read models | `modules/reporting` | `features/reporting` |
+| account, password, session identity | `modules/domains/identity` | `features/identity` |
+| school, subject, class | `modules/domains/organization` | composed by academic workspaces |
+| student records | `modules/domains/student_records` | `features/people/students` |
+| parent records and links | `modules/domains/parent_relationships` | `features/people/parents` |
+| Customer Support orchestration | `modules/people/customer_support/{dashboard,parents,teachers,tickets}` | `workspaces/customer_support` |
+| teacher records | `modules/domains/teacher_records` | `features/people/teachers` |
+| staff account registration | `modules/domains/identity/staff_accounts` | authorized workspace adapters |
+| Teacher Academy | `modules/domains/teacher_academy` | `features/teacher-academy` |
+| teacher recruitment | `modules/domains/recruitment` | `features/recruitment` |
+| curriculum/program | `modules/domains/academics/curriculum` | `features/academics` |
+| groups/enrollment | `modules/domains/academics/groups` | `features/academics` |
+| schedules/reflow/office hours | `modules/domains/academics/timetable` | `features/academics/timetable` |
+| lesson overrides | `modules/domains/academics/lessons` | timetable details UI |
+| attendance | `modules/domains/academics/attendance` | `features/academics/gradebook` |
+| homework/rewards/trends | `modules/domains/academics/gradebook` | `features/academics/gradebook` |
+| exams | `modules/domains/academics/assessments` | Gradebook exam view |
+| holiday closures | `modules/domains/academics/calendar` | timetable closure UI |
+| learning resources | `modules/domains/academics/resources` | `features/academics/resources` |
+| payments | `modules/domains/finance` | `features/finance` |
+| support tickets | `modules/domains/support_cases/tickets` | `features/support` |
+| announcements/chat | `modules/domains/communications` | `features/communications` |
+| dashboards/read models | `modules/domains/reporting` | `features/reporting` |
 | shared API/web/runtime infrastructure | `core/api`, `core/web`, `core/runtime` | n/a |
 | storage, Redis, Telegram adapter | `platform` | n/a |
 
@@ -35,11 +35,11 @@ Audience: engineers locating the owner of a change.
 
 | Owner | Principal tables |
 | --- | --- |
-| Identity | `accounts`, `account_telegram_links`, `student_auth`, `staff_profiles`, `audit_events` |
+| Identity | `accounts`, `account_telegram_links`, `student_auth`, `staff_profiles`, `msi_staff`, `staff_subject_scopes`, `audit_events` |
 | Organization | `schools`, `subjects`, `classes`, `class_students` |
-| People / Students | `students`, `student_profiles` |
-| People / Parents | `parents`, `parent_profiles`, parent links/invites |
-| People / Teachers and Staff | `teachers`, `teacher_profiles`, `msi_staff`, `staff_subject_scopes` |
+| Student Records | `students`, `student_profiles` |
+| Parent Relationships | `parents`, `parent_profiles`, parent links/invites |
+| Teacher Records | `teachers`, `teacher_profiles` |
 | Academics / Curriculum | `subject_programs`, `subject_program_items` |
 | Academics / Groups | `groups`, `group_students` |
 | Academics / Timetable | `group_schedule_rules`, `lesson_sessions`, office-hour tables |
@@ -52,7 +52,7 @@ Audience: engineers locating the owner of a change.
 | Recruitment | `teacher_candidates`, normalized candidate document/evaluation/assignment/task/note/approval/decision tables; legacy candidate events are read-only history |
 | Teacher Academy | training, evaluation, assignment, and development tables |
 | Finance | `payments` |
-| Support | complaint/support tables |
+| Support Cases | complaint/support tables |
 | Communications | announcement and chat tables |
 | Reporting | no transactional ownership; read-only projections |
 
@@ -60,7 +60,7 @@ When one physical table serves closely related academic concerns, the write cont
 
 ## Recruitment Internal Map
 
-`modules/hr/recruitment/service.py` and `repository.py` are compatibility facades that preserve existing imports and API behavior. New Recruitment work belongs in the focused owner:
+`modules/domains/recruitment/service.py` and `repository.py` are compatibility facades that preserve existing imports and API behavior. New Recruitment work belongs in the focused owner:
 
 | Capability | Service owner | Persistence owner |
 | --- | --- | --- |
@@ -74,24 +74,57 @@ When one physical table serves closely related academic concerns, the write cont
 | settings and options | compatibility service facade | `settings_repository.py` |
 | browser appointment reminders | `notifications.py` | `notification_repository.py` |
 
-Recruitment reminders are browser-only. Eligible portal clients atomically claim due reminders through the Recruitment API; no Telegram notification worker is deployed.
+Recruitment browser reminders remain client-claimed for compatibility. New durable background work uses
+`msi_v2.outbox_jobs` and the PostgreSQL-backed worker; reminder delivery will move behind a typed job
+handler when that compatibility surface is migrated.
+
+## Customer Support Internal Map
+
+The Customer Support person module composes reusable domain contracts. Its
+`module.py` records a separate domain allowlist and capability set for each
+section.
+
+| Section | Person orchestration | Domain boundary |
+| --- | --- | --- |
+| Dashboard | `people/customer_support/dashboard` | `reporting/customer_support` |
+| Parents | `people/customer_support/parents` | `parent_relationships/support_contracts.py`, plus typed Student, Finance, and Support Cases contracts |
+| Teachers | `people/customer_support/teachers` | `teacher_records/support_contracts.py` |
+| Tickets | `people/customer_support/tickets` | `support_cases/tickets` |
+
+The current Customer Support workspace adapter and
+`support_cases/customer_records_*` files remain compatibility boundaries.
+New workflows must enter one of the focused packages above.
 
 ## Explicit Size Exceptions
 
-These existing stateful orchestrators remain above the target threshold after extracting their models, calculations, dialogs, or child views. They are documented compatibility exceptions and must not grow without first extracting another focused unit:
+These existing stateful orchestrators remain above the target threshold. The owning domain team must
+not add another capability to one of these files before satisfying its removal condition:
 
-- `features/academics/AcademicPanel.tsx`
-- `features/academics/gradebook/GroupGradebook.tsx`
-- `features/academics/timetable/SchedulePanel.tsx`
-- `features/academics/timetable/Timetable.tsx`
-- `features/academics/timetable/ModernGroupTimetable.tsx`
-- `features/teacher-academy/TeacherAcademyPanel.tsx`
-- `features/recruitment/CandidateProfile.tsx` — retained recruitment profile orchestrator; its tab panels and form drawers should be extracted before adding another profile subdomain.
-- workspace orchestrators (transport composition, not domain features)
-- `modules/people/students/dashboard.py` and `platform/storage/r2.py`
-- `modules/hr/recruitment/service.py` — compatibility facade for stable imports and monkeypatch contracts plus the remaining task/settings/scheduling orchestration; new candidate, appointment, evaluation, decision, document, or handoff logic must go to its focused service.
-- `modules/hr/recruitment/api.py` — stable public route surface for the existing Recruitment API; extract route groups before adding another Recruitment capability.
-- `modules/customer_support/service.py` and `modules/customer_support/repository.py` — Phase 1 transactional records-desk facade. They keep school-scope checks, optimistic versions, account/profile synchronization, finance audit writes, and refreshed read models together for review; split Payments and Family/Access into focused units before adding ticket management in Phase 2.
+| Existing exception | Owner | Removal condition |
+|---|---|---|
+| `features/academics/AcademicPanel.tsx` | Academics | Extract the next added panel into its own feature component. |
+| `features/academics/gradebook/GroupGradebook.tsx` | Academics | Extract grading dialogs and bulk actions before adding another grade workflow. |
+| `features/academics/timetable/SchedulePanel.tsx` | Academics | Extract the next schedule editor workflow. |
+| `features/academics/timetable/Timetable.tsx` | Academics | Extract rendering and interaction controllers before another timetable mode. |
+| `features/academics/timetable/ModernGroupTimetable.tsx` | Academics | Extract the next group timetable interaction. |
+| `features/teacher-academy/TeacherAcademyPanel.tsx` | Teacher Academy | Move remaining orchestration state into capability hooks before another workflow. |
+| `features/teacher-academy/TeacherAcademyWorkflowModals.tsx` | Teacher Academy | Split one component per modal family before adding a modal. |
+| `features/recruitment/CandidateProfile.tsx` | Recruitment | Extract the remaining tab panels and form drawers before another profile subdomain. |
+| `features/recruitment/ScheduleView.tsx` | Recruitment | Extract appointment editing before another calendar workflow. |
+| `features/recruitment/PipelineView.tsx` | Recruitment | Extract stage columns and drag policy before another pipeline behavior. |
+| `features/recruitment/AcademicCandidateListView.tsx` | Recruitment | Extract filters and bulk actions before another list workflow. |
+| `features/recruitment/SettingsView.tsx` | Recruitment | Split each settings capability before adding a settings section. |
+| `features/recruitment/AnalyticsView.tsx` | Recruitment | Extract each report card before adding a metric family. |
+| workspace orchestrators | Application | Keep them transport-only and extract any business rule immediately. |
+| `modules/people/student/dashboard.py` | Student | Split the next dashboard projection into a focused query module. |
+| `platform/storage/r2.py` | Platform | Extract provider operations before adding another storage capability. |
+| `modules/domains/recruitment/service.py` | Recruitment | Keep it as a compatibility facade; put every new use case in a focused command or query. |
+| `modules/domains/recruitment/api.py` | Recruitment | Extract route groups before adding another Recruitment capability. |
+| `modules/domains/recruitment/candidates/read_repository.py` | Recruitment | Split candidate list and candidate detail SQL before adding another read model. |
+| `modules/domains/recruitment/evaluations/service.py` | Recruitment | Split rubric and submission commands before adding an evaluation type. |
+| `modules/domains/reporting/recruitment/repository.py` | HR Analytics | Split each report family before adding another analytics query. |
+| `modules/domains/support_cases/customer_records_service.py` | Support Cases | Split Student, Parent, and Payment commands before adding another support workflow. |
+| `modules/domains/support_cases/customer_records_repository.py` | Support Cases | Move student, parent, and payment writes behind their owning domain contracts before adding another records workflow. |
 
 No new backend domain implementation may exceed 800 lines and no new frontend feature component may exceed 600 lines without adding a named rationale here.
 

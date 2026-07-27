@@ -9,12 +9,12 @@ frontend/src/workspaces/  role-specific workspace adapters
 frontend/src/features/    product-domain UI and workflows
 frontend/src/shared/      shared UI, routing, time, and API primitives
 backend/application/      FastAPI composition and route registration
-backend/workspaces/       role-specific HTTP/page adapters
-backend/modules/          product domains and repository-owned SQL
+backend/modules/people/   person modules with co-located HTTP/page workspaces
+backend/modules/domains/  reusable product domains and repository-owned SQL
 backend/core/             configuration, PostgreSQL, sessions, and security
 backend/platform/         Redis, Telegram, and storage adapters
 database/alembic/         the only owner of schema DDL
-tgbot/                    Telegram worker shell; inbound router registry is empty
+tgbot/                    independent aiogram process and portal-entry router
 scripts/                  deployment and explicit reconciliation/import tools
 tests/                    backend, route, migration, and architecture coverage
 ```
@@ -22,7 +22,9 @@ tests/                    backend, route, migration, and architecture coverage
 The runtime dependency direction is:
 
 ```text
-React / Telegram Mini App -> workspace/API adapter -> module service -> module repository -> PostgreSQL
+React / Telegram Mini App -> API adapter -> command/query -> repository -> PostgreSQL
+                                                       \-> transactional outbox
+PostgreSQL outbox -> durable worker -> module job handler -> external integration
 ```
 
 PostgreSQL schema `msi_v2` is the only runtime source of truth. Google Sheets, Excel workbooks, and the old Telegram mini-app workflow are not LMS data integrations.
@@ -60,7 +62,9 @@ python main.py bot
 python main.py worker
 ```
 
-The bot command registry is intentionally empty at present. Telegram authentication and Mini App parent linking continue to work through the web application.
+The bot exposes the portal entry flow. Telegram authentication and Mini App parent linking
+continue through the web application. The worker claims durable jobs with PostgreSQL leases;
+Redis is optional infrastructure for caching and rate limiting only.
 
 ## Frontend
 
@@ -71,6 +75,8 @@ npm --prefix frontend run test:logic
 npm --prefix frontend run test:schedule
 npm --prefix frontend run test:shared-ui
 npm --prefix frontend run test:academic
+npm --prefix frontend run test:recruitment
+npm --prefix frontend run test:teacher
 npm --prefix frontend run check-types
 npm --prefix frontend run build
 ```
@@ -80,8 +86,11 @@ npm --prefix frontend run build
 ```bash
 python3 -m pytest
 python3 -m compileall -q backend database tgbot scripts main.py
+python3 -m ruff check backend tests
+python3 -m mypy
 npm --prefix frontend run check-types
 npm --prefix frontend run build
+python3 -m alembic heads
 git diff --check
 ```
 
@@ -94,7 +103,9 @@ Required in deployed environments:
 - `MINI_APP_URL`
 - `APP_SECRET_KEY`
 
-Common optional settings include `RUN_MODE`, `WEB_HOST`, `WEB_PORT`, `PORT`, database pool settings, `WEBAPP_INIT_DATA_TTL`, `TELEGRAM_BOT_USERNAME` (without `@`, used by staff account-link buttons), `BOT_POLL_LOCK_RETRY_SECONDS`, `RECRUITMENT_NOTIFICATION_POLL_SECONDS`, `RECRUITMENT_NOTIFICATION_BATCH_LIMIT`, `REDIS_URL`, and storage settings.
+Common optional settings include `RUN_MODE`, `WEB_HOST`, `WEB_PORT`, `PORT`, database pool
+settings, `WEBAPP_INIT_DATA_TTL`, `TELEGRAM_BOT_USERNAME` (without `@`), `REDIS_URL`,
+storage settings, and the `WORKER_*` batch, lease, polling, and retry settings.
 
 ## Documentation
 
@@ -103,6 +114,7 @@ Common optional settings include `RUN_MODE`, `WEB_HOST`, `WEB_PORT`, `PORT`, dat
 - [Database architecture](docs/ENGINEERING_DATABASE.md)
 - [Engineering architecture](docs/ENGINEERING_ARCHITECTURE.md)
 - [Module map](docs/ENGINEERING_MODULE_MAP.md)
+- [Backend style guide](docs/BACKEND_STYLE_GUIDE.md)
 - [Documentation index](docs/README.md)
 
 Production branch `main` is reference-only during rewrite work. Do not modify or deploy it from the rewrite task without explicit approval.

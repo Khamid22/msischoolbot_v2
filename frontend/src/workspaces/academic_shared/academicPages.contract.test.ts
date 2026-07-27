@@ -17,7 +17,7 @@ const rolePages = {
   "AcademicDepartmentWorkspace (timetable/announcements)": pageSource("workspaces/academic_shared/AcademicDepartmentWorkspace.tsx"),
   "AD HeadOfDepartments": pageSource("workspaces/academic_director/pages/HeadOfDepartments.tsx"),
   "AD TeacherAcademy": pageSource("workspaces/academic_director/pages/TeacherAcademy.tsx"),
-  "HOD TeacherAcademy": pageSource("workspaces/head_of_departments/pages/TeacherAcademy.tsx"),
+  "HOD TeacherAcademy": pageSource("workspaces/head_of_department/pages/TeacherAcademy.tsx"),
 };
 
 describe("AD/HOD pages use the shared role shell — no admin chrome", () => {

@@ -28,10 +28,10 @@ def test_legacy_database_module_is_removed_after_core_migration():
 
 
 def test_teacher_academy_domain_modules_import_successfully():
-    import backend.modules.teacher_academy.repository as academy_repository
-    import backend.modules.teacher_academy.mutations_repository as academy_mutations
-    import backend.modules.teacher_academy.read_service as academy_read_service
-    import backend.modules.teacher_academy.service as academy_service
+    import backend.modules.domains.teacher_academy.repository as academy_repository
+    import backend.modules.domains.teacher_academy.mutations_repository as academy_mutations
+    import backend.modules.domains.teacher_academy.read_service as academy_read_service
+    import backend.modules.domains.teacher_academy.service as academy_service
 
     assert callable(academy_repository.list_academy_teacher_rows)
     assert callable(academy_mutations.insert_academy_lesson_assignment)
@@ -46,9 +46,9 @@ def test_old_admin_teacher_academy_service_path_is_removed():
 
 
 def test_teacher_academy_service_uses_module_repository_not_inline_sql():
-    service_source = Path("backend/modules/teacher_academy/service.py").read_text()
+    service_source = Path("backend/modules/domains/teacher_academy/service.py").read_text()
 
-    assert "from backend.modules.teacher_academy import repository as repository" in service_source
+    assert "from backend.modules.domains.teacher_academy import repository as repository" in service_source
     assert "from database import queries" not in service_source
     assert "conn.execute" not in service_source
     assert "FROM msi_v2" not in service_source
@@ -56,13 +56,15 @@ def test_teacher_academy_service_uses_module_repository_not_inline_sql():
     assert "UPDATE msi_v2" not in service_source
 
 
-def test_page_and_role_edges_import_teacher_academy_domain_service_where_safe():
-    role_sources = [
-        Path("backend/workspaces/academic_director/page.py").read_text(),
-        Path("backend/workspaces/head_of_departments/page.py").read_text(),
-        Path("backend/modules/academics/head_of_departments_cards.py").read_text(),
-    ]
+def test_page_and_role_edges_enter_through_person_contracts():
+    academic_director_source = Path(
+        "backend/modules/people/academic_director/workspace/page.py"
+    ).read_text()
+    head_of_department_source = Path(
+        "backend/modules/people/head_of_department/workspace/page.py"
+    ).read_text()
 
-    for source in role_sources:
-        assert "backend.modules.teacher_academy.read_service" in source
-        assert "backend.roles.admin.services.teacher_academy_service" not in source
+    assert "backend.modules.people.academic_director.contracts" in academic_director_source
+    assert "backend.modules.people.head_of_department.contracts" in head_of_department_source
+    assert "backend.modules.domains.teacher_academy.read_service" not in academic_director_source
+    assert "backend.modules.domains.teacher_academy.read_service" not in head_of_department_source

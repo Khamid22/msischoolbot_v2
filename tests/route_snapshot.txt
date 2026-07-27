@@ -79,6 +79,8 @@
 /api/v1/customer-support/students/{student_id}/payments | POST
 /api/v1/customer-support/students/{student_id}/reactivate | POST
 /api/v1/customer-support/students/{student_id}/reset-access | POST
+/api/v1/customer-support/teachers | GET
+/api/v1/customer-support/teachers/{teacher_id} | GET
 /api/v1/head-of-department/teacher-academy/assignments/{assignment_id} | POST
 /api/v1/head-of-department/teacher-academy/{academy_teacher_id}/assessments | POST
 /api/v1/head-of-department/teacher-academy/{academy_teacher_id}/assessments/{assessment_id}/delete | POST
@@ -127,6 +129,7 @@
 /api/v1/recruitment/notifications/browser-preference | GET
 /api/v1/recruitment/notifications/browser-preference | PATCH
 /api/v1/recruitment/notifications/browser-test | POST
+/api/v1/recruitment/notifications/candidates/{candidate_id}/read | POST
 /api/v1/recruitment/notifications/unread-count | GET
 /api/v1/recruitment/notifications/{notification_id}/read | POST
 /api/v1/recruitment/options | GET
@@ -175,6 +178,7 @@
 /customer-support/parents | GET
 /customer-support/payments | GET
 /customer-support/students | GET
+/customer-support/teachers | GET
 /customer-support/tickets | GET
 /dashboard/{student_id} | GET
 /dashboard/{student_id}/aap-lessons | GET

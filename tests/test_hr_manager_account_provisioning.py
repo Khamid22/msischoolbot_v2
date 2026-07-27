@@ -3,7 +3,7 @@ from pathlib import Path
 
 from werkzeug.security import check_password_hash
 
-from backend.modules.people.staff import service
+from backend.modules.domains.identity import staff_accounts as service
 
 
 class _Connection:

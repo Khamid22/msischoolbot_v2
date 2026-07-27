@@ -32,7 +32,9 @@ Forbidden:
 
 ## Composition Boundaries
 
-`backend/application` registers pages/APIs and system endpoints. `backend/workspaces` translates HTTP into calls to domain services. Workspaces do not own business rules or persistence.
+`backend/application` registers pages/APIs and system endpoints. Each
+`backend/modules/people/<person>/workspace` translates HTTP into calls to its
+person contract. Workspaces do not own business rules or persistence.
 
 Core is divided by infrastructure responsibility: `core/access`, `core/api`, `core/runtime`, `core/web`, and `core/database.py`. Password and portal-session behavior is Identity-owned. The remaining `core/web/request_context.py` is an explicit compatibility boundary for older form routes, not the pattern for new FastAPI code.
 
@@ -42,9 +44,9 @@ Core is divided by infrastructure responsibility: `core/access`, `core/api`, `co
 
 ## Public Contracts
 
-- `backend.modules.organization.contracts` exposes organization lookup contracts.
-- `backend.modules.people.teachers.contracts` exposes teacher lookup contracts.
-- `backend.modules.reporting.academic_contract` is the reporting-facing academic read contract.
+- `backend.modules.domains.organization.contracts` exposes organization lookup contracts.
+- `backend.modules.domains.teacher_records.contracts` exposes teacher lookup contracts.
+- `backend.modules.domains.reporting.academic_contract` is the reporting-facing academic read contract.
 - Workspace APIs remain transport adapters, never reusable business owners.
 
 Package `__init__.py` files describe ownership only; they do not form broad import barrels. Callers import the focused service or contract they need.
@@ -55,7 +57,7 @@ PostgreSQL schema `msi_v2` remains unchanged. Each table has one documented owne
 
 ## Frontend Boundaries
 
-Workspaces compose domain features. `shared` is restricted to cross-domain API, UI, time, motion, and formatting primitives. Teacher Recruitment is owned by `modules/hr/recruitment` and hands accepted records to the separate Teacher Academy or active-teacher domains without provisioning accounts.
+Workspaces compose domain features. `shared` is restricted to cross-domain API, UI, time, motion, and formatting primitives. Teacher Recruitment is owned by `modules/domains/recruitment` and hands accepted records to the separate Teacher Academy or active-teacher domains without provisioning accounts.
 
 Large stateful screens are progressively decomposed through focused model, calculation, modal, and calendar modules. Temporary size exceptions are listed in the module map and guarded from further growth; they are not permission to create new catch-all components.
 

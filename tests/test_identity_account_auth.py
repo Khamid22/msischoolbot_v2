@@ -2,7 +2,7 @@ import pytest
 
 from werkzeug.security import generate_password_hash
 
-from backend.modules.identity import service as account_auth
+from backend.modules.domains.identity import service as account_auth
 
 
 class _Result:

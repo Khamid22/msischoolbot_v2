@@ -1,13 +1,16 @@
 """Single role registry: canonical roles, normalization, routing and display helpers."""
 
-ROLE_CEO = "ceo"
-ROLE_TEACHER = "teacher"
-ROLE_CUSTOMER_SUPPORT = "customer_support"
-ROLE_PARENT = "parent"
-ROLE_STUDENT = "student"
-ROLE_ACADEMIC_DIRECTOR = "academic_director"
-ROLE_HEAD_OF_DEPARTMENT = "head_of_department"
-ROLE_HR_MANAGER = "hr_manager"
+from backend.core.access.domain_types import Role
+
+
+ROLE_CEO = Role.CEO.value
+ROLE_TEACHER = Role.TEACHER.value
+ROLE_CUSTOMER_SUPPORT = Role.CUSTOMER_SUPPORT.value
+ROLE_PARENT = Role.PARENT.value
+ROLE_STUDENT = Role.STUDENT.value
+ROLE_ACADEMIC_DIRECTOR = Role.ACADEMIC_DIRECTOR.value
+ROLE_HEAD_OF_DEPARTMENT = Role.HEAD_OF_DEPARTMENT.value
+ROLE_HR_MANAGER = Role.HR_MANAGER.value
 
 WORKSPACE_ROLES = {
     ROLE_CEO,

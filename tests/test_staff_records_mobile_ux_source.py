@@ -11,10 +11,12 @@ def _read(path: str) -> str:
 
 
 def test_academy_uses_shared_accessible_modal_and_action_menu():
-    source = "\n".join([
-        _read("features/teacher-academy/TeacherAcademyPanel.tsx"),
-        _read("features/teacher-academy/TeacherAcademyWorkflowModals.tsx"),
-    ])
+    source = "\n".join(
+        [
+            _read("features/teacher-academy/TeacherAcademyPanel.tsx"),
+            _read("features/teacher-academy/TeacherAcademyWorkflowModals.tsx"),
+        ]
+    )
     assert 'from "@/shared/ui/ActionMenu"' in source
     assert 'from "@/shared/ui/Modal"' in source
     assert "ActionMenu" in source
@@ -35,11 +37,11 @@ def test_teacher_academy_uses_compact_cards_at_every_roster_breakpoint():
     assert not (ROOT / "features/teacher-academy/AppointedLessonsView.tsx").exists()
 
 
-def test_head_of_departments_workspace_uses_exact_folder_and_shared_shell():
-    source = _read("workspaces/head_of_departments/pages/TeacherAcademy.tsx")
+def test_head_of_department_workspace_uses_exact_folder_and_shared_shell():
+    source = _read("workspaces/head_of_department/pages/TeacherAcademy.tsx")
     assert "HeadOfDepartmentPageShell" in source
     assert "allowTeacherPreview" not in source
-    assert not (ROOT / "workspaces/head_of_department").exists()
+    assert not (ROOT / "workspaces/head_of_departments").exists()
 
 
 def test_academic_director_workspace_has_no_teacher_portal_preview():

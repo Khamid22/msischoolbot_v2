@@ -4,31 +4,14 @@ from __future__ import annotations
 
 import atexit
 import logging
-import os
 import threading
 import time
 
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_PROJECT_DOTENV_PATH = os.path.join(_PROJECT_ROOT, ".env")
-
-
-def _load_project_env_once() -> None:
-    if getattr(_load_project_env_once, "_loaded", False):
-        return
-    setattr(_load_project_env_once, "_loaded", True)
-    try:
-        from dotenv import load_dotenv
-    except Exception:
-        return
-    load_dotenv(dotenv_path=_PROJECT_DOTENV_PATH)
+from backend.core.runtime.config import get_app_settings
 
 
 def _database_url() -> str:
-    _load_project_env_once()
-    return (
-        os.environ.get("DATABASE_URL", "").strip()
-        or os.environ.get("POSTGRES_URL", "").strip()
-    )
+    return get_app_settings().database.url
 
 
 def _is_postgres_database_url(url: str) -> bool:
@@ -133,39 +116,24 @@ _POOL_SLOW_ACQUIRE_COUNT = 0
 LOGGER = logging.getLogger("msi.database")
 
 
-def _env_int(name: str, default: int) -> int:
-    try:
-        return int(str(os.environ.get(name, "") or "").strip() or default)
-    except ValueError:
-        return default
-
-
-def _env_float(name: str, default: float) -> float:
-    try:
-        return float(str(os.environ.get(name, "") or "").strip() or default)
-    except ValueError:
-        return default
-
-
 def _pool_enabled() -> bool:
-    flag = str(os.environ.get("DB_POOL_DISABLE", "") or "").strip().casefold()
-    return flag not in {"1", "true", "yes", "on"}
+    return get_app_settings().database.pool_enabled
 
 
 def _pool_min() -> int:
-    return max(0, _env_int("DB_POOL_MIN", 2))
+    return get_app_settings().database.pool_min
 
 
 def _pool_max() -> int:
-    return max(1, _env_int("DB_POOL_MAX", 5))
+    return get_app_settings().database.pool_max
 
 
 def _pool_timeout() -> float:
-    return max(1.0, _env_float("DB_POOL_TIMEOUT", 10.0))
+    return get_app_settings().database.pool_timeout_seconds
 
 
 def _pool_max_idle_seconds() -> int:
-    return max(1, _env_int("DB_POOL_MAX_IDLE_SECONDS", 300))
+    return get_app_settings().database.pool_max_idle_seconds
 
 
 def _open_new_connection(database_url: str):
@@ -246,7 +214,7 @@ def close_idle_pool_connections() -> None:
 
 def _record_pool_wait(elapsed_ms: float) -> None:
     global _POOL_ACQUIRE_COUNT, _POOL_ACQUIRE_TOTAL_MS, _POOL_ACQUIRE_MAX_MS, _POOL_SLOW_ACQUIRE_COUNT
-    threshold_ms = max(_env_float("DB_POOL_SLOW_WAIT_MS", 25.0), 0.0)
+    threshold_ms = get_app_settings().database.slow_wait_ms
     with _POOL_METRICS_LOCK:
         _POOL_ACQUIRE_COUNT += 1
         _POOL_ACQUIRE_TOTAL_MS += elapsed_ms

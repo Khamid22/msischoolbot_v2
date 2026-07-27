@@ -1,0 +1,162 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+include = [
+    "backend/application/container.py",
+    "backend/application/customer_support.py",
+    "backend/application/module_spec.py",
+    "backend/application/modules.py",
+    "backend/application/person_modules.py",
+    "backend/application/security_middleware.py",
+    "backend/application/worker.py",
+    "backend/core/access/capabilities.py",
+    "backend/core/access/context.py",
+    "backend/core/access/domain_types.py",
+    "backend/core/api/pagination.py",
+    "backend/core/api/schemas.py",
+    "backend/core/clock.py",
+    "backend/core/jobs.py",
+    "backend/core/runtime/config.py",
+    "backend/core/time.py",
+    "backend/core/unit_of_work.py",
+    "backend/core/web/cache_policy.py",
+    "backend/modules/domains/student_records/policies.py",
+    "backend/modules/domains/recruitment/catalog.py",
+    "backend/modules/domains/recruitment/contracts.py",
+    "backend/modules/domains/recruitment/domain_types.py",
+    "backend/modules/domains/identity/contracts.py",
+    "backend/modules/jobs/**/*.py",
+    "backend/modules/domains/parent_relationships/contracts.py",
+    "backend/modules/domains/teacher_records/policies.py",
+    "backend/modules/domains/teacher_records/support_queries.py",
+    "backend/modules/domains/teacher_records/support_repository.py",
+    "backend/modules/domains/teacher_academy/catalog.py",
+    "backend/modules/domains/teacher_academy/commands/**/*.py",
+    "backend/modules/domains/teacher_academy/domain_types.py",
+    "backend/modules/domains/teacher_academy/events.py",
+    "backend/modules/domains/teacher_academy/job_handlers.py",
+    "backend/modules/domains/teacher_academy/lifecycle_repository.py",
+    "backend/modules/domains/teacher_academy/module.py",
+    "backend/modules/domains/*/contracts.py",
+    "backend/modules/domains/*/*_contracts.py",
+    "backend/modules/domains/*/module.py",
+    "backend/modules/domains/reporting/customer_support/*.py",
+    "backend/modules/domains/support_cases/tickets/*.py",
+    "backend/modules/people/*/contracts.py",
+    "backend/modules/people/*/module.py",
+    "backend/modules/people/customer_support/dashboard/*.py",
+    "backend/modules/people/customer_support/parents/*.py",
+    "backend/modules/people/customer_support/teachers/*.py",
+    "backend/modules/people/customer_support/tickets/*.py",
+    "backend/modules/people/customer_support/domain_types.py",
+    "backend/modules/people/customer_support/policies.py",
+    "backend/modules/people/customer_support/scope.py",
+    "backend/modules/people/customer_support/workspace/teachers_api.py",
+    "backend/platform/telegram/polling_repository.py",
+    "tests/integrations/test_outbox_postgres.py",
+    "tests/test_expansion_architecture.py",
+    "tests/test_outbox_jobs.py",
+    "tests/test_people_scoped_architecture.py",
+]
+extend-exclude = [
+    "backend/static",
+    "frontend",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "N",
+    "UP",
+    "B",
+    "C4",
+    "SIM",
+]
+ignore = [
+    # Enable incrementally while legacy services are decomposed.
+    "E501",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["N802", "N803", "N806"]
+"backend/modules/people/customer_support/workspace/teachers_api.py" = ["B008"]
+
+[tool.mypy]
+python_version = "3.12"
+files = [
+    "backend/application/container.py",
+    "backend/application/customer_support.py",
+    "backend/application/module_spec.py",
+    "backend/application/modules.py",
+    "backend/application/person_modules.py",
+    "backend/application/security_middleware.py",
+    "backend/application/worker.py",
+    "backend/core/access/capabilities.py",
+    "backend/core/access/context.py",
+    "backend/core/access/domain_types.py",
+    "backend/core/api/pagination.py",
+    "backend/core/api/schemas.py",
+    "backend/core/clock.py",
+    "backend/core/jobs.py",
+    "backend/core/runtime/config.py",
+    "backend/core/time.py",
+    "backend/core/unit_of_work.py",
+    "backend/core/web/cache_policy.py",
+    "backend/modules/domains/student_records/policies.py",
+    "backend/modules/domains/recruitment/catalog.py",
+    "backend/modules/domains/recruitment/domain_types.py",
+    "backend/modules/jobs",
+    "backend/modules/domains/teacher_records/policies.py",
+    "backend/modules/domains/teacher_records/support_queries.py",
+    "backend/modules/domains/teacher_records/support_repository.py",
+    "backend/modules/domains/teacher_academy/catalog.py",
+    "backend/modules/domains/teacher_academy/commands",
+    "backend/modules/domains/teacher_academy/domain_types.py",
+    "backend/modules/domains/teacher_academy/events.py",
+    "backend/modules/domains/teacher_academy/job_handlers.py",
+    "backend/modules/domains/teacher_academy/lifecycle_repository.py",
+    "backend/modules/domains/*/contracts.py",
+    "backend/modules/domains/*/*_contracts.py",
+    "backend/modules/domains/*/module.py",
+    "backend/modules/domains/reporting/customer_support",
+    "backend/modules/domains/support_cases/tickets",
+    "backend/modules/people/*/contracts.py",
+    "backend/modules/people/*/module.py",
+    "backend/modules/people/customer_support/dashboard",
+    "backend/modules/people/customer_support/parents",
+    "backend/modules/people/customer_support/teachers",
+    "backend/modules/people/customer_support/tickets",
+    "backend/modules/people/customer_support/domain_types.py",
+    "backend/modules/people/customer_support/policies.py",
+    "backend/modules/people/customer_support/scope.py",
+    "backend/modules/people/customer_support/workspace/teachers_api.py",
+    "backend/platform/telegram/polling_repository.py",
+]
+follow_imports = "skip"
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+check_untyped_defs = true
+no_implicit_optional = true
+exclude = [
+    "backend/static/",
+    "frontend/",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "aiogram.*",
+    "boto3.*",
+    "botocore.*",
+    "psycopg.*",
+    "psycopg_pool.*",
+    "slowapi.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+markers = [
+    "postgres: requires an explicitly configured disposable PostgreSQL test database",
+]

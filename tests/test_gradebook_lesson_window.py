@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from backend.modules.academics.gradebook.window import _gradebook_lesson_window
+from backend.modules.domains.academics.gradebook.window import _gradebook_lesson_window
 
 
 def lesson(number, day):

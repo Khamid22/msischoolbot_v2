@@ -7,8 +7,8 @@ from contextlib import contextmanager
 import pytest
 
 from backend.core.access import CurrentUser
-from backend.modules.hr.recruitment import service as recruitment_service
-from backend.modules.hr.recruitment.candidates import read_repository, read_service
+from backend.modules.domains.recruitment import service as recruitment_service
+from backend.modules.domains.recruitment.candidates import read_repository, read_service
 
 
 class _Result:

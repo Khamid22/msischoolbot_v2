@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from itsdangerous import TimestampSigner
 
-from backend.modules.teacher_academy.notifications import notify_academy_teacher_event
+from backend.modules.domains.teacher_academy.notifications import notify_academy_teacher_event
 
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}
@@ -246,7 +246,7 @@ def _minimal_academic_context():
 
 
 def _patch_admin_page_context(monkeypatch):
-    import backend.workspaces.academic_director.page as academic_director_routes
+    import backend.modules.people.academic_director.workspace.page as academic_director_routes
 
     def fake_teacher_academy_page_context():
         admin_context = _minimal_admin_page_context()
@@ -277,7 +277,7 @@ def test_academic_director_can_access_academy_management_route(client, monkeypat
 
 
 def test_academic_director_can_create_academy_teacher_through_api_v1(client, monkeypatch):
-    import backend.modules.teacher_academy.responses as academy_api
+    import backend.modules.domains.teacher_academy.responses as academy_api
 
     calls = []
     monkeypatch.setattr(
@@ -309,7 +309,7 @@ def test_academic_director_can_create_academy_teacher_through_api_v1(client, mon
 
 
 def test_next_teacher_code_uses_four_digit_tch_format():
-    from backend.modules.people.teachers.repository import get_next_teacher_code
+    from backend.modules.domains.teacher_records.repository import get_next_teacher_code
 
     class _OneRow:
         def fetchone(self):
@@ -339,7 +339,7 @@ def test_notification_does_not_crash_without_telegram_link(monkeypatch):
 
 
 def test_notification_posts_new_teacher_to_subject_channel(monkeypatch):
-    from backend.modules.teacher_academy import notifications as notifications
+    from backend.modules.domains.teacher_academy import notifications as notifications
 
     sent_messages = []
     monkeypatch.setenv("BOT_TOKEN", "test-token")
@@ -371,7 +371,7 @@ def test_notification_posts_new_teacher_to_subject_channel(monkeypatch):
 
 
 def test_notification_sends_direct_message_to_linked_teacher(monkeypatch):
-    from backend.modules.teacher_academy import notifications as notifications
+    from backend.modules.domains.teacher_academy import notifications as notifications
 
     sent_messages = []
     monkeypatch.setenv("BOT_TOKEN", "test-token")
@@ -400,7 +400,7 @@ def test_notification_sends_direct_message_to_linked_teacher(monkeypatch):
 
 
 def test_new_teacher_direct_message_is_greeting_only(monkeypatch):
-    from backend.modules.teacher_academy import notifications as notifications
+    from backend.modules.domains.teacher_academy import notifications as notifications
 
     sent_messages = []
     monkeypatch.setenv("BOT_TOKEN", "test-token")

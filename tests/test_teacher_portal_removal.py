@@ -8,7 +8,7 @@ from pathlib import Path
 from itsdangerous import TimestampSigner
 
 from backend.core.access.roles import is_valid_role, normalize_role
-from backend.modules.identity import service as accounts
+from backend.modules.domains.identity import service as accounts
 
 
 def _set_teacher_session(client):
@@ -33,20 +33,20 @@ def test_teacher_is_a_valid_session_role():
 
 
 def test_teacher_portal_is_a_read_only_workspace_adapter():
-    assert Path("backend/workspaces/teacher/page.py").exists()
+    assert Path("backend/modules/people/teacher/workspace/page.py").exists()
     assert not Path("backend/pages/teachers").exists()
     assert not Path("backend/api/v1/teachers").exists()
     assert Path("frontend/src/workspaces/teacher/pages/Home.tsx").exists()
     assert "teacher-home" in Path("frontend/src/app/App.tsx").read_text()
-    assert "@router.post" not in Path("backend/workspaces/teacher/page.py").read_text()
+    assert "@router.post" not in Path("backend/modules/people/teacher/workspace/page.py").read_text()
 
 
 def test_teacher_staff_and_academy_modules_are_preserved():
     for path in [
-        Path("backend/modules/people/teachers/service.py"),
-        Path("backend/modules/people/teachers/repository.py"),
-        Path("backend/modules/teacher_academy/service.py"),
-        Path("backend/modules/teacher_academy/repository.py"),
+        Path("backend/modules/domains/teacher_records/service.py"),
+        Path("backend/modules/domains/teacher_records/repository.py"),
+        Path("backend/modules/domains/teacher_academy/service.py"),
+        Path("backend/modules/domains/teacher_academy/repository.py"),
     ]:
         assert path.exists()
 
@@ -78,7 +78,7 @@ def test_teacher_page_exists_without_teacher_mutation_api(app):
 
 
 def test_teacher_page_renders_teacher_bootstrap_when_academy_profile_is_missing(client, monkeypatch):
-    import backend.workspaces.teacher.page as teacher_page
+    import backend.modules.people.teacher.workspace.page as teacher_page
 
     _set_teacher_session(client)
     monkeypatch.setattr(teacher_page, "_safe_teacher_academy_profile", lambda: None)

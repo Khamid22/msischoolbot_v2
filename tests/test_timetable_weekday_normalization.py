@@ -1,4 +1,4 @@
-from backend.modules.academics.foundation import _normalize_weekdays
+from backend.modules.domains.academics.foundation import _normalize_weekdays
 
 
 def test_monday_zero_is_preserved_with_other_weekdays():

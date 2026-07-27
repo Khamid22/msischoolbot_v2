@@ -25,7 +25,7 @@ The physical PostgreSQL schema remains `msi_v2`; use the current Alembic head in
 - Runtime DDL is prohibited; `database/alembic` owns schema changes.
 - Google Sheets and Excel are not LMS integrations.
 - Telegram authentication and Mini App parent linking remain active web integrations.
-- `tgbot` has an explicit empty inbound router registry while new bot handlers are not yet implemented.
+- `tgbot` owns the portal-entry command; durable outbound work is owned by the PostgreSQL worker.
 - The current tree includes a read-only Teacher workspace; Teacher remains staff data managed by authorized roles. The former System Admin and Internal Operations surfaces were removed.
 
 ## Supporting Engineering Docs

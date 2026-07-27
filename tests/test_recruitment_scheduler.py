@@ -9,9 +9,9 @@ from pathlib import Path
 import pytest
 
 from backend.core.access import CurrentUser
-from backend.modules.hr.recruitment import notifications, repository, service
-from backend.modules.hr.recruitment.constants import DEMO_CRITERIA
-from backend.modules.hr.recruitment.schemas import AppointmentCreate
+from backend.modules.domains.recruitment import notifications, repository, service
+from backend.modules.domains.recruitment.constants import DEMO_CRITERIA
+from backend.modules.domains.recruitment.schemas import AppointmentCreate
 
 
 ROOT = Path(__file__).resolve().parents[1]

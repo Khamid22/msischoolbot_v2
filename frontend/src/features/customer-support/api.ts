@@ -1,5 +1,10 @@
 import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders, XHR_HEADERS } from "@/shared/lib/api";
-import type { SupportApiErrorDetails, SupportErrorCode } from "@/features/customer-support/model";
+import type {
+  SupportApiErrorDetails,
+  SupportErrorCode,
+  TeacherDetail,
+  TeacherDirectoryPage,
+} from "@/features/customer-support/model";
 
 export * from "@/features/customer-support/model";
 
@@ -59,4 +64,33 @@ export async function deleteSupport<T>(path: string, csrfToken: string) {
     headers: jsonCsrfHeaders(csrfToken),
   });
   return parseResponse<T>(response);
+}
+
+export type TeacherDirectoryFilters = {
+  query?: string;
+  schoolId?: string;
+  status?: string;
+  cursor?: string | null;
+  limit?: number;
+};
+
+export async function listSupportTeachers(
+  filters: TeacherDirectoryFilters,
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams({
+    status: filters.status || "all",
+    limit: String(filters.limit || 25),
+  });
+  if (filters.query?.trim()) params.set("q", filters.query.trim());
+  if (filters.schoolId) params.set("schoolId", filters.schoolId);
+  if (filters.cursor) params.set("cursor", filters.cursor);
+  return getSupport<TeacherDirectoryPage>(`/teachers?${params}`, signal);
+}
+
+export async function getSupportTeacher(
+  teacherId: number,
+  signal?: AbortSignal,
+) {
+  return getSupport<TeacherDetail>(`/teachers/${teacherId}`, signal);
 }

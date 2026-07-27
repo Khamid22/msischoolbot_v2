@@ -22,14 +22,14 @@ Runtime code does not own schema DDL. Table, index, and constraint changes belon
 | Capability | Repository owner |
 | --- | --- |
 | accounts and Telegram links | `backend/modules/accounts/repository.py` |
-| academics, groups, gradebook | `backend/modules/academics/repository.py` |
-| schedules | `backend/modules/academics/timetable_repository.py` |
-| office hours | `backend/modules/academics/office_hours_repository.py` |
-| reporting and summaries | `backend/modules/reporting/*repository.py` |
+| academics, groups, gradebook | `backend/modules/domains/academics/repository.py` |
+| schedules | `backend/modules/domains/academics/timetable_repository.py` |
+| office hours | `backend/modules/domains/academics/office_hours_repository.py` |
+| reporting and summaries | `backend/modules/domains/reporting/*repository.py` |
 | students | `backend/modules/student_records/repository.py` |
 | teachers and staff development | `backend/modules/staff_records/*repository.py` |
 | parents and invites | `backend/modules/parent_access/repository.py` |
-| announcements/chat | `backend/modules/communications/*repository.py` |
+| announcements/chat | `backend/modules/domains/communications/*repository.py` |
 | complaints | `backend/modules/complaints/repository.py` |
 | payments | `backend/modules/payments/repository.py` |
 | resources/comments | `backend/modules/learning_resources/repository.py` |

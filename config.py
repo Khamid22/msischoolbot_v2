@@ -7,6 +7,34 @@ Temporary compatibility wrapper. Delete after all imports use
 ``backend.core.runtime.config``.
 """
 
-from backend.core.runtime.config import Settings, WebSettings, get_settings, get_web_settings
+from backend.core.runtime.config import (
+    AppSettings,
+    DatabaseSettings,
+    ObservabilitySettings,
+    RedisSettings,
+    SessionSettings,
+    Settings,
+    StorageSettings,
+    TelegramSettings,
+    WebSettings,
+    WorkerSettings,
+    get_app_settings,
+    get_settings,
+    get_web_settings,
+)
 
-__all__ = ["Settings", "WebSettings", "get_settings", "get_web_settings"]
+__all__ = [
+    "AppSettings",
+    "DatabaseSettings",
+    "ObservabilitySettings",
+    "RedisSettings",
+    "SessionSettings",
+    "Settings",
+    "StorageSettings",
+    "TelegramSettings",
+    "WebSettings",
+    "WorkerSettings",
+    "get_app_settings",
+    "get_settings",
+    "get_web_settings",
+]

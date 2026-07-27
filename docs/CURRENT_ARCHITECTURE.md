@@ -1,6 +1,6 @@
 # Current Architecture
 
-Date: 2026-07-20
+Date: 2026-07-26
 
 Branch: `FastAPI-Run-System`
 
@@ -13,12 +13,23 @@ MSI School is a product-domain modular monolith. PostgreSQL is the sole LMS sour
 ```text
 React workspace
   -> FastAPI workspace adapter
-    -> domain service or public read contract
+    -> command/query or compatibility facade
       -> owning repository
         -> PostgreSQL (msi_v2)
+
+FastAPI / Telegram command
+  -> UnitOfWork
+    -> module command and repositories
+      -> domain write + outbox job in one transaction
+
+Durable worker
+  -> FOR UPDATE SKIP LOCKED claim
+    -> typed module job handler
+      -> retry, completion, or dead-job state
 ```
 
-Alembic is the only DDL owner. The current migration head is `0028_remove_system_admin`; the Recruitment migrations preserve historical candidates while providing the normalized workflow and unified Teacher Academy profiles.
+Alembic is the only DDL owner. The current migration head is
+`0044_student_identifier_sequence`.
 
 ## Backend Layout
 
@@ -30,39 +41,47 @@ backend/
 │   ├── api/                     shared JSON schemas and responses
 │   ├── runtime/                 config, observability, performance, limits
 │   ├── web/                     rendering, requests, assets, HTML responses
+│   ├── jobs.py                  typed worker handler contracts
+│   ├── unit_of_work.py          explicit read/write transactions
 │   └── database.py              PostgreSQL connection/pool infrastructure
 ├── modules/
-│   ├── identity/                accounts, passwords, Telegram account linking
-│   ├── organization/            schools, subjects, classes
 │   ├── people/
-│   │   ├── students/            student records and student read models
-│   │   ├── parents/             parent records and child access
-│   │   ├── teachers/            teacher records and management contracts
-│   │   └── staff/               managed staff registration and credentials
-│   ├── academics/
-│   │   ├── curriculum/          programs and scheme of work
-│   │   ├── groups/              groups and enrollment
-│   │   ├── timetable/           schedules, sessions, reflow, office hours
-│   │   ├── lessons/             lesson overrides and one-off changes
-│   │   ├── attendance/          attendance records
-│   │   ├── gradebook/           homework, rewards, gradebook, trends
-│   │   ├── assessments/         exam results
-│   │   ├── calendar/            school/group closures and teaching dates
-│   │   └── resources/           learning resources and comments
-│   ├── hr/
-│   │   ├── recruitment/         candidates, appointments, evaluations, decisions
-│   │   │                        documents, notifications, and academy handoffs
-│   │   └── analytics/           HR recruitment operations read models
-│   ├── teacher_academy/         training, evaluation, progression
-│   ├── support/                 complaints and support cases
-│   ├── finance/                 payments
-│   ├── communications/          chat and announcements
-│   └── reporting/               cross-domain read models
-├── workspaces/                  role-specific HTTP/page adapters
+│   │   ├── ceo/                 orchestration, contracts, workspace/
+│   │   ├── academic_director/   orchestration, contracts, workspace/
+│   │   ├── head_of_department/  orchestration, contracts, workspace/
+│   │   ├── hr_manager/          orchestration, contracts, workspace/
+│   │   ├── customer_support/    orchestration, contracts, workspace/
+│   │   ├── teacher/             orchestration, contracts, workspace/
+│   │   ├── student/             orchestration, contracts, workspace/
+│   │   └── parent/              orchestration, contracts, workspace/
+│   ├── domains/
+│   │   ├── identity/            accounts, passwords, account linking
+│   │   ├── organization/        schools, subjects, classes
+│   │   ├── student_records/
+│   │   ├── parent_relationships/
+│   │   ├── teacher_records/
+│   │   ├── academics/           curriculum, groups, timetable, gradebook
+│   │   ├── recruitment/
+│   │   ├── teacher_academy/
+│   │   ├── finance/
+│   │   ├── support_cases/
+│   │   ├── communications/
+│   │   └── reporting/
+│   ├── jobs/                    outbox commands, queries, repository, leases
 └── platform/                    Redis, storage, Telegram integration
 ```
 
-Every SQL statement under `backend/modules` is in a repository module. Services own validation, policy, calculations, transactions, and response assembly. Cross-domain reads use public contracts; a domain never imports another domain's repository.
+Each `people/<person>/workspace/` calls its surrounding person contract. Person
+modules own actor-specific orchestration and default scopes, while reusable
+domains own rules and SQL. Person modules cannot import one another. Every SQL
+statement under `backend/modules` is in a domain or jobs repository.
+
+Customer Support is additionally divided into `dashboard`, `parents`,
+`teachers`, and `tickets`. Each section has its own capability and domain
+allowlist in `people/customer_support/module.py`. Dashboard projections live in
+`reporting/customer_support`, ticket persistence lives in
+`support_cases/tickets`, and parent/teacher data is accessed through the public
+contracts of its owning domain.
 
 Identity owns password and session helpers. Core is product-agnostic infrastructure. Role workspaces are the only role-facing transport adapters.
 
@@ -98,8 +117,10 @@ The current working tree includes a read-only Teacher workspace. Teacher is stil
 - `Asia/Tashkent` remains the school calendar timezone.
 - There is no runtime Excel or Google Sheets integration.
 - Teacher Recruitment is active under `/api/v1/recruitment` and role-scoped pages. Legacy candidate events remain read-only and are copied into the audit timeline.
-- Recruitment acceptance into Teacher Academy delegates Teacher account provisioning to `modules/teacher_academy`; Recruitment does not own account persistence.
-- Recruitment notification delivery runs as a separate `python main.py worker` process and is not started by FastAPI.
+- Recruitment acceptance into Teacher Academy delegates Teacher account provisioning to `modules/domains/teacher_academy`; Recruitment does not own account persistence.
+- Durable background delivery runs as a separate `python main.py worker` process and is not
+  started by FastAPI. Recruitment browser reminders retain their compatibility flow; new
+  notification handlers use the PostgreSQL outbox.
 
 ## Verification
 

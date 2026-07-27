@@ -7,7 +7,7 @@ from contextlib import contextmanager
 import pytest
 
 from backend.core.access import CurrentUser
-from backend.modules.identity import telegram_linking
+from backend.modules.domains.identity import telegram_linking
 
 
 class _Result:

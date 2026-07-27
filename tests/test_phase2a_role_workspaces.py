@@ -60,8 +60,8 @@ def _set_session(client, data):
 
 
 def _patch_workspace_cards(monkeypatch):
-    import backend.workspaces.academic_director.page as academic_director_routes
-    import backend.workspaces.ceo.page as ceo_page
+    import backend.modules.people.academic_director.workspace.page as academic_director_routes
+    import backend.modules.people.ceo.workspace.page as ceo_page
 
     monkeypatch.setattr(
         ceo_page,
@@ -212,8 +212,8 @@ def test_recruitment_routes_replace_the_removed_legacy_hr_pipeline(app):
 def test_staff_role_pages_are_owned_by_one_staff_module():
     assert not Path("backend/roles").exists()
     for path in [
-        Path("backend/workspaces/ceo/page.py"),
-        Path("backend/workspaces/customer_support/page.py"),
-        Path("backend/modules/reporting/service.py"),
+        Path("backend/modules/people/ceo/workspace/page.py"),
+        Path("backend/modules/people/customer_support/workspace/page.py"),
+        Path("backend/modules/domains/reporting/service.py"),
     ]:
         assert path.is_file()

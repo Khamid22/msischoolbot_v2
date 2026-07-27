@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from backend.modules.hr.recruitment.candidates import repository
+from backend.modules.domains.recruitment.candidates import repository
 
 
 ROOT = Path(__file__).resolve().parents[1]

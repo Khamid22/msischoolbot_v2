@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 import hashlib
 
-from backend.modules.people.parents import service
+from backend.modules.domains.parent_relationships import contracts, service
 
 
 class _Connection:
@@ -19,11 +19,11 @@ def test_new_parent_invite_stores_only_a_sha256_digest(monkeypatch):
     captured = {}
     raw_code = "secret-parent-code"
     monkeypatch.setattr(service, "_connect", lambda: _connected(connection))
-    monkeypatch.setattr(service.secrets, "token_urlsafe", lambda _size: raw_code)
+    monkeypatch.setattr(contracts.secrets, "token_urlsafe", lambda _size: raw_code)
     monkeypatch.setattr(
         service.parent_repository,
         "get_student_v2_id_by_legacy_row",
-        lambda _conn, _student_id: 41,
+        lambda _conn, _student_id, for_update=False: 41,
     )
     monkeypatch.setattr(
         service.parent_repository,
@@ -33,7 +33,7 @@ def test_new_parent_invite_stores_only_a_sha256_digest(monkeypatch):
     monkeypatch.setattr(
         service.parent_repository,
         "insert_parent_invite_row",
-        lambda _conn, **values: captured.update(values),
+        lambda _conn, **values: captured.update(values) or True,
     )
 
     returned_code = service.create_parent_invite_code(7, issued_by=9)
@@ -47,11 +47,15 @@ def test_replacing_parent_invite_revokes_pending_link_before_insert(monkeypatch)
     connection = _Connection()
     calls = []
     monkeypatch.setattr(service, "_connect", lambda: _connected(connection))
-    monkeypatch.setattr(service.secrets, "token_urlsafe", lambda _size: "new-parent-code")
+    monkeypatch.setattr(
+        contracts.secrets,
+        "token_urlsafe",
+        lambda _size: "new-parent-code",
+    )
     monkeypatch.setattr(
         service.parent_repository,
         "get_student_v2_id_by_legacy_row",
-        lambda _conn, _student_id: 41,
+        lambda _conn, _student_id, for_update=False: 41,
     )
     monkeypatch.setattr(
         service.parent_repository,
@@ -66,7 +70,8 @@ def test_replacing_parent_invite_revokes_pending_link_before_insert(monkeypatch)
     monkeypatch.setattr(
         service.parent_repository,
         "insert_parent_invite_row",
-        lambda _conn, **values: calls.append(("insert", values["student_db_id"])),
+        lambda _conn, **values: calls.append(("insert", values["student_db_id"]))
+        or True,
     )
 
     service.create_parent_invite_code(

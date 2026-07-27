@@ -134,7 +134,7 @@ def _minimal_academic_context():
 
 
 def _patch_academic_director_cards(monkeypatch):
-    import backend.workspaces.academic_director.page as academic_director_routes
+    import backend.modules.people.academic_director.workspace.page as academic_director_routes
 
     monkeypatch.setattr(
         academic_director_routes,
@@ -149,8 +149,8 @@ def _patch_academic_director_cards(monkeypatch):
 
 
 def _patch_admin_page_context(monkeypatch):
-    import backend.workspaces.academic_director.page as academic_director_routes
-    import backend.workspaces.head_of_departments.page as head_of_department_routes
+    import backend.modules.people.academic_director.workspace.page as academic_director_routes
+    import backend.modules.people.head_of_department.workspace.page as head_of_department_routes
 
     def fake_teacher_academy_page_context():
         admin_context = _minimal_admin_page_context()
@@ -164,7 +164,11 @@ def _patch_admin_page_context(monkeypatch):
             "curriculum_items": academic_context["curriculum_items"],
         }
 
-    monkeypatch.setattr(academic_director_routes, "list_academic_management_rows", lambda include_heavy=True: _minimal_academic_context())
+    monkeypatch.setattr(
+        academic_director_routes,
+        "list_academic_management_rows",
+        lambda include_heavy=True: _minimal_academic_context(),
+    )
     monkeypatch.setattr(
         academic_director_routes,
         "academic_director_workspace_cards",
@@ -176,7 +180,11 @@ def _patch_admin_page_context(monkeypatch):
         ],
     )
     monkeypatch.setattr(head_of_department_routes, "head_of_department_workspace_cards", lambda: [])
-    monkeypatch.setattr(academic_director_routes, "list_teacher_academy_page_context", fake_teacher_academy_page_context)
+    monkeypatch.setattr(
+        academic_director_routes,
+        "list_teacher_academy_page_context",
+        fake_teacher_academy_page_context,
+    )
     monkeypatch.setattr(
         academic_director_routes,
         "list_academy_timetable_events",
@@ -232,10 +240,20 @@ def _patch_admin_page_context(monkeypatch):
             }
         ],
     )
-    monkeypatch.setattr(head_of_department_routes, "list_teacher_academy_page_context", fake_teacher_academy_page_context)
+    monkeypatch.setattr(
+        head_of_department_routes,
+        "list_teacher_academy_page_context",
+        fake_teacher_academy_page_context,
+    )
     monkeypatch.setattr(head_of_department_routes, "current_hod_subject_ids", lambda: {5})
-    monkeypatch.setattr(head_of_department_routes, "list_academy_timetable_events", academic_director_routes.list_academy_timetable_events)
-    monkeypatch.setattr(head_of_department_routes, "list_announcements", academic_director_routes.list_announcements)
+    monkeypatch.setattr(
+        head_of_department_routes,
+        "list_academy_timetable_events",
+        academic_director_routes.list_academy_timetable_events,
+    )
+    monkeypatch.setattr(
+        head_of_department_routes, "list_announcements", academic_director_routes.list_announcements
+    )
     monkeypatch.setattr(
         academic_director_routes,
         "list_active_subjects",
@@ -320,8 +338,12 @@ def test_academic_director_head_of_departments_route_loads_safe_page(client, mon
 
 def test_academic_department_timetable_announcements_and_profile_routes_load(client, monkeypatch):
     _patch_admin_page_context(monkeypatch)
-    ad_workspace_source = Path("frontend/src/workspaces/academic_director/pages/AcademicWorkspace.tsx").read_text()
-    department_workspace_source = Path("frontend/src/workspaces/academic_shared/AcademicDepartmentWorkspace.tsx").read_text()
+    ad_workspace_source = Path(
+        "frontend/src/workspaces/academic_director/pages/AcademicWorkspace.tsx"
+    ).read_text()
+    department_workspace_source = Path(
+        "frontend/src/workspaces/academic_shared/AcademicDepartmentWorkspace.tsx"
+    ).read_text()
 
     _set_session(client, {"auth_role": "academic_director", "auth_login": "AD0001"})
     ad_groups = client.get("/academic-director/groups")
@@ -361,7 +383,9 @@ def test_academic_department_timetable_announcements_and_profile_routes_load(cli
     assert "Academic Director Profile" in ad_profile.text
 
     client.cookies.clear()
-    _set_session(client, {"auth_role": "head_of_department", "auth_login": "HOD0001", "account_id": 80})
+    _set_session(
+        client, {"auth_role": "head_of_department", "auth_login": "HOD0001", "account_id": 80}
+    )
     hod_timetable = client.get("/head-of-departments/timetable")
     hod_announcements = client.get("/head-of-departments/announcements")
     hod_profile = client.get("/head-of-departments/profile")
@@ -389,10 +413,14 @@ def test_academic_department_timetable_announcements_and_profile_routes_load(cli
 
 def test_academic_department_overviews_do_not_render_duplicate_profile_logout_blocks():
     source = Path("frontend/src/workspaces/shared/RoleHome.tsx").read_text()
-    route_source = Path("backend/workspaces/academic_director/page.py").read_text()
-    hod_route_source = Path("backend/workspaces/head_of_departments/page.py").read_text()
-    ad_overview_block = source.split("function AcademicDirectorHome", 1)[1].split("function HeadOfDepartmentHome", 1)[0]
-    hod_overview_block = source.split("function HeadOfDepartmentHome", 1)[1].split("export function RoleHome", 1)[0]
+    route_source = Path("backend/modules/people/academic_director/workspace/page.py").read_text()
+    hod_route_source = Path("backend/modules/people/head_of_department/workspace/page.py").read_text()
+    ad_overview_block = source.split("function AcademicDirectorHome", 1)[1].split(
+        "function HeadOfDepartmentHome", 1
+    )[0]
+    hod_overview_block = source.split("function HeadOfDepartmentHome", 1)[1].split(
+        "export function RoleHome", 1
+    )[0]
     ad_overview_return = ad_overview_block.rsplit("return (", 1)[1]
     hod_overview_return = hod_overview_block.rsplit("return (", 1)[1]
 
@@ -401,8 +429,14 @@ def test_academic_department_overviews_do_not_render_duplicate_profile_logout_bl
     assert 'view="profile"' in hod_route_source
     assert 'view === "profile"' in ad_overview_block
     assert 'view === "profile"' in hod_overview_block
-    assert "AcademicDirectorProfileSection authLogin={authLogin} csrfToken={csrfToken}" in ad_overview_block
-    assert "HeadOfDepartmentProfileSection authLogin={authLogin} csrfToken={csrfToken}" in hod_overview_block
+    assert (
+        "AcademicDirectorProfileSection authLogin={authLogin} csrfToken={csrfToken}"
+        in ad_overview_block
+    )
+    assert (
+        "HeadOfDepartmentProfileSection authLogin={authLogin} csrfToken={csrfToken}"
+        in hod_overview_block
+    )
     assert "AcademicDirectorProfileSection" not in ad_overview_return
     assert "HeadOfDepartmentProfileSection" not in hod_overview_return
     assert "AcademicDirectorTeacherAcademyCta" in ad_overview_return
@@ -413,8 +447,12 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     source = Path("frontend/src/workspaces/academic_shared/AcademicDirectorShell.tsx").read_text()
     nav_source = Path("frontend/src/workspaces/academic_shared/academicNav.ts").read_text()
     routes_source = Path("frontend/src/shared/lib/routes.ts").read_text()
-    academy_source = Path("frontend/src/workspaces/academic_director/pages/TeacherAcademy.tsx").read_text()
-    hod_academy_source = Path("frontend/src/workspaces/head_of_departments/pages/TeacherAcademy.tsx").read_text()
+    academy_source = Path(
+        "frontend/src/workspaces/academic_director/pages/TeacherAcademy.tsx"
+    ).read_text()
+    hod_academy_source = Path(
+        "frontend/src/workspaces/head_of_department/pages/TeacherAcademy.tsx"
+    ).read_text()
     app_source = Path("frontend/src/app/App.tsx").read_text()
     bootstrap_source = Path("frontend/src/shared/lib/bootstrap.ts").read_text()
 
@@ -437,7 +475,10 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert "Open Teacher Academy" in source
     assert 'academicDirectorOverview: "/academic-director"' in routes_source
     assert 'academicDirectorTeacherAcademy: "/academic-director/teacher-academy"' in routes_source
-    assert 'academicDirectorHeadOfDepartments: "/academic-director/head-of-departments"' in routes_source
+    assert (
+        'academicDirectorHeadOfDepartments: "/academic-director/head-of-departments"'
+        in routes_source
+    )
     assert 'academicDirectorGroups: "/academic-director/groups"' in routes_source
     assert 'academicDirectorSubjects: "/academic-director/subjects"' in routes_source
     assert 'academicDirectorTimetable: "/academic-director/timetable"' in routes_source
@@ -465,7 +506,10 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert "head-of-department-profile" in source
     assert "academicDirectorActiveNavFromPath" in source
     assert "headOfDepartmentActiveNavFromPath" in source
-    assert 'mobileNavItemsFrom(academicDirectorNavConfig, ["departments", "subjects", "announcements"])' in nav_source
+    assert (
+        'mobileNavItemsFrom(academicDirectorNavConfig, ["departments", "subjects", "announcements"])'
+        in nav_source
+    )
     assert "pointer-events-none" not in source
     assert "InternalOperationsSidebar" not in source
     assert "action={routes.logout}" in source
@@ -508,15 +552,27 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
 def test_academic_director_academy_uses_single_shell_source():
     server_source = Path("backend/server.py").read_text()
     registry_source = Path("backend/application/registry.py").read_text()
-    route_source = Path("backend/workspaces/academic_director/page.py").read_text()
-    hod_route_source = Path("backend/workspaces/head_of_departments/page.py").read_text()
-    academy_source = Path("frontend/src/workspaces/academic_director/pages/TeacherAcademy.tsx").read_text()
-    hod_academy_source = Path("frontend/src/workspaces/head_of_departments/pages/TeacherAcademy.tsx").read_text()
+    route_source = Path("backend/modules/people/academic_director/workspace/page.py").read_text()
+    hod_route_source = Path("backend/modules/people/head_of_department/workspace/page.py").read_text()
+    academy_source = Path(
+        "frontend/src/workspaces/academic_director/pages/TeacherAcademy.tsx"
+    ).read_text()
+    hod_academy_source = Path(
+        "frontend/src/workspaces/head_of_department/pages/TeacherAcademy.tsx"
+    ).read_text()
 
     assert "register_academic_director_page_routes(app, render_admin_page" not in registry_source
     assert "register_head_of_department_page_routes(app, render_admin_page" not in registry_source
-    assert "register_academic_director_page_routes(app)" in registry_source
-    assert "register_head_of_department_page_routes(app)" in registry_source
+    assert (
+        'WorkspaceSpec("academic_director", register_academic_director_page_routes)'
+        in registry_source
+    )
+    assert (
+        'WorkspaceSpec("head_of_department", register_head_of_department_page_routes)'
+        in registry_source
+    )
+    assert "for workspace in WORKSPACES:" in registry_source
+    assert "workspace.register_pages(app)" in registry_source
     assert "register_application_pages(app_instance)" in server_source
     assert "def register_academic_director_page_routes(app):" in route_source
     assert "def register_head_of_department_page_routes(app):" in hod_route_source

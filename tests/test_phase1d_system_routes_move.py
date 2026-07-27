@@ -60,7 +60,7 @@ def test_system_routes_remain_registered(app):
 
 def test_old_and_new_system_route_import_paths_work():
     import backend.application.system_page as legacy_system_routes
-    import backend.modules.identity.api as auth_routes
+    import backend.modules.domains.identity.api as auth_routes
     import backend.application.system_api as system_routes
 
     assert legacy_system_routes.router is not None

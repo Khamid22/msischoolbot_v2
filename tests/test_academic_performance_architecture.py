@@ -16,7 +16,7 @@ class _Connection:
 
 
 def test_group_page_is_bounded_and_uses_an_opaque_cursor(monkeypatch):
-    from backend.modules.academics.groups import read_service
+    from backend.modules.domains.academics.groups import read_service
 
     captured = {}
 
@@ -42,7 +42,7 @@ def test_group_page_is_bounded_and_uses_an_opaque_cursor(monkeypatch):
 
 
 def test_group_page_caps_requested_size(monkeypatch):
-    from backend.modules.academics.groups import read_service
+    from backend.modules.domains.academics.groups import read_service
 
     captured = {}
 
@@ -59,7 +59,7 @@ def test_group_page_caps_requested_size(monkeypatch):
 
 
 def test_timetable_range_rejects_unbounded_reads_before_database_access(monkeypatch):
-    from backend.modules.academics.groups import read_service
+    from backend.modules.domains.academics.groups import read_service
 
     monkeypatch.setattr(
         read_service,
@@ -74,7 +74,7 @@ def test_timetable_range_rejects_unbounded_reads_before_database_access(monkeypa
 
 
 def test_light_academic_context_omits_group_collection(monkeypatch):
-    from backend.modules.academics.groups import service
+    from backend.modules.domains.academics.groups import service
 
     monkeypatch.setattr(service, "_connect", lambda: _Connection())
     monkeypatch.setattr(service.organization_contract, "list_school_rows", lambda _conn: [])
@@ -101,7 +101,7 @@ def test_light_academic_context_omits_group_collection(monkeypatch):
 
 
 def test_group_archive_preserves_dependencies_and_writes_audit(monkeypatch):
-    from backend.modules.academics.groups import operations
+    from backend.modules.domains.academics.groups import operations
 
     connection = _Connection()
     connection.committed = False
@@ -157,7 +157,7 @@ def test_group_archive_preserves_dependencies_and_writes_audit(monkeypatch):
 
 
 def test_permanent_group_purge_requires_archival_and_exact_confirmation(monkeypatch):
-    from backend.modules.academics.groups import operations
+    from backend.modules.domains.academics.groups import operations
 
     connection = _Connection()
     connection.commit = lambda: None
@@ -199,8 +199,8 @@ def test_permanent_group_purge_requires_archival_and_exact_confirmation(monkeypa
 
 def test_workspace_adapters_do_not_own_academic_sql_or_internal_schemas():
     paths = [
-        Path("backend/workspaces/academic_director/academics_api.py"),
-        Path("backend/modules/academics/groups/read_service.py"),
+        Path("backend/modules/people/academic_director/workspace/academics_api.py"),
+        Path("backend/modules/domains/academics/groups/read_service.py"),
     ]
     for path in paths:
         source = path.read_text(encoding="utf-8")
@@ -211,7 +211,7 @@ def test_workspace_adapters_do_not_own_academic_sql_or_internal_schemas():
 
 def test_granular_routes_exist_for_academic_director(app):
     del app
-    from backend.workspaces.academic_director.academics_api import router as director_router
+    from backend.modules.people.academic_director.workspace.academics_api import router as director_router
 
     def collect_paths(router, prefix=""):
         paths = {}

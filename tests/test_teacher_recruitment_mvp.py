@@ -12,14 +12,14 @@ from itsdangerous import TimestampSigner
 from pydantic import ValidationError
 
 from backend.core.access import CurrentUser
-from backend.modules.hr.recruitment import notifications, repository, service
-from backend.modules.hr.recruitment.constants import (
+from backend.modules.domains.recruitment import notifications, repository, service
+from backend.modules.domains.recruitment.constants import (
     ALL_STAGES,
     DEMO_CRITERIA,
     PRIMARY_STAGES,
     REJECTION_REASONS,
 )
-from backend.modules.hr.recruitment.schemas import (
+from backend.modules.domains.recruitment.schemas import (
     CandidateCreate,
     CandidateUpdate,
     DemoLessonWrite,
@@ -519,7 +519,7 @@ def test_non_terminal_stage_move_keeps_scheduled_appointment(monkeypatch):
 def test_candidate_audit_insert_serializes_detail_json():
     """insert_audit must serialize detail to JSON (regression: missing import)."""
 
-    from backend.modules.hr.recruitment.candidates import (
+    from backend.modules.domains.recruitment.candidates import (
         repository as candidates_repository,
     )
 
@@ -548,7 +548,7 @@ def test_candidate_audit_insert_serializes_detail_json():
 def test_candidate_creation_anchors_new_stage_sla_to_application_date():
     """The SLA clock must start from application_date, not the row's created_at."""
 
-    from backend.modules.hr.recruitment.candidates import (
+    from backend.modules.domains.recruitment.candidates import (
         repository as candidates_repository,
     )
 
@@ -1624,10 +1624,10 @@ def test_candidate_trash_bin_migration_is_soft_delete_only():
 
 def test_trashed_candidates_are_archived_from_operational_queries():
     appointment_source = Path(
-        "backend/modules/hr/recruitment/appointments/repository.py"
+        "backend/modules/domains/recruitment/appointments/repository.py"
     ).read_text()
     candidate_source = Path(
-        "backend/modules/hr/recruitment/candidates/read_repository.py"
+        "backend/modules/domains/recruitment/candidates/read_repository.py"
     ).read_text()
 
     assert (

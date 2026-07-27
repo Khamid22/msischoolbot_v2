@@ -7,8 +7,8 @@ import pytest
 from pydantic import ValidationError
 
 from backend.core.access import CurrentUser
-from backend.modules.hr.recruitment import repository, service
-from backend.modules.hr.recruitment.schemas import (
+from backend.modules.domains.recruitment import repository, service
+from backend.modules.domains.recruitment.schemas import (
     PipelineStageArchive,
     PipelineStageCreate,
     PipelineStageUpdate,
@@ -258,7 +258,7 @@ def test_test_and_demo_stage_has_a_unique_orange_color_migration():
 
 def test_custom_stage_sla_uses_application_date_with_created_at_fallback():
     source = Path(
-        "backend/modules/hr/recruitment/candidates/repository.py"
+        "backend/modules/domains/recruitment/candidates/repository.py"
     ).read_text(encoding="utf-8")
 
     assert "definition.stage_kind = 'custom'" in source

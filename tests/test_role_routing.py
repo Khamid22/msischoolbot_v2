@@ -36,9 +36,9 @@ def _set_session(client, data):
 
 
 def _patch_workspace_cards(monkeypatch):
-    import backend.workspaces.academic_director.page as academic_director_routes
-    import backend.workspaces.head_of_departments.page as head_of_department_routes
-    import backend.workspaces.ceo.page as ceo_page
+    import backend.modules.people.academic_director.workspace.page as academic_director_routes
+    import backend.modules.people.head_of_department.workspace.page as head_of_department_routes
+    import backend.modules.people.ceo.workspace.page as ceo_page
 
     monkeypatch.setattr(
         ceo_page,

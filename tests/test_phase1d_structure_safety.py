@@ -112,7 +112,7 @@ def test_critical_routes_remain_registered(app, method, path):
 
 
 def test_account_login_path_is_always_available(app, monkeypatch):
-    import backend.modules.identity.page as identity_routes
+    import backend.modules.domains.identity.page as identity_routes
 
     client = _rate_limit_isolated_client(app, "account-login")
     calls = {"auth": 0}
@@ -144,8 +144,8 @@ def test_account_login_path_is_always_available(app, monkeypatch):
     "module_name",
     [
         "backend.application",
-        "backend.workspaces",
         "backend.modules",
+        "backend.modules.people",
         "backend.core",
         "backend.platform",
         "backend.platform.telegram",

@@ -30,6 +30,7 @@ COPY database ./database
 COPY scripts ./scripts
 COPY tgbot ./tgbot
 COPY --from=frontend-builder /app/backend/static/react /app/backend/static/react
+RUN python -c "from backend.core.web.assets import ensure_js_bundles; ensure_js_bundles('backend/static')"
 RUN chmod +x scripts/railway_start.sh
 
 EXPOSE 8080

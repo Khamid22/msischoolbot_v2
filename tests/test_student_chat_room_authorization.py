@@ -3,8 +3,8 @@
 import pytest
 from fastapi import HTTPException
 
-import backend.modules.people.students.chat_api as chat_api
-from backend.modules.communications import chat_service
+import backend.modules.people.student.chat_api as chat_api
+from backend.modules.domains.communications import chat_service
 from backend.core.access.api import CurrentUser
 
 
@@ -52,7 +52,7 @@ def test_subject_room_access_uses_active_enrollment(monkeypatch):
 
 def test_api_rejects_room_when_student_is_not_enrolled(monkeypatch):
     user = CurrentUser(login="MSI00001", role="student", student_db_id=9001)
-    monkeypatch.setattr(chat_service, "student_can_access_room", lambda *_args: False)
+    monkeypatch.setattr(chat_api.chat_service, "student_can_access_room", lambda *_args: False)
 
     with pytest.raises(HTTPException) as exc_info:
         chat_api._require_room_access(user, "group:7A")

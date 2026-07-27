@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from backend.core.access import CurrentUser
-from backend.modules.hr.recruitment import repository, service
+from backend.modules.domains.recruitment import repository, service
 
 
 class _Rows:
@@ -147,7 +147,7 @@ def test_unified_profile_migration_and_reconciliation_are_history_safe():
     ).read_text()
     command = Path("scripts/reconcile_teacher_academy_profiles.py").read_text()
     persistence = Path(
-        "backend/modules/hr/recruitment/handoffs/intake_repository.py"
+        "backend/modules/domains/recruitment/handoffs/intake_repository.py"
     ).read_text()
     assert "profile_origin" in migration
     assert "is_application_received" in migration
@@ -193,22 +193,22 @@ def test_frontend_uses_the_shared_profile_and_academy_block():
 def test_academy_removal_is_audited_and_history_preserving():
     service_source = "\n".join(
         [
-            Path("backend/modules/hr/recruitment/service.py").read_text(),
-            Path("backend/modules/hr/recruitment/handoffs/service.py").read_text(),
+            Path("backend/modules/domains/recruitment/service.py").read_text(),
+            Path("backend/modules/domains/recruitment/handoffs/service.py").read_text(),
         ]
     )
     repository_source = "\n".join(
         [
             Path(
-                "backend/modules/hr/recruitment/handoffs/lifecycle_repository.py"
+                "backend/modules/domains/recruitment/handoffs/lifecycle_repository.py"
             ).read_text(),
             Path(
-                "backend/modules/hr/recruitment/handoffs/intake_repository.py"
+                "backend/modules/domains/recruitment/handoffs/intake_repository.py"
             ).read_text(),
         ]
     )
     ad_routes = Path(
-        "backend/workspaces/academic_director/staff_records_api.py"
+        "backend/modules/people/academic_director/workspace/staff_records_api.py"
     ).read_text()
 
     assert "def remove_academy_teacher(" in service_source
@@ -231,10 +231,10 @@ def test_academy_removal_is_audited_and_history_preserving():
 
 def test_academy_roster_excludes_closed_and_promoted_lifecycle_profiles():
     repository_source = Path(
-        "backend/modules/teacher_academy/repository.py"
+        "backend/modules/domains/teacher_academy/repository.py"
     ).read_text()
     mutations_source = Path(
-        "backend/modules/teacher_academy/mutations_repository.py"
+        "backend/modules/domains/teacher_academy/mutations_repository.py"
     ).read_text()
     migration_source = Path(
         "database/alembic/versions/0031_academy_roster_lifecycle.py"
@@ -249,7 +249,7 @@ def test_academy_roster_excludes_closed_and_promoted_lifecycle_profiles():
 
 def test_permanent_candidate_purge_deletes_only_closed_academy_handoffs():
     repository_source = Path(
-        "backend/modules/hr/recruitment/candidates/repository.py"
+        "backend/modules/domains/recruitment/candidates/repository.py"
     ).read_text()
 
     assert "def purge_closed_academy_handoff" in repository_source

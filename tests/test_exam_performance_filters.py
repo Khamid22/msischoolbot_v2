@@ -1,6 +1,6 @@
 """Regression coverage for exam-performance row classification."""
 
-from backend.modules.academics.assessments.filters import is_exam_performance_row
+from backend.modules.domains.academics.assessments.filters import is_exam_performance_row
 
 
 def test_exam_performance_filter_excludes_normal_lesson_topics():

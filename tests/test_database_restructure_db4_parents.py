@@ -6,8 +6,8 @@ import pytest
 
 
 def test_parent_domain_modules_import_successfully():
-    import backend.modules.people.parents.repository as parent_repository
-    import backend.modules.people.parents.service as parent_service
+    import backend.modules.domains.parent_relationships.repository as parent_repository
+    import backend.modules.domains.parent_relationships.service as parent_service
 
     assert callable(parent_repository.link_parent_from_invite)
     assert callable(parent_repository.get_parent_by_telegram_id)
@@ -46,19 +46,22 @@ def test_parent_module_is_canonical_and_legacy_facades_are_gone():
 
 
 def test_parent_domain_imports_are_used_where_safe():
-    identity_routes_source = Path("backend/modules/identity/page.py").read_text()
-    parent_routes_source = Path("backend/workspaces/parent/page.py").read_text()
-    student_payload_source = Path("backend/modules/people/students/payload.py").read_text()
+    identity_routes_source = Path("backend/modules/domains/identity/page.py").read_text()
+    parent_routes_source = Path("backend/modules/people/parent/workspace/page.py").read_text()
+    student_payload_source = Path("backend/modules/people/student/payload.py").read_text()
 
-    assert "from backend.modules.people.parents.service import (" in identity_routes_source
-    assert "from backend.modules.people.parents.service import (" in parent_routes_source
+    assert "from backend.modules.domains.parent_relationships.contracts import (" in identity_routes_source
+    assert "from backend.modules.people.parent.contracts import (" in parent_routes_source
     assert not Path("backend/internal_operations").exists()
-    assert "from backend.modules.people.parents.service import parent_can_access_dashboard" in student_payload_source
+    assert (
+        "from backend.modules.domains.student_records.contracts import "
+        "parent_can_access_dashboard"
+    ) in student_payload_source
     assert not Path("backend/identity/telegram_links.py").exists()
 
 
 def test_parent_query_sql_is_owned_by_the_domain():
-    source = Path("backend/modules/people/parents/repository.py").read_text()
+    source = Path("backend/modules/domains/parent_relationships/repository.py").read_text()
 
     assert "def get_parent_child_row" in source
     assert "FROM msi_v2" in source
@@ -68,8 +71,8 @@ def test_parent_query_sql_is_owned_by_the_domain():
 
 
 def test_parent_invite_and_dashboard_logic_live_in_parent_domain():
-    parent_service_source = Path("backend/modules/people/parents/service.py").read_text()
-    parent_query_source = Path("backend/modules/people/parents/repository.py").read_text()
+    parent_service_source = Path("backend/modules/domains/parent_relationships/service.py").read_text()
+    parent_query_source = Path("backend/modules/domains/parent_relationships/repository.py").read_text()
 
     assert "def create_parent_invite_code" in parent_service_source
     assert "def claim_parent_invite_code" in parent_service_source

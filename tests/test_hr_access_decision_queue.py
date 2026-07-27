@@ -12,9 +12,9 @@ from fastapi import HTTPException
 from itsdangerous import TimestampSigner
 
 from backend.core.access import CurrentUser
-from backend.modules.hr.recruitment import handoff_api, policies, repository, service
-from backend.modules.hr.recruitment.decisions import service as decision_service
-from backend.modules.hr.recruitment.handoffs import intake_repository
+from backend.modules.domains.recruitment import handoff_api, policies, repository, service
+from backend.modules.domains.recruitment.decisions import service as decision_service
+from backend.modules.domains.recruitment.handoffs import intake_repository
 
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}
@@ -283,7 +283,7 @@ def test_subject_scoped_hod_can_assign_academy_curriculum(client, monkeypatch):
 
 
 def test_hr_login_routes_directly_to_recruitment_when_password_change_is_optional(client, monkeypatch):
-    import backend.modules.identity.page as identity_page
+    import backend.modules.domains.identity.page as identity_page
 
     csrf = "hr-first-login-csrf"
     client.cookies.set("session", _signed_session({"csrf_token": csrf}))

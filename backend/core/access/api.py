@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import Depends, HTTPException, Request, status
 
 from backend.core.access import management_permissions, roles
+from backend.core.access.context import ActorContext, actor_context_from_session
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,22 @@ def get_current_user_role(user: CurrentUser = Depends(get_current_user)) -> str:
     """
 
     return user.role
+
+
+def get_actor_context(
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+) -> ActorContext:
+    """Build the typed actor context used by new command and query handlers."""
+
+    session = dict(request.session)
+    session["auth_role"] = user.role
+    request_id = str(getattr(request.state, "request_id", "") or "")
+    return actor_context_from_session(
+        session,
+        request_id=request_id,
+        correlation_id=str(request.headers.get("x-correlation-id") or request_id),
+    )
 
 
 def _normalize_allowed_roles(allowed_roles: tuple[Any, ...]) -> set[str]:

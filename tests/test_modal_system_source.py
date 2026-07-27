@@ -23,7 +23,7 @@ def test_shared_modal_component_uses_portal_backdrop_scroll_lock_and_top_z_index
     assert 'popover: "z-[120]"' in layers_source
     assert "export function BottomSheet" in source
     assert "bg-foreground/60" in source
-    assert "backdrop-blur-[2px]" in source
+    assert "backdrop-blur-[0.125rem]" in source
     assert 'data-modal-backdrop="true"' in source
     assert "document.body.style.overflow = \"hidden\"" in hook_source
     assert "document.body.style.overflow = previousBodyOverflow" in hook_source
@@ -46,10 +46,16 @@ def test_shared_modal_component_uses_portal_backdrop_scroll_lock_and_top_z_index
 
 
 def test_teacher_academy_modals_use_shared_modal_system_and_keep_assignment_selectors():
-    source = Path("frontend/src/features/teacher-academy/TeacherAcademyPanel.tsx").read_text()
+    panel_source = Path(
+        "frontend/src/features/teacher-academy/TeacherAcademyPanel.tsx"
+    ).read_text()
+    source = Path(
+        "frontend/src/features/teacher-academy/TeacherAcademyWorkflowModals.tsx"
+    ).read_text()
 
     assert 'import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";' in source
     assert "function ModalShell" in source
+    assert "TeacherAcademyWorkflowModals" in panel_source
     assert "<Modal" in source
     assert "<ModalBody" in source
     assert "<ModalFooter" in source

@@ -1,12 +1,12 @@
 from urllib.parse import parse_qs, urlparse
 
-from backend.modules.people.students import service as student_service
-from backend.modules.people.students import dashboard as dashboard_service
+from backend.modules.domains.student_records import service as student_service
+from backend.modules.people.student import dashboard as dashboard_service
 
 
 def test_subject_switch_options_mark_current_subject_and_group(monkeypatch):
     monkeypatch.setattr(
-        student_service,
+        dashboard_service,
         "get_student_subject_enrollments",
         lambda _student_id: [
             {

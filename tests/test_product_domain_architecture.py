@@ -6,26 +6,35 @@ from pathlib import Path
 
 
 BACKEND_REQUIRED = {
-    "identity",
-    "organization",
-    "people/students",
-    "people/parents",
-    "people/teachers",
-    "people/staff",
-    "academics/curriculum",
-    "academics/groups",
-    "academics/timetable",
-    "academics/lessons",
-    "academics/attendance",
-    "academics/gradebook",
-    "academics/assessments",
-    "academics/calendar",
-    "academics/resources",
-    "teacher_academy",
-    "support",
-    "finance",
-    "communications",
-    "reporting",
+    "people/ceo",
+    "people/academic_director",
+    "people/head_of_department",
+    "people/hr_manager",
+    "people/customer_support",
+    "people/teacher",
+    "people/student",
+    "people/parent",
+    "domains/identity",
+    "domains/organization",
+    "domains/student_records",
+    "domains/parent_relationships",
+    "domains/teacher_records",
+    "domains/academics/curriculum",
+    "domains/academics/groups",
+    "domains/academics/timetable",
+    "domains/academics/lessons",
+    "domains/academics/attendance",
+    "domains/academics/gradebook",
+    "domains/academics/assessments",
+    "domains/academics/calendar",
+    "domains/academics/resources",
+    "domains/recruitment",
+    "domains/teacher_academy",
+    "domains/support_cases",
+    "domains/finance",
+    "domains/communications",
+    "domains/reporting",
+    "jobs",
 }
 
 FRONTEND_REQUIRED = {
@@ -135,7 +144,7 @@ def test_core_is_navigable_and_internal_operations_is_removed():
 
 
 def test_core_and_product_domains_do_not_depend_on_internal_operations():
-    for root in (Path("backend/core"), Path("backend/modules"), Path("backend/workspaces")):
+    for root in (Path("backend/core"), Path("backend/modules")):
         for path in _python_sources(root):
             source = path.read_text(encoding="utf-8")
             assert "backend.internal_operations" not in source, (
@@ -167,7 +176,7 @@ def test_obsolete_ownership_packages_and_imports_are_absent():
 
 def test_recruitment_domain_does_not_restore_the_legacy_pipeline_or_lesson_practice():
     for path in (
-        Path("backend/modules/hr/recruitment"),
+        Path("backend/modules/domains/recruitment"),
         Path("frontend/src/features/recruitment"),
     ):
         assert path.exists()
@@ -191,7 +200,7 @@ def test_runtime_postgresql_sql_is_repository_owned():
 
 
 def test_removed_academic_catch_all_files_stay_removed():
-    root = Path("backend/modules/academics")
+    root = Path("backend/modules/domains/academics")
     for name in ("operations.py", "service.py", "repository.py"):
         assert not (root / name).exists()
 

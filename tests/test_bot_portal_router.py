@@ -6,7 +6,7 @@ import asyncio
 from pathlib import Path
 
 import main as runtime
-from backend.modules.identity import telegram_linking
+from backend.modules.domains.identity import telegram_linking
 from tgbot.portal_router import open_portal
 from tgbot.routing import BOT_ROUTERS
 
@@ -84,7 +84,11 @@ class _Connection:
 
 def test_bot_polling_uses_one_database_advisory_lock_per_token(monkeypatch):
     leader = _Connection(True)
-    monkeypatch.setattr(runtime, "connect_auth_db", lambda: leader)
+    monkeypatch.setattr(
+        runtime.polling_repository,
+        "connect_auth_db",
+        lambda: leader,
+    )
 
     acquired = runtime._try_acquire_bot_polling_lock("secret-token")
 
@@ -102,7 +106,11 @@ def test_bot_polling_uses_one_database_advisory_lock_per_token(monkeypatch):
 
 def test_bot_polling_follower_releases_database_connection(monkeypatch):
     follower = _Connection(False)
-    monkeypatch.setattr(runtime, "connect_auth_db", lambda: follower)
+    monkeypatch.setattr(
+        runtime.polling_repository,
+        "connect_auth_db",
+        lambda: follower,
+    )
 
     assert runtime._try_acquire_bot_polling_lock("secret-token") is None
     assert follower.closed
@@ -120,9 +128,12 @@ def test_staff_link_uses_reliable_bot_start_fallback(monkeypatch):
 
 def test_bot_runtime_configures_the_persistent_mini_app_menu():
     source = Path("main.py").read_text(encoding="utf-8")
+    polling_repository_source = Path(
+        "backend/platform/telegram/polling_repository.py"
+    ).read_text(encoding="utf-8")
 
     assert "set_chat_menu_button" in source
     assert 'MenuButtonWebApp(text="Open MSI School"' in source
     assert "set_my_commands" in source
-    assert "pg_try_advisory_lock" in source
+    assert "pg_try_advisory_lock" in polling_repository_source
     assert "drop_pending_updates=False" in source

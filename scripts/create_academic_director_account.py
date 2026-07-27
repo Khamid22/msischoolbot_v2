@@ -17,7 +17,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from backend.roles.academic_director.staff_registration import create_academic_director_account  # noqa: E402
+from backend.modules.people.academic_director.contracts import (  # noqa: E402
+    create_academic_director_account,
+)
 
 
 def main() -> int:

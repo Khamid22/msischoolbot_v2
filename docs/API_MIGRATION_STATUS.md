@@ -4,7 +4,7 @@ Date: 2026-07-10
 
 Branch: `FastAPI-Run-System`
 
-The API is versioned under `/api/v1` and composed by `backend/application/api.py`. Business workspace APIs are registered from the matching package under `backend/workspaces`; reusable capabilities are registered from `backend/modules`. The former System Admin API and Internal Operations adapter were removed.
+The API is versioned under `/api/v1` and composed by `backend/application/api.py`. Each business workspace API is co-located under `backend/modules/people/<person>/workspace`; reusable capabilities are registered from `backend/modules/domains`. The former System Admin API and Internal Operations adapter were removed.
 
 The former `backend/api/v1` tree has been removed. There are no Teacher portal APIs and no non-versioned role API namespaces. `tests/route_snapshot.txt` is the executable contract.
 

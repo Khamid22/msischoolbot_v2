@@ -14,15 +14,20 @@ from itsdangerous import TimestampSigner
 
 from backend.core.access.management_permissions import role_has_permission
 from backend.core.access.workspace_permissions import has_workspace_permission
-from backend.modules.customer_support import repository, service
-from backend.workspaces.customer_support.api import router
-
+from backend.modules.domains.support_cases import (
+    customer_records_repository_contracts as repository,
+)
+from backend.modules.domains.support_cases import customer_records_service as service
+from backend.modules.people.customer_support import contracts as public_contracts
+from backend.modules.people.customer_support.workspace.api import router
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}
 
 
 def _session(role: str, *, csrf: str = "support-csrf") -> str:
-    secret = os.environ.get("APP_SECRET_KEY", "").strip() or "dev-only-insecure-key-do-not-use-in-prod"
+    secret = (
+        os.environ.get("APP_SECRET_KEY", "").strip() or "dev-only-insecure-key-do-not-use-in-prod"
+    )
     payload = {
         "auth_role": role,
         "auth_login": f"{role}@test",
@@ -48,7 +53,7 @@ def test_customer_support_permissions_are_explicit_and_academics_stay_read_only(
 
 def test_customer_support_api_is_role_isolated(client, monkeypatch):
     monkeypatch.setattr(
-        service,
+        public_contracts,
         "context",
         lambda actor: {"schools": [], "allSchools": True, "actor": actor.login},
     )
@@ -66,7 +71,7 @@ def test_api_exposes_void_but_never_hard_delete_for_payments():
     routes = {
         (method, route.path)
         for route in router.routes
-        for method in (route.methods or set())
+        for method in (getattr(route, "methods", None) or set())
     }
     assert ("POST", "/customer-support/payments/{payment_id}/void") in routes
     assert ("POST", "/customer-support/payments/{payment_id}/settlement") in routes
@@ -233,11 +238,15 @@ def test_customer_support_parent_invite_replaces_pending_link(monkeypatch):
     )
     monkeypatch.setattr(
         service,
-        "create_parent_invite_code",
-        lambda student_row_id, **kwargs: invite_call.update(
-            {"student_row_id": student_row_id, **kwargs}
+        "create_parent_invite_contract",
+        lambda connection, command: invite_call.update(
+            {
+                "student_row_id": command.legacy_student_row_id,
+                "issued_by": command.issued_by_staff_id,
+                "replace_pending": command.replace_pending,
+            }
         )
-        or "new-code",
+        or type("Invite", (), {"invite_code": "new-code"})(),
     )
     monkeypatch.setattr(service, "_audit", lambda *args, **kwargs: None)
 
@@ -276,10 +285,43 @@ def test_voided_payments_remain_visible_but_never_change_totals():
     tomorrow = date.today() + timedelta(days=1)
     payload = service._payments_payload(
         [
-            {"id": 1, "amount": 100, "currency": "UZS", "status": "paid", "paid_at": date.today(), "due_date": yesterday, "voided_at": None},
-            {"id": 2, "amount": 250, "currency": "UZS", "status": "due", "paid_at": None, "due_date": yesterday, "voided_at": None},
-            {"id": 3, "amount": 400, "currency": "UZS", "status": "due", "paid_at": None, "due_date": tomorrow, "voided_at": None},
-            {"id": 4, "amount": 9999, "currency": "UZS", "status": "voided", "paid_at": None, "due_date": yesterday, "voided_at": date.today(), "void_reason": "Duplicate"},
+            {
+                "id": 1,
+                "amount": 100,
+                "currency": "UZS",
+                "status": "paid",
+                "paid_at": date.today(),
+                "due_date": yesterday,
+                "voided_at": None,
+            },
+            {
+                "id": 2,
+                "amount": 250,
+                "currency": "UZS",
+                "status": "due",
+                "paid_at": None,
+                "due_date": yesterday,
+                "voided_at": None,
+            },
+            {
+                "id": 3,
+                "amount": 400,
+                "currency": "UZS",
+                "status": "due",
+                "paid_at": None,
+                "due_date": tomorrow,
+                "voided_at": None,
+            },
+            {
+                "id": 4,
+                "amount": 9999,
+                "currency": "UZS",
+                "status": "voided",
+                "paid_at": None,
+                "due_date": yesterday,
+                "voided_at": date.today(),
+                "void_reason": "Duplicate",
+            },
         ]
     )
     assert [item["state"] for item in payload["items"]] == ["paid", "debt", "upcoming", "voided"]
@@ -297,8 +339,12 @@ def test_migration_adds_versions_and_auditable_void_metadata_without_deleting_da
 
 def test_parent_link_storage_prevents_duplicate_pairs_and_preserves_inactive_history():
     baseline = Path("database/alembic/versions/0001_msi_v2_baseline.sql").read_text()
-    customer_support_repository = Path("backend/modules/customer_support/repository.py").read_text()
-    parent_repository = Path("backend/modules/people/parents/repository.py").read_text()
+    customer_support_repository = Path(
+        "backend/modules/domains/support_cases/customer_records_repository.py"
+    ).read_text()
+    parent_repository = Path(
+        "backend/modules/domains/parent_relationships/repository.py"
+    ).read_text()
 
     link_table = baseline.split(
         "CREATE TABLE IF NOT EXISTS msi_v2.parent_student_links",
@@ -314,14 +360,31 @@ def test_parent_link_storage_prevents_duplicate_pairs_and_preserves_inactive_his
 
 def test_frontend_contract_is_split_search_first_and_strongly_typed():
     entry = Path("frontend/src/workspaces/customer_support/pages/Home.tsx").read_text()
-    workspace = Path("frontend/src/features/customer-support/CustomerSupportWorkspace.tsx").read_text()
+    workspace = Path(
+        "frontend/src/features/customer-support/CustomerSupportWorkspace.tsx"
+    ).read_text()
     layout = Path("frontend/src/features/customer-support/shared/SupportPageLayout.tsx").read_text()
-    records_hook = Path("frontend/src/features/customer-support/shared/useSupportRecords.ts").read_text()
+    records_hook = Path(
+        "frontend/src/features/customer-support/shared/useSupportRecords.ts"
+    ).read_text()
     students = Path("frontend/src/features/customer-support/students/StudentsPage.tsx").read_text()
     parents = Path("frontend/src/features/customer-support/parents/ParentsPage.tsx").read_text()
-    student_detail = Path("frontend/src/features/customer-support/students/StudentDetail.tsx").read_text()
-    parent_detail = Path("frontend/src/features/customer-support/parents/ParentDetail.tsx").read_text()
-    link_dialog = Path("frontend/src/features/customer-support/parents/LinkStudentDialog.tsx").read_text()
+    teachers = Path("frontend/src/features/customer-support/teachers/TeachersPage.tsx").read_text()
+    teacher_detail = Path(
+        "frontend/src/features/customer-support/teachers/TeacherDetail.tsx"
+    ).read_text()
+    teacher_hook = Path(
+        "frontend/src/features/customer-support/teachers/useTeacherDirectory.ts"
+    ).read_text()
+    student_detail = Path(
+        "frontend/src/features/customer-support/students/StudentDetail.tsx"
+    ).read_text()
+    parent_detail = Path(
+        "frontend/src/features/customer-support/parents/ParentDetail.tsx"
+    ).read_text()
+    link_dialog = Path(
+        "frontend/src/features/customer-support/parents/LinkStudentDialog.tsx"
+    ).read_text()
     model = Path("frontend/src/features/customer-support/model.ts").read_text()
     api = Path("frontend/src/features/customer-support/api.ts").read_text()
     assert len(entry.splitlines()) < 10
@@ -330,6 +393,7 @@ def test_frontend_contract_is_split_search_first_and_strongly_typed():
         workspace.index('key: "payments"'),
         workspace.index('key: "parents"'),
         workspace.index('key: "students"'),
+        workspace.index('key: "teachers"'),
         workspace.index('key: "tickets"'),
     ]
     assert nav_positions == sorted(nav_positions)
@@ -349,6 +413,10 @@ def test_frontend_contract_is_split_search_first_and_strongly_typed():
     assert 'params.set("recordType"' not in records_hook
     assert "Student record ID" not in students
     assert "LinkStudentDialog" in parents and 'status: "active"' in link_dialog
+    assert "useInfiniteQuery" in teacher_hook
+    assert "listSupportTeachers" in teacher_hook
+    assert "Read-only support view" in teacher_detail
+    assert "mutation" not in teachers.casefold()
     assert "excludeParentId: String(parentId)" in link_dialog
     assert "} while (cursor);" in link_dialog
     assert "excludedIds" not in link_dialog
@@ -386,6 +454,7 @@ def test_frontend_contract_is_split_search_first_and_strongly_typed():
         ("/customer-support/payments", "payments", "Payments Workspace"),
         ("/customer-support/parents", "parents", "Parents"),
         ("/customer-support/students", "students", "Students"),
+        ("/customer-support/teachers", "teachers", "Teachers"),
         ("/customer-support/tickets", "tickets", "Support Tickets"),
     ],
 )

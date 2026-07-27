@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _window_function():
-    operations = (ROOT / "backend/modules/academics/gradebook/window.py").read_text(encoding="utf-8")
+    operations = (ROOT / "backend/modules/domains/academics/gradebook/window.py").read_text(encoding="utf-8")
     tree = ast.parse(operations)
     function = next(
         node
@@ -128,7 +128,7 @@ def test_gradebook_month_keeps_cancellations_in_their_calendar_month():
 
 
 def test_gradebook_get_is_read_only_and_records_are_id_keyed():
-    gradebook_source = (ROOT / "backend/modules/academics/gradebook/service.py").read_text(
+    gradebook_source = (ROOT / "backend/modules/domains/academics/gradebook/service.py").read_text(
         encoding="utf-8"
     )
 

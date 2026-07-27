@@ -2,7 +2,7 @@ from pathlib import Path
 
 from werkzeug.security import check_password_hash
 
-from backend.modules.people.staff import service
+from backend.modules.domains.identity import staff_accounts as service
 
 
 class _Connection:
@@ -89,7 +89,7 @@ def test_cs0001_rerun_resets_same_account_and_invalidates_sessions(monkeypatch):
     assert captured["audit"]["event_type"] == "account.password_reset"
     assert conn.commits == 1
     assert "session_version = session_version + 1" in Path(
-        "backend/modules/people/staff/repository.py"
+        "backend/modules/domains/identity/staff_repository.py"
     ).read_text()
 
 

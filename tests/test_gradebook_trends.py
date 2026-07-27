@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 from fastapi import HTTPException
 
-from backend.modules.academics.gradebook import trends as operations
-from backend.workspaces.academic_director import academics_api as director_academics_api
+from backend.modules.domains.academics.gradebook import trends as operations
+from backend.modules.people.academic_director.workspace import academics_api as director_academics_api
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -156,7 +156,7 @@ def test_academic_director_handler_returns_success_and_meaningful_errors(monkeyp
 
 
 def test_trend_aggregation_is_read_only_and_academic_director_exposes_it():
-    trend_source = (ROOT / "backend/modules/academics/gradebook/trends.py").read_text(
+    trend_source = (ROOT / "backend/modules/domains/academics/gradebook/trends.py").read_text(
         encoding="utf-8"
     )
     assert "INSERT " not in trend_source
@@ -165,7 +165,7 @@ def test_trend_aggregation_is_read_only_and_academic_director_exposes_it():
     assert "conn.commit()" not in trend_source
 
     route_source = (
-        ROOT / "backend/workspaces/academic_director/academics_api.py"
+        ROOT / "backend/modules/people/academic_director/workspace/academics_api.py"
     ).read_text(encoding="utf-8")
     assert '"/groups/{group_id}/gradebook-trends"' in route_source
     assert "get_group_gradebook_trends" in route_source

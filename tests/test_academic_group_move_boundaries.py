@@ -2,7 +2,7 @@ from contextlib import contextmanager
 
 import pytest
 
-from backend.modules.academics.groups import operations as academic_service
+from backend.modules.domains.academics.groups import operations as academic_service
 
 
 class _Result:

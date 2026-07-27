@@ -13,9 +13,12 @@ python3 main.py bot
 python3 main.py worker
 ```
 
-The web process serves FastAPI and built React assets. The bot process currently starts aiogram with an empty inbound router registry; Telegram Mini App authentication and parent linking are web flows and remain active without bot command handlers. The worker process delivers due Recruitment notifications in bounded batches.
+The web process serves FastAPI and built React assets. The bot process owns the aiogram portal
+entry flow. The worker claims typed outbox jobs in bounded PostgreSQL batches and runs module-owned
+handlers.
 
-Deploy web, bot, and worker as independent services sharing PostgreSQL. Do not run Recruitment notification polling inside a web replica.
+Deploy web, bot, and worker as independent services sharing PostgreSQL. Do not run durable job
+polling inside a web replica.
 
 ## Database Deployment
 
@@ -26,7 +29,9 @@ python -m alembic upgrade head
 python main.py "$RUN_MODE"
 ```
 
-Repository migration head is `0027_unified_profiles`. A failed migration stops startup. Test the entire chain on a disposable representative clone before release, especially intentionally irreversible revisions.
+Repository migration head is `0044_student_identifier_sequence`. A failed migration stops startup. Test the
+entire chain on a disposable representative clone before release, especially intentionally
+irreversible revisions.
 
 Never substitute manual production DDL for a migration.
 
@@ -50,7 +55,9 @@ Required deployed settings include:
 - Telegram bot token and Mini App URL;
 - host/port/runtime mode.
 
-Optional settings include database pool limits, `WEBAPP_INIT_DATA_TTL`, rate-limit/cache configuration, object storage, Teacher Academy notification chat IDs, `RECRUITMENT_NOTIFICATION_POLL_SECONDS`, and `RECRUITMENT_NOTIFICATION_BATCH_LIMIT`.
+Optional settings include database pool limits, `WEBAPP_INIT_DATA_TTL`, rate-limit/cache
+configuration, object storage, Teacher Academy notification chat IDs, and `WORKER_*` batch,
+polling, lease, and retry settings.
 
 ## Pre-release Gate
 
@@ -63,7 +70,7 @@ Optional settings include database pool limits, `WEBAPP_INIT_DATA_TTL`, rate-lim
 - reviewed workbook reconciliation evidence if academic data changes are included;
 - no `.env`, credentials, source workbooks, dumps, backups, or private reports staged.
 
-Do not require an inbound bot-command smoke until handlers exist.
+Smoke-test the bot portal-entry command and one controlled worker job before release.
 
 ## Production Branch Rule
 

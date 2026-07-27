@@ -5,8 +5,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_group_timetable_schedules_existing_curriculum_lessons():
-    service = (ROOT / "backend/modules/academics/timetable/service.py").read_text(encoding="utf-8")
-    repository = (ROOT / "backend/modules/academics/timetable/repository.py").read_text(encoding="utf-8")
+    service = (ROOT / "backend/modules/domains/academics/timetable/service.py").read_text(encoding="utf-8")
+    repository = (ROOT / "backend/modules/domains/academics/timetable/repository.py").read_text(encoding="utf-8")
 
     assert "def schedule_group_curriculum(" in service
     assert 'scope not in {"all", "from_date", "remaining"}' in service

@@ -1,7 +1,7 @@
 """Read-only role workspace count cards."""
 
-from backend.modules.reporting import service as workspace_counts
-from backend.modules.reporting import repository as staff_repository
+from backend.modules.domains.reporting import service as workspace_counts
+from backend.modules.domains.reporting import repository as staff_repository
 
 
 class _Result:

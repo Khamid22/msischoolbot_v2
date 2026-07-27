@@ -11,11 +11,11 @@ import pytest
 from itsdangerous import TimestampSigner
 
 from backend.core.access import CurrentUser
-from backend.modules.hr.analytics import repository as analytics_repository
-from backend.modules.hr.analytics import service as analytics_service
-from backend.modules.hr.recruitment import service
-from backend.modules.hr.recruitment.constants import DEMO_CRITERIA
-from backend.modules.hr.recruitment.schemas import DemoLessonWrite, InterviewWrite, SubjectTestWrite
+from backend.modules.domains.reporting.recruitment import repository as analytics_repository
+from backend.modules.domains.reporting.recruitment import service as analytics_service
+from backend.modules.domains.recruitment import service
+from backend.modules.domains.recruitment.constants import DEMO_CRITERIA
+from backend.modules.domains.recruitment.schemas import DemoLessonWrite, InterviewWrite, SubjectTestWrite
 
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}

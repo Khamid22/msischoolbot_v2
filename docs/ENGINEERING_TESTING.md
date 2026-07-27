@@ -7,13 +7,17 @@ Audience: engineers verifying the LMS rewrite.
 ```bash
 python3 -m compileall -q backend database tgbot scripts main.py
 python3 -m pytest
+python3 -m ruff check backend tests
+python3 -m mypy
 npm --prefix frontend run test:logic
 npm --prefix frontend run test:schedule
-npm --prefix frontend run test:teacher-nav
 npm --prefix frontend run test:shared-ui
 npm --prefix frontend run test:academic
+npm --prefix frontend run test:recruitment
+npm --prefix frontend run test:teacher
 npm --prefix frontend run check-types
 npm --prefix frontend run build
+python3 -m alembic heads
 git diff --check
 ```
 
@@ -71,15 +75,16 @@ Do not validate identity/integrity migrations directly against production.
 
 `0006_secure_parent_invites` is intentionally irreversible; test restoration from backup or invite regeneration rather than a downgrade.
 
-## Workbook Reconciliation
-
-Use the explicit reconciliation tool in report/dry-run mode before any writer:
+The durable outbox also has real transaction and competing-worker coverage. It
+is intentionally opt-in so the unit suite never mutates a developer database:
 
 ```bash
-python3 scripts/reconcile_academic_workbooks.py --help
+MSI_TEST_DATABASE_URL=postgresql://.../msi_test \
+  python3 -m pytest -m postgres tests/integrations/test_outbox_postgres.py
 ```
 
-Review ambiguous identities, group/enrollment resolution, lesson/date/source ordering, attendance, homework, exams, and student-wide coins. Parsing successfully or matching aggregate counts does not prove parity. Never invent a date/time or silently merge uncertain students to make the report pass.
+The configured database name must contain `test` and must already be migrated
+to the current Alembic head.
 
 ## Frontend and Browser Verification
 
@@ -98,7 +103,8 @@ In addition to automated tests, verify at representative phone, tablet, laptop, 
 
 Current Telegram tests cover web/Mini App integration: initData verification, canonical account resolution, start-parameter handling, invite claim, and linked-child access.
 
-Do not require `/start`, `/whoami`, or callback smoke tests yet: the inbound `tgbot` router registry is intentionally empty. Add bot command tests when product-approved handlers are implemented.
+Keep the `/start` portal-entry flow covered. Add command-specific bot tests whenever another
+product-approved handler is registered.
 
 ## Documentation Privacy
 

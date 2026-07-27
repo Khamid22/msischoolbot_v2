@@ -18,7 +18,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from backend.core.database import connect_auth_db  # noqa: E402
-from backend.modules.hr.recruitment import repository  # noqa: E402
+from backend.modules.domains.recruitment import repository  # noqa: E402
 
 
 APPLICATION_LINKS = (

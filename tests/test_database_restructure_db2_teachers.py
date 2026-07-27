@@ -6,8 +6,8 @@ from pathlib import Path
 
 
 def test_teacher_module_imports_successfully():
-    import backend.modules.people.teachers.repository as teacher_repository
-    import backend.modules.people.teachers.service as teacher_service
+    import backend.modules.domains.teacher_records.repository as teacher_repository
+    import backend.modules.domains.teacher_records.service as teacher_service
 
     assert callable(teacher_repository.list_teachers_rows)
     assert callable(teacher_repository.get_teacher_by_id_row)
@@ -32,18 +32,18 @@ def test_teacher_identity_wrapper_is_gone():
 
 
 def test_teacher_module_service_is_used_by_consumers():
-    academy_service_source = Path("backend/modules/teacher_academy/service.py").read_text()
-    academy_api_source = Path("backend/modules/teacher_academy/responses.py").read_text()
+    academy_service_source = Path("backend/modules/domains/teacher_academy/service.py").read_text()
+    academy_api_source = Path("backend/modules/domains/teacher_academy/responses.py").read_text()
 
-    assert "from backend.modules.people.teachers.service import list_teachers, upsert_teacher" in academy_service_source
-    assert "from backend.modules.people.teachers.service import list_teachers" in academy_api_source
+    assert "from backend.modules.domains.teacher_records.service import list_teachers, upsert_teacher" in academy_service_source
+    assert "from backend.modules.domains.teacher_records.service import list_teachers" in academy_api_source
     assert not Path("backend/internal_operations").exists()
 
 
 def test_teacher_academy_uses_teacher_repository_for_teacher_helpers():
-    source = Path("backend/modules/teacher_academy/repository.py").read_text()
+    source = Path("backend/modules/domains/teacher_academy/repository.py").read_text()
 
-    assert "from backend.modules.people.teachers import contracts as teacher_contract" in source
+    assert "from backend.modules.domains.teacher_records import contracts as teacher_contract" in source
     for helper_name in [
         "get_teacher_by_full_name_row",
         "insert_teacher_profile_row",
@@ -58,7 +58,7 @@ def test_teacher_academy_uses_teacher_repository_for_teacher_helpers():
 
 
 def test_teacher_sql_is_owned_by_the_module_repository():
-    source = Path("backend/modules/people/teachers/repository.py").read_text()
+    source = Path("backend/modules/domains/teacher_records/repository.py").read_text()
 
     assert "def list_teachers_rows" in source
     assert "FROM msi_v2" in source
@@ -72,5 +72,5 @@ def test_scattered_teacher_owners_are_removed():
         Path("backend/roles/teacher"),
     ]:
         assert not path.exists(), f"Teacher ownership must stay in the teacher layer files: {path}"
-    assert Path("backend/workspaces/teacher/page.py").exists()
-    assert Path("backend/modules/people/teachers/repository.py").is_file()
+    assert Path("backend/modules/people/teacher/workspace/page.py").exists()
+    assert Path("backend/modules/domains/teacher_records/repository.py").is_file()

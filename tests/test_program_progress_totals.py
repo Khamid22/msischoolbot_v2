@@ -1,5 +1,5 @@
-from backend.modules.people.students.dashboard import extract_program_total_lessons
-from backend.modules.people.parents.service import _average_program_completion
+from backend.modules.people.student.dashboard import extract_program_total_lessons
+from backend.modules.domains.parent_relationships.service import _average_program_completion
 
 
 def test_program_total_comes_from_canonical_payload():

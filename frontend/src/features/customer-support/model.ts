@@ -1,5 +1,5 @@
 export type SupportRecordKind = "student" | "parent";
-export type SupportWorkspaceView = "dashboard" | "payments" | "parents" | "students" | "tickets";
+export type SupportWorkspaceView = "dashboard" | "payments" | "parents" | "students" | "teachers" | "tickets";
 export type SupportRecordStatus = "active" | "disabled" | "archived";
 export type SupportLanguage = "uz" | "ru" | "en";
 
@@ -243,3 +243,28 @@ export type SupportErrorCode =
   | "active_dependencies"
   | "customer_support_error"
   | string;
+
+export type TeacherDirectoryItem = {
+  teacherId: number;
+  fullName: string;
+  login: string;
+  phone: string;
+  telegramUsername: string;
+  accountStatus: string;
+  schoolIds: number[];
+  schoolNames: string[];
+  subjectNames: string[];
+  assignedGroupCount: number;
+};
+
+export type TeacherDirectoryPage = {
+  items: TeacherDirectoryItem[];
+  nextCursor?: string | null;
+  hasMore: boolean;
+  total?: number | null;
+};
+
+export type TeacherDetail = {
+  teacher: TeacherDirectoryItem;
+  assignedGroupNames: string[];
+};

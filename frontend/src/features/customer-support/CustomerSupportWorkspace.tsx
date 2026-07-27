@@ -1,10 +1,11 @@
-import { CreditCard, GraduationCap, LayoutDashboard, TicketCheck, UsersRound } from "lucide-react";
+import { ContactRound, CreditCard, GraduationCap, LayoutDashboard, TicketCheck, UsersRound } from "lucide-react";
 import type { SupportWorkspaceView } from "@/features/customer-support/model";
 import { ParentsPage } from "@/features/customer-support/parents/ParentsPage";
 import { DashboardPlaceholder } from "@/features/customer-support/placeholders/DashboardPlaceholder";
 import { PaymentsPlaceholder } from "@/features/customer-support/placeholders/PaymentsPlaceholder";
 import { TicketsPlaceholder } from "@/features/customer-support/placeholders/TicketsPlaceholder";
 import { StudentsPage } from "@/features/customer-support/students/StudentsPage";
+import { TeachersPage } from "@/features/customer-support/teachers/TeachersPage";
 import { RoleWorkspaceShell } from "@/shared/ui/RoleWorkspaceShell";
 
 type Props = {
@@ -15,12 +16,13 @@ type Props = {
   view?: string;
 };
 
-const VALID_VIEWS = new Set<SupportWorkspaceView>(["dashboard", "payments", "parents", "students", "tickets"]);
+const VALID_VIEWS = new Set<SupportWorkspaceView>(["dashboard", "payments", "parents", "students", "teachers", "tickets"]);
 const CUSTOMER_SUPPORT_NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", href: "/customer-support/dashboard", icon: LayoutDashboard },
   { key: "payments", label: "Payments", href: "/customer-support/payments", icon: CreditCard },
   { key: "parents", label: "Parents", href: "/customer-support/parents", icon: UsersRound },
   { key: "students", label: "Students", href: "/customer-support/students", icon: GraduationCap },
+  { key: "teachers", label: "Teachers", href: "/customer-support/teachers", icon: ContactRound },
   { key: "tickets", label: "Tickets", href: "/customer-support/tickets", icon: TicketCheck },
 ] as const;
 
@@ -59,6 +61,8 @@ export default function CustomerSupportWorkspace({
         <StudentsPage key="students" {...pageProps} csrfToken={csrfToken} />
       ) : activeView === "payments" ? (
         <PaymentsPlaceholder key="payments" {...pageProps} />
+      ) : activeView === "teachers" ? (
+        <TeachersPage key="teachers" {...pageProps} />
       ) : activeView === "tickets" ? (
         <TicketsPlaceholder key="tickets" {...pageProps} />
       ) : (

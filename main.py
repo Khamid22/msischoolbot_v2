@@ -8,8 +8,8 @@ import logging
 import threading
 
 from backend.core.runtime.config import get_web_settings
-from backend.core.database import connect_auth_db
-from backend.modules.identity.bootstrap import init_storage
+from backend.modules.domains.identity.bootstrap import init_storage
+from backend.platform.telegram import polling_repository
 
 
 _ADDRESS_IN_USE_ERRNOS = {
@@ -64,35 +64,21 @@ def _bot_polling_lock_retry_seconds():
 
 
 def _try_acquire_bot_polling_lock(bot_token):
-    connection = connect_auth_db()
-    try:
-        row = connection.execute(
-            "SELECT pg_try_advisory_lock(%s) AS acquired",
-            (_bot_polling_lock_key(bot_token),),
-        ).fetchone()
-        connection.commit()
-        if row and bool(row["acquired"]):
-            return connection
-    except Exception:
-        connection.close()
-        raise
-    connection.close()
-    return None
+    return polling_repository.try_acquire_polling_lock(
+        _bot_polling_lock_key(bot_token)
+    )
 
 
 def _release_bot_polling_lock(connection, bot_token):
     if connection is None:
         return
     try:
-        connection.execute(
-            "SELECT pg_advisory_unlock(%s)",
-            (_bot_polling_lock_key(bot_token),),
+        polling_repository.release_polling_lock(
+            connection,
+            _bot_polling_lock_key(bot_token),
         )
-        connection.commit()
     except Exception:
         logging.exception("Unable to release the Telegram polling advisory lock.")
-    finally:
-        connection.close()
 
 
 async def _wait_for_bot_polling_lock(bot_token):
@@ -307,13 +293,15 @@ def _resolve_run_mode():
         "web": "web",
         "server": "web",
         "bot": "bot",
+        "worker": "worker",
+        "recruitment-worker": "worker",
     }
     resolved = aliases.get(raw_mode)
     if resolved:
         return resolved
 
     logging.warning(
-        "Unknown run mode %r. Supported: both, web, bot. Falling back to web.",
+        "Unknown run mode %r. Supported: both, web, bot, worker. Falling back to web.",
         raw_mode,
     )
     return "web"
@@ -328,6 +316,10 @@ if __name__ == "__main__":
         run_web_server()
     elif run_mode == "bot":
         asyncio.run(run_bot())
+    elif run_mode == "worker":
+        from backend.application.worker import run_worker
+
+        run_worker()
     else:
         logging.info(
             "Running bot + web in one process. "
