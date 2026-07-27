@@ -7,7 +7,11 @@ from datetime import datetime
 from pydantic import Field
 
 from backend.core.api import ApiModel
-from backend.modules.domains.support_cases.tickets.contracts import TicketStatus
+from backend.modules.domains.support_cases.tickets.contracts import (
+    TicketPriority,
+    TicketSlaState,
+    TicketStatus,
+)
 from backend.modules.people.customer_support.tickets.commands import TicketMutationResult
 from backend.modules.people.customer_support.tickets.queries import (
     TicketDetailResult,
@@ -25,10 +29,16 @@ class TicketQueueItemResponse(ApiModel):
     topic: str
     category: str
     status: str
+    priority: TicketPriority
+    sla_state: TicketSlaState
     requester_name: str
     assigned_staff_id: int | None
     assigned_staff_name: str
     reply_count: int
+    first_response_due_at: datetime | None
+    resolution_due_at: datetime | None
+    first_responded_at: datetime | None
+    is_waiting_on_requester: bool
     created_at: datetime
     updated_at: datetime
 
@@ -43,10 +53,16 @@ class TicketQueueItemResponse(ApiModel):
             topic=item.topic,
             category=item.category.value,
             status=item.status.value,
+            priority=item.priority,
+            sla_state=item.sla_state,
             requester_name=item.requester_name,
             assigned_staff_id=item.assigned_staff_id,
             assigned_staff_name=item.assigned_staff_name,
             reply_count=item.reply_count,
+            first_response_due_at=item.first_response_due_at,
+            resolution_due_at=item.resolution_due_at,
+            first_responded_at=item.first_responded_at,
+            is_waiting_on_requester=item.is_waiting_on_requester,
             created_at=item.created_at,
             updated_at=item.updated_at,
         )
@@ -68,10 +84,7 @@ class TicketDetailResponse(ApiModel):
     def from_result(cls, result: TicketDetailResult) -> TicketDetailResponse:
         return cls(
             ticket=TicketQueueItemResponse.from_item(result.ticket),
-            messages=[
-                TicketMessageResponse(**message.__dict__)
-                for message in result.messages
-            ],
+            messages=[TicketMessageResponse(**message.__dict__) for message in result.messages],
         )
 
 
@@ -107,6 +120,14 @@ class AssignTicketRequest(ApiModel):
 class ChangeTicketStatusRequest(ApiModel):
     status: TicketStatus
     reason: str = Field(default="", max_length=1_000)
+
+
+class ChangeTicketPriorityRequest(ApiModel):
+    priority: TicketPriority
+
+
+class SetTicketWaitingRequest(ApiModel):
+    is_waiting: bool
 
 
 class TicketMutationResponse(ApiModel):

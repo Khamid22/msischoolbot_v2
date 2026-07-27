@@ -6,7 +6,11 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from backend.core.access.context import ActorContext
-from backend.modules.domains.support_cases.tickets.contracts import TicketStatus
+from backend.modules.domains.support_cases.tickets.contracts import (
+    TicketPriority,
+    TicketSlaState,
+    TicketStatus,
+)
 
 
 @dataclass(frozen=True)
@@ -29,10 +33,25 @@ class ChangeTicketStatusCommand:
 
 
 @dataclass(frozen=True)
+class ChangeTicketPriorityCommand:
+    ticket_id: int
+    priority: TicketPriority
+
+
+@dataclass(frozen=True)
+class SetTicketWaitingCommand:
+    ticket_id: int
+    is_waiting: bool
+
+
+@dataclass(frozen=True)
 class TicketMutationResult:
     ticket_id: int
     status: TicketStatus
     updated_at: str
+    priority: TicketPriority = TicketPriority.NORMAL
+    sla_state: TicketSlaState = TicketSlaState.ON_TRACK
+    is_waiting_on_requester: bool = False
 
 
 class CustomerSupportTicketCommands(Protocol):
@@ -54,11 +73,25 @@ class CustomerSupportTicketCommands(Protocol):
         command: ChangeTicketStatusCommand,
     ) -> TicketMutationResult: ...
 
+    def change_ticket_priority(
+        self,
+        actor: ActorContext,
+        command: ChangeTicketPriorityCommand,
+    ) -> TicketMutationResult: ...
+
+    def set_ticket_waiting(
+        self,
+        actor: ActorContext,
+        command: SetTicketWaitingCommand,
+    ) -> TicketMutationResult: ...
+
 
 __all__ = [
     "AssignTicketCommand",
+    "ChangeTicketPriorityCommand",
     "ChangeTicketStatusCommand",
     "CustomerSupportTicketCommands",
     "ReplyToTicketCommand",
+    "SetTicketWaitingCommand",
     "TicketMutationResult",
 ]

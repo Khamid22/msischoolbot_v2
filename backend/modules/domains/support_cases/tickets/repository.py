@@ -1,3 +1,6 @@
+import json
+
+
 def _ticket_row_select():
     return """
         SELECT
@@ -10,6 +13,26 @@ def _ticket_row_select():
             t.topic,
             COALESCE(opening.body, '') AS message,
             t.status,
+            t.priority,
+            t.first_response_target_minutes,
+            t.resolution_target_minutes,
+            to_char(
+                t.first_response_due_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+            ) AS first_response_due_at,
+            to_char(
+                t.resolution_due_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+            ) AS resolution_due_at,
+            to_char(
+                t.first_responded_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+            ) AS first_responded_at,
+            to_char(
+                t.waiting_on_requester_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+            ) AS waiting_on_requester_at,
+            t.requester_wait_seconds,
             COALESCE(latest_staff.body, '') AS reply,
             to_char(t.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
             to_char(t.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at,
@@ -128,6 +151,8 @@ def list_support_ticket_rows(
     all_schools,
     status,
     category,
+    priority,
+    sla_state,
     assigned_staff_id,
     is_unassigned,
     cursor_status_rank,
@@ -144,6 +169,34 @@ def list_support_ticket_rows(
             ELSE 4
         END
     """
+    sla_expression = """
+        CASE
+            WHEN t.status = 'resolved' THEN
+                CASE
+                    WHEN t.resolved_at IS NOT NULL
+                     AND t.resolution_due_at IS NOT NULL
+                     AND t.resolved_at <= t.resolution_due_at
+                    THEN 'met'
+                    ELSE 'breached'
+                END
+            WHEN t.waiting_on_requester_at IS NOT NULL
+             AND t.first_responded_at IS NOT NULL THEN 'paused'
+            WHEN (
+                (t.first_responded_at IS NULL AND now() >= t.first_response_due_at)
+                OR now() >= t.resolution_due_at
+            ) THEN 'breached'
+            WHEN (
+                t.first_responded_at IS NULL
+                AND t.first_response_due_at - now()
+                    <= make_interval(mins => t.first_response_target_minutes / 4)
+            ) OR (
+                t.first_responded_at IS NOT NULL
+                AND t.resolution_due_at - now()
+                    <= make_interval(mins => t.resolution_target_minutes / 4)
+            ) THEN 'due_soon'
+            ELSE 'on_track'
+        END
+    """
     search_pattern = f"%{str(search_text or '').strip()}%"
     return conn.execute(
         f"""
@@ -152,6 +205,8 @@ def list_support_ticket_rows(
           AND (%s::bigint IS NULL OR sch.id = %s)
           AND (%s = '' OR t.status = %s)
           AND (%s = '' OR t.category = %s)
+          AND (%s = '' OR t.priority = %s)
+          AND (%s = '' OR ({sla_expression}) = %s)
           AND (%s::bigint IS NULL OR t.assigned_to_staff_id = %s)
           AND (NOT %s OR t.assigned_to_staff_id IS NULL)
           AND (
@@ -184,6 +239,10 @@ def list_support_ticket_rows(
             str(status or ""),
             str(category or ""),
             str(category or ""),
+            str(priority or ""),
+            str(priority or ""),
+            str(sla_state or ""),
+            str(sla_state or ""),
             assigned_staff_id,
             assigned_staff_id,
             bool(is_unassigned),
@@ -228,24 +287,68 @@ def insert_parent_complaint_row(
     student_id = _resolve_student_v2_id(conn, student_row_id)
     inserted = conn.execute(
         """
+        WITH selected_student AS (
+            SELECT id, school_id
+            FROM msi_v2.students
+            WHERE id = %s
+        ),
+        selected_policy AS (
+            SELECT
+                policy.first_response_minutes,
+                policy.resolution_minutes
+            FROM msi_v2.support_ticket_sla_policies policy
+            LEFT JOIN selected_student student ON true
+            WHERE policy.is_active
+              AND policy.priority = 'normal'
+              AND (
+                    policy.school_id = student.school_id
+                    OR policy.school_id IS NULL
+              )
+            ORDER BY policy.school_id NULLS LAST
+            LIMIT 1
+        )
         INSERT INTO msi_v2.support_tickets (
             parent_id,
             student_id,
             category,
             topic,
             status,
+            priority,
+            first_response_target_minutes,
+            resolution_target_minutes,
+            first_response_due_at,
+            resolution_due_at,
             created_at,
             updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s::timestamptz, %s::timestamptz)
+        SELECT
+            %s,
+            %s,
+            %s,
+            %s,
+            %s,
+            'normal',
+            COALESCE(policy.first_response_minutes, 240),
+            COALESCE(policy.resolution_minutes, 1440),
+            %s::timestamptz
+                + make_interval(mins => COALESCE(policy.first_response_minutes, 240)),
+            %s::timestamptz
+                + make_interval(mins => COALESCE(policy.resolution_minutes, 1440)),
+            %s::timestamptz,
+            %s::timestamptz
+        FROM (SELECT 1) seed
+        LEFT JOIN selected_policy policy ON true
         RETURNING id
         """,
         (
+            student_id,
             int(parent_admin_id),
             student_id,
             str(category or "other").strip(),
             str(topic or "").strip(),
             str(status or "new").strip().casefold(),
+            str(created_at or "").strip(),
+            str(created_at or "").strip(),
             str(created_at or "").strip(),
             str(updated_at or "").strip(),
         ),
@@ -454,6 +557,145 @@ def update_ticket_state_row(
     ).fetchone()
 
 
+def mark_first_staff_response_row(conn, *, ticket_id, responded_at):
+    return conn.execute(
+        """
+        UPDATE msi_v2.support_tickets
+        SET first_responded_at = COALESCE(first_responded_at, %s),
+            updated_at = %s
+        WHERE id = %s
+        RETURNING id
+        """,
+        (responded_at, responded_at, int(ticket_id)),
+    ).fetchone()
+
+
+def set_ticket_waiting_on_requester_row(
+    conn,
+    *,
+    ticket_id,
+    is_waiting,
+    changed_at,
+):
+    if is_waiting:
+        return conn.execute(
+            """
+            UPDATE msi_v2.support_tickets
+            SET waiting_on_requester_at = COALESCE(waiting_on_requester_at, %s),
+                updated_at = %s
+            WHERE id = %s
+            RETURNING id
+            """,
+            (changed_at, changed_at, int(ticket_id)),
+        ).fetchone()
+    return conn.execute(
+        """
+        UPDATE msi_v2.support_tickets
+        SET resolution_due_at = CASE
+                WHEN waiting_on_requester_at IS NULL THEN resolution_due_at
+                ELSE resolution_due_at + (%s - waiting_on_requester_at)
+            END,
+            requester_wait_seconds = requester_wait_seconds + CASE
+                WHEN waiting_on_requester_at IS NULL THEN 0
+                ELSE GREATEST(
+                    0,
+                    EXTRACT(EPOCH FROM (%s - waiting_on_requester_at))::bigint
+                )
+            END,
+            waiting_on_requester_at = NULL,
+            updated_at = %s
+        WHERE id = %s
+        RETURNING id
+        """,
+        (changed_at, changed_at, changed_at, int(ticket_id)),
+    ).fetchone()
+
+
+def update_ticket_priority_row(
+    conn,
+    *,
+    ticket_id,
+    priority,
+    updated_at,
+):
+    return conn.execute(
+        """
+        WITH selected_policy AS (
+            SELECT
+                policy.first_response_minutes,
+                policy.resolution_minutes
+            FROM msi_v2.support_tickets ticket
+            LEFT JOIN msi_v2.students student ON student.id = ticket.student_id
+            JOIN msi_v2.support_ticket_sla_policies policy
+              ON policy.is_active
+             AND policy.priority = %s
+             AND (
+                    policy.school_id = student.school_id
+                    OR policy.school_id IS NULL
+             )
+            WHERE ticket.id = %s
+            ORDER BY policy.school_id NULLS LAST
+            LIMIT 1
+        )
+        UPDATE msi_v2.support_tickets ticket
+        SET priority = %s,
+            first_response_target_minutes = policy.first_response_minutes,
+            resolution_target_minutes = policy.resolution_minutes,
+            first_response_due_at = ticket.created_at
+                + make_interval(mins => policy.first_response_minutes),
+            resolution_due_at = ticket.created_at
+                + make_interval(mins => policy.resolution_minutes)
+                + make_interval(secs => ticket.requester_wait_seconds::integer),
+            updated_at = %s
+        FROM selected_policy policy
+        WHERE ticket.id = %s
+        RETURNING ticket.id
+        """,
+        (
+            str(priority),
+            int(ticket_id),
+            str(priority),
+            updated_at,
+            int(ticket_id),
+        ),
+    ).fetchone()
+
+
+def insert_ticket_audit_event(
+    conn,
+    *,
+    ticket_id,
+    event_type,
+    actor_staff_id,
+    actor_account_id,
+    detail,
+    created_at,
+):
+    return conn.execute(
+        """
+        INSERT INTO msi_v2.audit_events (
+            actor_staff_id,
+            actor_account_id,
+            event_type,
+            entity_type,
+            entity_id,
+            detail_json,
+            created_at
+        )
+        VALUES (%s, %s, %s, 'support_ticket', %s, %s::jsonb, %s)
+        RETURNING id
+        """,
+        (
+            int(actor_staff_id) if actor_staff_id else None,
+            int(actor_account_id) if actor_account_id else None,
+            str(event_type),
+            int(ticket_id),
+            json.dumps(detail, separators=(",", ":")),
+            created_at,
+        ),
+    ).fetchone()
+
+
 def count_complaints_by_parent(conn):
     """Map of parent_id -> {total, open} ticket counts (open = not resolved)."""
     return conn.execute(
@@ -477,9 +719,13 @@ __all__ = [
     "insert_complaint_message_row",
     "insert_parent_complaint_row",
     "insert_staff_ticket_message_row",
+    "insert_ticket_audit_event",
     "list_complaint_message_rows",
     "list_parent_complaint_rows",
     "list_support_ticket_rows",
+    "mark_first_staff_response_row",
+    "set_ticket_waiting_on_requester_row",
     "update_parent_complaint_row",
+    "update_ticket_priority_row",
     "update_ticket_state_row",
 ]

@@ -42,11 +42,7 @@ export function StudentsPage({
   title: string;
   description: string;
 }) {
-  const controller = useSupportRecords("student", {
-    fixedSchoolKey: "school5",
-    fixedSchoolLabel: "School 5",
-    loadAll: true,
-  });
+  const controller = useSupportRecords("student");
   const [dialog, setDialog] = useState<StudentDialog>(null);
   const [settlementTarget, setSettlementTarget] = useState<{ payment: PaymentRecord; paid: boolean } | null>(null);
   const { toast, showToast, clearToast } = useFloatingToast();

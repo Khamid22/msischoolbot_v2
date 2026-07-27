@@ -12,6 +12,7 @@
     "test:recruitment": "node --experimental-strip-types --test src/features/recruitment/recruitmentUi.contract.test.ts",
     "test:teacher": "node --experimental-strip-types --test src/workspaces/teacher/teacherCabinet.contract.test.ts",
     "test:parent": "node --experimental-strip-types --test src/workspaces/parent/parentWorkspace.contract.test.ts",
+    "test:customer-support": "node --experimental-strip-types --test src/features/customer-support/customerSupportDashboard.contract.test.ts",
     "check-types": "tsc -p tsconfig.app.json --noEmit",
     "build": "vite build",
     "preview": "vite preview"

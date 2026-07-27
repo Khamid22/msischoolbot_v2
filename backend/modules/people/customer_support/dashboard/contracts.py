@@ -6,6 +6,7 @@ from backend.modules.domains.reporting.customer_support.contracts import (
     CustomerSupportDashboardMetrics,
     CustomerSupportDashboardResponse,
     CustomerSupportTicketSummary,
+    DashboardPeriodDays,
 )
 from backend.modules.people.customer_support.dashboard.queries import (
     GetCustomerSupportDashboard,
@@ -17,5 +18,6 @@ __all__ = [
     "CustomerSupportDashboardMetrics",
     "CustomerSupportDashboardResponse",
     "CustomerSupportTicketSummary",
+    "DashboardPeriodDays",
     "GetCustomerSupportDashboard",
 ]

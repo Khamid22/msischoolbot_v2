@@ -402,9 +402,9 @@ def test_frontend_contract_is_split_search_first_and_strongly_typed():
     assert "lg:grid-cols-[minmax(20rem,0.72fr)_minmax(0,1.55fr)]" in layout
     assert "debouncedQuery" in records_hook and "URLSearchParams" in records_hook
     assert "AbortController" in records_hook and "275" in records_hook
-    assert 'fixedSchoolKey: "school5"' in students
-    assert 'fixedSchoolLabel: "School 5"' in students
-    assert "loadAll: true" in students
+    assert 'useSupportRecords("student")' in students
+    assert 'fixedSchoolKey: "school5"' not in students
+    assert "loadAll: true" not in students
     assert "school.school_key.trim().toLocaleLowerCase() === normalizedKey" in records_hook
     assert "if (fixedSchoolKey && !schoolId) return;" in records_hook
     assert 'limit: loadAll ? "50" : "25"' in records_hook

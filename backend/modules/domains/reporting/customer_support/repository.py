@@ -18,10 +18,13 @@ class CustomerSupportDashboardReadScope:
 
     school_ids: tuple[int, ...]
     all_schools: bool
+    available_school_ids: tuple[int, ...]
+    has_all_school_access: bool
     started_at: datetime
     ended_at: datetime
     ticket_limit: int
     activity_limit: int
+    actor_staff_id: int | None
 
     @property
     def has_school_access(self) -> bool:

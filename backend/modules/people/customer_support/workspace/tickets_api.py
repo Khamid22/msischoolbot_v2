@@ -12,20 +12,26 @@ from backend.core.api.pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from backend.modules.people.customer_support.policies import CustomerSupportAccessError
 from backend.modules.people.customer_support.tickets.commands import (
     AssignTicketCommand,
+    ChangeTicketPriorityCommand,
     ChangeTicketStatusCommand,
     ReplyToTicketCommand,
+    SetTicketWaitingCommand,
 )
 from backend.modules.people.customer_support.tickets.contracts import (
     TicketCategory,
     TicketLifecycleError,
     TicketNotFoundError,
+    TicketPriority,
+    TicketSlaState,
     TicketStatus,
 )
 from backend.modules.people.customer_support.tickets.queries import TicketQueueQuery
 from backend.modules.people.customer_support.tickets.schemas import (
     AssignTicketRequest,
+    ChangeTicketPriorityRequest,
     ChangeTicketStatusRequest,
     ReplyTicketRequest,
+    SetTicketWaitingRequest,
     TicketDetailResponse,
     TicketMutationResponse,
     TicketQueueResponse,
@@ -60,12 +66,15 @@ def list_tickets(
     school_id: int | None = Query(default=None, gt=0, alias="schoolId"),
     ticket_status: TicketStatus | None = Query(default=None, alias="status"),
     category: TicketCategory | None = Query(default=None),
+    priority: TicketPriority | None = Query(default=None),
+    sla_state: TicketSlaState | None = Query(default=None, alias="slaState"),
     assigned_staff_id: int | None = Query(
         default=None,
         gt=0,
         alias="assignedStaffId",
     ),
     is_unassigned: bool = Query(default=False, alias="unassigned"),
+    assigned_to_me: bool = Query(default=False, alias="assignedToMe"),
     cursor: str = Query(default="", max_length=500),
     limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
     actor: ActorContext = Depends(get_actor_context),
@@ -79,7 +88,10 @@ def list_tickets(
                 school_id=school_id,
                 status=ticket_status,
                 category=category,
+                priority=priority,
+                sla_state=sla_state,
                 assigned_staff_id=assigned_staff_id,
+                assigned_to_me=assigned_to_me,
                 is_unassigned=is_unassigned,
                 cursor=cursor or None,
                 page_size=limit,
@@ -175,6 +187,54 @@ def change_ticket_status(
                 ticket_id=ticket_id,
                 status=payload.status,
                 reason=payload.reason,
+            ),
+        )
+    except Exception as exc:
+        return _error(exc)
+    return api_success(TicketMutationResponse.from_result(result))
+
+
+@router.patch(
+    "/{ticket_id}/priority",
+    response_model=ApiSuccess[TicketMutationResponse],
+    operation_id="api_v1_customer_support_ticket_priority",
+)
+def change_ticket_priority(
+    ticket_id: int,
+    payload: ChangeTicketPriorityRequest,
+    actor: ActorContext = Depends(get_actor_context),
+    use_cases: CustomerSupportTickets = Depends(get_ticket_use_cases),
+):
+    try:
+        result = use_cases.change_ticket_priority(
+            actor,
+            ChangeTicketPriorityCommand(
+                ticket_id=ticket_id,
+                priority=payload.priority,
+            ),
+        )
+    except Exception as exc:
+        return _error(exc)
+    return api_success(TicketMutationResponse.from_result(result))
+
+
+@router.patch(
+    "/{ticket_id}/waiting-state",
+    response_model=ApiSuccess[TicketMutationResponse],
+    operation_id="api_v1_customer_support_ticket_waiting_state",
+)
+def set_ticket_waiting(
+    ticket_id: int,
+    payload: SetTicketWaitingRequest,
+    actor: ActorContext = Depends(get_actor_context),
+    use_cases: CustomerSupportTickets = Depends(get_ticket_use_cases),
+):
+    try:
+        result = use_cases.set_ticket_waiting(
+            actor,
+            SetTicketWaitingCommand(
+                ticket_id=ticket_id,
+                is_waiting=payload.is_waiting,
             ),
         )
     except Exception as exc:

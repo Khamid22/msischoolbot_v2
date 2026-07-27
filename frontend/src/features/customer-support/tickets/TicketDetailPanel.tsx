@@ -3,16 +3,20 @@ import {
   ArrowLeft,
   CheckCircle2,
   CornerUpRight,
+  Flag,
   Loader2,
   MessageSquareReply,
   UserCheck,
   UserMinus,
+  PauseCircle,
+  PlayCircle,
 } from "lucide-react";
 import { FormEvent } from "react";
 import {
   getSupport,
   sendSupport,
   type SupportTicketDetail,
+  type SupportTicketPriority,
   type SupportTicketStatus,
 } from "@/features/customer-support/api";
 import {
@@ -62,6 +66,9 @@ export function TicketDetailPanel({
     void queryClient.invalidateQueries({
       queryKey: ["customer-support", "tickets"],
     });
+    void queryClient.invalidateQueries({
+      queryKey: ["customer-support", "dashboard"],
+    });
   };
   const reply = useMutation({
     mutationFn: (body: string) => sendSupport(
@@ -86,6 +93,24 @@ export function TicketDetailPanel({
       `/tickets/${ticketId}/assignment`,
       "PATCH",
       { assignedStaffId },
+      csrfToken,
+    ),
+    onSuccess: refresh,
+  });
+  const priority = useMutation({
+    mutationFn: (nextPriority: SupportTicketPriority) => sendSupport(
+      `/tickets/${ticketId}/priority`,
+      "PATCH",
+      { priority: nextPriority },
+      csrfToken,
+    ),
+    onSuccess: refresh,
+  });
+  const waiting = useMutation({
+    mutationFn: (isWaiting: boolean) => sendSupport(
+      `/tickets/${ticketId}/waiting-state`,
+      "PATCH",
+      { isWaiting },
       csrfToken,
     ),
     onSuccess: refresh,
@@ -119,7 +144,7 @@ export function TicketDetailPanel({
 
   const { ticket, messages } = query.data;
   const isResolved = ticket.status === "resolved";
-  const mutationError = reply.error || status.error || assignment.error;
+  const mutationError = reply.error || status.error || assignment.error || priority.error || waiting.error;
 
   function submitReply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -147,17 +172,19 @@ export function TicketDetailPanel({
             </div>
             <StatusBadge status={ticket.status} />
           </div>
-          <dl className="mt-4 grid gap-2 text-xs sm:grid-cols-3">
+          <dl className="mt-4 grid gap-2 text-xs sm:grid-cols-2 xl:grid-cols-4">
             <TicketFact label="Category" value={ticket.category.split("_").join(" ")} />
+            <TicketFact label="Priority" value={ticket.priority} />
+            <TicketFact label="SLA" value={ticket.slaState.split("_").join(" ")} />
             <TicketFact
               label="Assigned to"
               value={ticket.assignedStaffName || "Unassigned"}
             />
-            <TicketFact label="Updated" value={formatDate(ticket.updatedAt, true)} />
           </dl>
         </header>
 
-        <div className="flex flex-wrap gap-2 border-b border-border p-3">
+        {!isResolved ? (
+          <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
           {currentStaffId ? (
             ticket.assignedStaffId === currentStaffId ? (
               <button
@@ -181,6 +208,34 @@ export function TicketDetailPanel({
               </button>
             )
           ) : null}
+          <label className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-black text-foreground">
+            <Flag className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <span className="sr-only">Ticket priority</span>
+            <select
+              value={ticket.priority}
+              disabled={priority.isPending}
+              onChange={(event) => priority.mutate(event.target.value as SupportTicketPriority)}
+              className="bg-transparent capitalize outline-none"
+            >
+              <option value="urgent">Urgent</option>
+              <option value="high">High</option>
+              <option value="normal">Normal</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            className={secondaryButton}
+            disabled={waiting.isPending}
+            onClick={() => waiting.mutate(!ticket.isWaitingOnRequester)}
+          >
+            {ticket.isWaitingOnRequester ? (
+              <PlayCircle className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <PauseCircle className="h-4 w-4" aria-hidden="true" />
+            )}
+            {ticket.isWaitingOnRequester ? "Resume SLA" : "Waiting on parent"}
+          </button>
           {STATUS_ACTIONS.filter((action) => action.status !== ticket.status).map((action) => {
             const Icon = action.icon;
             return (
@@ -196,7 +251,8 @@ export function TicketDetailPanel({
               </button>
             );
           })}
-        </div>
+          </div>
+        ) : null}
 
         {mutationError ? (
           <p className="m-4 rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm font-bold text-destructive" role="alert">
@@ -230,7 +286,7 @@ export function TicketDetailPanel({
 
         {isResolved ? (
           <p className="border-t border-border bg-emerald-50 px-4 py-4 text-sm font-bold text-emerald-800">
-            This ticket is resolved and read-only. Change its status before sending another reply.
+            This ticket is resolved and read-only. The parent must create a new ticket for a new request.
           </p>
         ) : (
           <form onSubmit={submitReply} className="border-t border-border p-4">

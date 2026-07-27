@@ -7,6 +7,8 @@ from typing import NotRequired, TypedDict, cast
 from backend.modules.domains.support_cases.tickets import service
 from backend.modules.domains.support_cases.tickets.domain_types import (
     TicketCategory,
+    TicketPriority,
+    TicketSlaState,
     TicketStatus,
 )
 from backend.modules.domains.support_cases.tickets.transactional import (
@@ -15,6 +17,7 @@ from backend.modules.domains.support_cases.tickets.transactional import (
     TicketLifecycleError,
     TicketMessageData,
     TicketNotFoundError,
+    change_ticket_priority,
     create_parent_ticket,
     get_parent_ticket,
     get_support_ticket,
@@ -22,6 +25,7 @@ from backend.modules.domains.support_cases.tickets.transactional import (
     list_support_tickets,
     reply_to_parent_ticket,
     reply_to_support_ticket,
+    set_ticket_waiting_on_requester,
     update_support_ticket,
 )
 
@@ -138,6 +142,8 @@ __all__ = [
     "AddTicketReplyPayload",
     "CreateTicketPayload",
     "TicketCategory",
+    "TicketPriority",
+    "TicketSlaState",
     "TicketData",
     "TicketLifecycleError",
     "TicketMessageData",
@@ -149,6 +155,7 @@ __all__ = [
     "UpdateTicketPayload",
     "add_complaint_reply",
     "add_ticket_reply",
+    "change_ticket_priority",
     "create_complaint",
     "create_ticket",
     "get_complaint",
@@ -164,5 +171,6 @@ __all__ = [
     "list_support_tickets",
     "reply_to_parent_ticket",
     "reply_to_support_ticket",
+    "set_ticket_waiting_on_requester",
     "update_support_ticket",
 ]

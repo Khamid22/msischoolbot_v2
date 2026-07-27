@@ -201,6 +201,14 @@ export type SupportContext = {
 };
 
 export type SupportTicketStatus = "new" | "in_progress" | "escalated" | "resolved";
+export type SupportTicketPriority = "low" | "normal" | "high" | "urgent";
+export type SupportTicketSlaState =
+  | "on_track"
+  | "due_soon"
+  | "breached"
+  | "paused"
+  | "met"
+  | "not_applicable";
 
 export type SupportTicketQueueItem = {
   ticketId: number;
@@ -211,10 +219,16 @@ export type SupportTicketQueueItem = {
   topic: string;
   category: string;
   status: SupportTicketStatus;
+  priority: SupportTicketPriority;
+  slaState: SupportTicketSlaState;
   requesterName: string;
   assignedStaffId: number | null;
   assignedStaffName: string;
   replyCount: number;
+  firstResponseDueAt: string | null;
+  resolutionDueAt: string | null;
+  firstRespondedAt: string | null;
+  isWaitingOnRequester: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -237,6 +251,138 @@ export type SupportTicketQueue = {
 export type SupportTicketDetail = {
   ticket: SupportTicketQueueItem;
   messages: SupportTicketMessage[];
+};
+
+export type CustomerSupportDashboardSchool = {
+  schoolId: number;
+  schoolName: string;
+};
+
+export type CustomerSupportDashboardMetrics = {
+  openTickets: number;
+  assignedToMe: number;
+  unassignedTickets: number;
+  escalatedTickets: number;
+  slaBreachedTickets: number;
+  waitingOnRequesterTickets: number;
+  overduePaymentAccounts: number;
+  studentsWithoutActiveParentLink: number;
+};
+
+export type CustomerSupportDailyTicketFlow = {
+  day: string;
+  opened: number;
+  resolved: number;
+};
+
+export type CustomerSupportTicketAgeBucket = {
+  bucket: "under_24h" | "one_to_three_days" | "four_to_seven_days" | "eight_plus_days";
+  label: string;
+  count: number;
+};
+
+export type CustomerSupportTicketCategoryVolume = {
+  category: string;
+  count: number;
+};
+
+export type CustomerSupportSchoolWorkload = {
+  schoolId: number;
+  schoolName: string;
+  openTickets: number;
+  unassignedTickets: number;
+  slaBreachedTickets: number;
+};
+
+export type CustomerSupportDashboardTicket = {
+  ticketId: number;
+  parentId: number | null;
+  studentId: number | null;
+  studentRowId: number | null;
+  studentCode: string;
+  title: string;
+  requesterName: string;
+  schoolId: number;
+  schoolName: string;
+  category: string;
+  status: SupportTicketStatus;
+  priority: SupportTicketPriority;
+  slaState: SupportTicketSlaState;
+  assignedStaffId: number | null;
+  assignedStaffName: string;
+  createdAt: string;
+  updatedAt: string;
+  firstResponseDueAt: string | null;
+  resolutionDueAt: string | null;
+  isWaitingOnRequester: boolean;
+};
+
+export type CustomerSupportCurrencyAmount = {
+  currency: string;
+  amount: number | string;
+  accountCount: number;
+};
+
+export type CustomerSupportOverduePayment = {
+  paymentId: number;
+  studentId: number;
+  studentRowId: number | null;
+  studentCode: string;
+  studentName: string;
+  schoolId: number;
+  schoolName: string;
+  dueDate: string;
+  amount: number | string;
+  currency: string;
+  daysOverdue: number;
+};
+
+export type CustomerSupportStudentWithoutParent = {
+  studentId: number;
+  studentRowId: number | null;
+  studentCode: string;
+  studentName: string;
+  schoolId: number;
+  schoolName: string;
+};
+
+export type CustomerSupportActivity = {
+  activityId: string;
+  activityType: "ticket" | "payment";
+  eventType: string;
+  summary: string;
+  schoolId: number;
+  schoolName: string;
+  entityId: number;
+  actorStaffId: number | null;
+  actorName: string;
+  occurredAt: string;
+};
+
+export type CustomerSupportDashboard = {
+  generatedAt: string;
+  periodDays: 7 | 30 | 90;
+  periodStartedAt: string;
+  periodEndedAt: string;
+  effectiveSchoolIds: number[];
+  allSchools: boolean;
+  availableSchools: CustomerSupportDashboardSchool[];
+  metrics: CustomerSupportDashboardMetrics;
+  dailyTicketFlow: CustomerSupportDailyTicketFlow[];
+  ticketAgeBuckets: CustomerSupportTicketAgeBucket[];
+  ticketCategories: CustomerSupportTicketCategoryVolume[];
+  schoolWorkload: CustomerSupportSchoolWorkload[];
+  actionRequiredTickets: CustomerSupportDashboardTicket[];
+  oldestOpenTickets: CustomerSupportDashboardTicket[];
+  paymentExceptions: {
+    overdueTotals: CustomerSupportCurrencyAmount[];
+    dueSoonTotals: CustomerSupportCurrencyAmount[];
+    topOverdueAccounts: CustomerSupportOverduePayment[];
+  };
+  accountExceptions: {
+    studentsWithoutActiveParentLink: CustomerSupportStudentWithoutParent[];
+  };
+  recentActivity: CustomerSupportActivity[];
 };
 
 export type SearchPayload = {

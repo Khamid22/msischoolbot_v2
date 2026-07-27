@@ -60,13 +60,14 @@ class CustomerSupportDashboardQueries:
         self,
         *,
         school_scope: SchoolScope,
+        actor_staff_id: int | None = None,
         filters: CustomerSupportDashboardFilters | None = None,
     ) -> CustomerSupportDashboardResponse:
         selected_filters = filters or CustomerSupportDashboardFilters()
         generated_at = _require_aware(self.clock.now(), field_name="generated_at")
         ended_at = selected_filters.ended_at or generated_at
         started_at = selected_filters.started_at or (
-            ended_at - timedelta(days=DEFAULT_DASHBOARD_LOOKBACK_DAYS)
+            ended_at - timedelta(days=selected_filters.period_days)
         )
         if started_at > ended_at:
             raise ValueError("Dashboard start time must not be after its end time.")
@@ -78,10 +79,13 @@ class CustomerSupportDashboardQueries:
         read_scope = CustomerSupportDashboardReadScope(
             school_ids=school_ids,
             all_schools=all_schools,
+            available_school_ids=tuple(sorted(school_scope.allowed_school_ids)),
+            has_all_school_access=school_scope.all_schools,
             started_at=started_at,
             ended_at=ended_at,
             ticket_limit=selected_filters.ticket_limit,
             activity_limit=selected_filters.activity_limit,
+            actor_staff_id=actor_staff_id,
         )
 
         dashboard_data = _empty_data()
@@ -94,13 +98,30 @@ class CustomerSupportDashboardQueries:
 
         return CustomerSupportDashboardResponse(
             generated_at=generated_at,
+            period_days=selected_filters.period_days,
             period_started_at=started_at,
             period_ended_at=ended_at,
-            school_ids=list(school_ids),
+            effective_school_ids=(
+                list(school_ids)
+                if school_ids
+                else [school.school_id for school in dashboard_data.available_schools]
+            ),
+            school_ids=(
+                list(school_ids)
+                if school_ids
+                else [school.school_id for school in dashboard_data.available_schools]
+            ),
             all_schools=all_schools,
+            available_schools=dashboard_data.available_schools,
             metrics=dashboard_data.metrics,
+            daily_ticket_flow=dashboard_data.daily_ticket_flow,
+            ticket_age_buckets=dashboard_data.ticket_age_buckets,
+            ticket_categories=dashboard_data.ticket_categories,
+            school_workload=dashboard_data.school_workload,
             action_required_tickets=dashboard_data.action_required_tickets,
             oldest_open_tickets=dashboard_data.oldest_open_tickets,
+            payment_exceptions=dashboard_data.payment_exceptions,
+            account_exceptions=dashboard_data.account_exceptions,
             recent_activity=dashboard_data.recent_activity,
         )
 

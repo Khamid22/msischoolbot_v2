@@ -1,7 +1,7 @@
 import { ContactRound, CreditCard, GraduationCap, LayoutDashboard, TicketCheck, UsersRound } from "lucide-react";
 import type { SupportWorkspaceView } from "@/features/customer-support/model";
+import { DashboardPage } from "@/features/customer-support/dashboard/DashboardPage";
 import { ParentsPage } from "@/features/customer-support/parents/ParentsPage";
-import { DashboardPlaceholder } from "@/features/customer-support/placeholders/DashboardPlaceholder";
 import { PaymentsPlaceholder } from "@/features/customer-support/placeholders/PaymentsPlaceholder";
 import { StudentsPage } from "@/features/customer-support/students/StudentsPage";
 import { TeachersPage } from "@/features/customer-support/teachers/TeachersPage";
@@ -66,7 +66,7 @@ export default function CustomerSupportWorkspace({
       ) : activeView === "tickets" ? (
         <TicketsPage key="tickets" {...pageProps} csrfToken={csrfToken} />
       ) : (
-        <DashboardPlaceholder key="dashboard" {...pageProps} />
+        <DashboardPage key="dashboard" {...pageProps} />
       )}
     </RoleWorkspaceShell>
   );

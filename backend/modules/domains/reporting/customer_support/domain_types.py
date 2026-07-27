@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from backend.modules.domains.support_cases.tickets.domain_types import TicketPriority
+
 
 class SupportRequesterType(StrEnum):
     PARENT = "parent"
@@ -12,11 +14,8 @@ class SupportRequesterType(StrEnum):
     OTHER = "other"
 
 
-class DashboardTicketPriority(StrEnum):
-    LOW = "low"
-    NORMAL = "normal"
-    HIGH = "high"
-    URGENT = "urgent"
+# Compatibility alias: the Support Cases domain owns the vocabulary.
+DashboardTicketPriority = TicketPriority
 
 
 __all__ = ["DashboardTicketPriority", "SupportRequesterType"]

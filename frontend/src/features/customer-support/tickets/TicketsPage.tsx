@@ -8,11 +8,13 @@ import {
   ShieldCheck,
   TicketCheck,
 } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
   getSupport,
   type SupportContext,
   type SupportTicketQueue,
+  type SupportTicketPriority,
+  type SupportTicketSlaState,
   type SupportTicketStatus,
 } from "@/features/customer-support/api";
 import { inputClass } from "@/features/customer-support/shared/ui";
@@ -29,6 +31,36 @@ const TICKET_STATUSES: Array<{ value: "" | SupportTicketStatus; label: string }>
   { value: "resolved", label: "Resolved" },
 ];
 const SUPPORT_TICKET_PAGE_SIZE = 25;
+const TICKET_CATEGORIES = [
+  "complaint",
+  "direct_contact",
+  "payment",
+  "teacher",
+  "lesson_quality",
+  "schedule",
+  "attendance",
+  "technical",
+  "account",
+  "other",
+] as const;
+
+function readTicketFilters() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    selectedId: Number(params.get("ticketId") || 0) || null,
+    search: params.get("q") || "",
+    status: (params.get("status") || "") as "" | SupportTicketStatus,
+    schoolId: params.get("schoolId") || "",
+    category: params.get("category") || "",
+    priority: (params.get("priority") || "") as "" | SupportTicketPriority,
+    slaState: (params.get("slaState") || "") as "" | SupportTicketSlaState,
+    assignment: params.get("assignedToMe") === "true"
+      ? "mine"
+      : params.get("unassigned") === "true"
+        ? "unassigned"
+        : "",
+  };
+}
 
 export function TicketsPage({
   authLogin,
@@ -41,17 +73,32 @@ export function TicketsPage({
   description: string;
   csrfToken: string;
 }) {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<"" | SupportTicketStatus>("");
-  const [schoolId, setSchoolId] = useState("");
+  const initial = readTicketFilters();
+  const [selectedId, setSelectedId] = useState<number | null>(initial.selectedId);
+  const [searchInput, setSearchInput] = useState(initial.search);
+  const [search, setSearch] = useState(initial.search);
+  const [status, setStatus] = useState<"" | SupportTicketStatus>(initial.status);
+  const [schoolId, setSchoolId] = useState(initial.schoolId);
+  const [category, setCategory] = useState(initial.category);
+  const [priority, setPriority] = useState<"" | SupportTicketPriority>(initial.priority);
+  const [slaState, setSlaState] = useState<"" | SupportTicketSlaState>(initial.slaState);
+  const [assignment, setAssignment] = useState(initial.assignment);
   const context = useQuery({
     queryKey: ["customer-support", "context"],
     queryFn: ({ signal }) => getSupport<SupportContext>("/context", signal),
   });
   const queue = useInfiniteQuery({
-    queryKey: ["customer-support", "tickets", search, status, schoolId],
+    queryKey: [
+      "customer-support",
+      "tickets",
+      search,
+      status,
+      schoolId,
+      category,
+      priority,
+      slaState,
+      assignment,
+    ],
     initialPageParam: "",
     queryFn: ({ signal, pageParam }) => {
       const params = new URLSearchParams({
@@ -60,6 +107,11 @@ export function TicketsPage({
       if (search) params.set("q", search);
       if (status) params.set("status", status);
       if (schoolId) params.set("schoolId", schoolId);
+      if (category) params.set("category", category);
+      if (priority) params.set("priority", priority);
+      if (slaState) params.set("slaState", slaState);
+      if (assignment === "mine") params.set("assignedToMe", "true");
+      if (assignment === "unassigned") params.set("unassigned", "true");
       if (pageParam) params.set("cursor", pageParam);
       return getSupport<SupportTicketQueue>(`/tickets?${params}`, signal);
     },
@@ -67,6 +119,24 @@ export function TicketsPage({
   });
   const tickets = queue.data?.pages.flatMap((page) => page.items) || [];
   const actorStaffId = queue.data?.pages[0]?.actorStaffId || null;
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (search) params.set("q", search);
+    if (status) params.set("status", status);
+    if (schoolId) params.set("schoolId", schoolId);
+    if (category) params.set("category", category);
+    if (priority) params.set("priority", priority);
+    if (slaState) params.set("slaState", slaState);
+    if (assignment === "mine") params.set("assignedToMe", "true");
+    if (assignment === "unassigned") params.set("unassigned", "true");
+    if (selectedId) params.set("ticketId", String(selectedId));
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}${params.size ? `?${params}` : ""}`,
+    );
+  }, [assignment, category, priority, schoolId, search, selectedId, slaState, status]);
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -94,9 +164,9 @@ export function TicketsPage({
 
       <form
         onSubmit={submitSearch}
-        className="grid gap-3 rounded-lg border border-border bg-card p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_12rem_12rem_auto]"
+        className="grid gap-3 rounded-lg border border-border bg-card p-3 shadow-sm sm:grid-cols-2 xl:grid-cols-4"
       >
-        <label className="relative min-w-0">
+        <label className="relative min-w-0 sm:col-span-2 xl:col-span-2">
           <span className="sr-only">Search tickets</span>
           <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
           <input
@@ -139,9 +209,74 @@ export function TicketsPage({
             ))}
           </select>
         </label>
+        <label>
+          <span className="sr-only">Ticket category</span>
+          <select
+            value={category}
+            onChange={(event) => {
+              setCategory(event.target.value);
+              setSelectedId(null);
+            }}
+            className={inputClass}
+          >
+            <option value="">All categories</option>
+            {TICKET_CATEGORIES.map((value) => (
+              <option key={value} value={value}>{value.split("_").join(" ")}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">Priority</span>
+          <select
+            value={priority}
+            onChange={(event) => {
+              setPriority(event.target.value as "" | SupportTicketPriority);
+              setSelectedId(null);
+            }}
+            className={inputClass}
+          >
+            <option value="">All priorities</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="normal">Normal</option>
+            <option value="low">Low</option>
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">SLA state</span>
+          <select
+            value={slaState}
+            onChange={(event) => {
+              setSlaState(event.target.value as "" | SupportTicketSlaState);
+              setSelectedId(null);
+            }}
+            className={inputClass}
+          >
+            <option value="">All SLA states</option>
+            <option value="breached">Breached</option>
+            <option value="due_soon">Due soon</option>
+            <option value="paused">Waiting on parent</option>
+            <option value="on_track">On track</option>
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">Assignment</span>
+          <select
+            value={assignment}
+            onChange={(event) => {
+              setAssignment(event.target.value);
+              setSelectedId(null);
+            }}
+            className={inputClass}
+          >
+            <option value="">Any assignment</option>
+            <option value="mine">Assigned to me</option>
+            <option value="unassigned">Unassigned</option>
+          </select>
+        </label>
         <button
           type="submit"
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-black text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-black text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:col-span-2 xl:col-span-4"
         >
           <Search className="h-4 w-4" />
           Search

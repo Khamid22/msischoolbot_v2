@@ -16,6 +16,26 @@ class TicketStatus(StrEnum):
     RESOLVED = "resolved"
 
 
+class TicketPriority(StrEnum):
+    """Stable urgency values used by persistence, APIs, and workers."""
+
+    LOW = "low"
+    NORMAL = "normal"
+    HIGH = "high"
+    URGENT = "urgent"
+
+
+class TicketSlaState(StrEnum):
+    """Calculated SLA state for queue filtering and operator guidance."""
+
+    ON_TRACK = "on_track"
+    DUE_SOON = "due_soon"
+    BREACHED = "breached"
+    PAUSED = "paused"
+    MET = "met"
+    NOT_APPLICABLE = "not_applicable"
+
+
 class TicketCategory(StrEnum):
     """Persisted ticket categories; display labels belong in the frontend."""
 
@@ -41,6 +61,7 @@ TICKET_STATUS_ALIASES: Final = MappingProxyType(
 )
 VALID_TICKET_STATUSES: Final = frozenset(status.value for status in TicketStatus)
 VALID_TICKET_CATEGORIES: Final = frozenset(category.value for category in TicketCategory)
+VALID_TICKET_PRIORITIES: Final = frozenset(priority.value for priority in TicketPriority)
 
 
 def normalize_ticket_status(value: object) -> str:
@@ -58,12 +79,23 @@ def normalize_ticket_category(value: object) -> str:
     return TicketCategory.OTHER.value
 
 
+def normalize_ticket_priority(value: object) -> str:
+    normalized = str(value or "").strip().casefold()
+    if normalized in VALID_TICKET_PRIORITIES:
+        return normalized
+    return TicketPriority.NORMAL.value
+
+
 __all__ = [
     "TICKET_STATUS_ALIASES",
     "VALID_TICKET_CATEGORIES",
+    "VALID_TICKET_PRIORITIES",
     "VALID_TICKET_STATUSES",
     "TicketCategory",
+    "TicketPriority",
+    "TicketSlaState",
     "TicketStatus",
     "normalize_ticket_category",
+    "normalize_ticket_priority",
     "normalize_ticket_status",
 ]
