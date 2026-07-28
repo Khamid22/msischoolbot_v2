@@ -38,7 +38,7 @@ from backend.modules.domains.support_cases.tickets.domain_types import (
     normalize_ticket_status,
 )
 
-SCHOOL_TIME_ZONE_NAME = "Asia/Tashkent"
+SCHOOL_TIME_ZONE_NAME = SCHOOL_TIMEZONE.key
 
 _SLA_STATE_SQL = """
     CASE
@@ -240,12 +240,11 @@ class PostgresCustomerSupportDashboardRepository:
                       AND ticket.waiting_on_requester_at IS NOT NULL
                 ) AS waiting_on_requester_tickets,
                 (
-                    SELECT COUNT(DISTINCT payment.student_id)
-                    FROM msi_v2.payments payment
-                    JOIN scoped_students student ON student.id = payment.student_id
-                    WHERE payment.voided_at IS NULL
-                      AND payment.status NOT IN ('paid', 'voided')
-                      AND payment.due_date < %(school_today)s
+                    SELECT COUNT(DISTINCT invoice.student_id)
+                    FROM msi_v2.invoices invoice
+                    JOIN scoped_students student ON student.id = invoice.student_id
+                    WHERE invoice.status IN ('issued', 'partially_paid', 'overdue')
+                      AND invoice.due_date < %(school_today)s
                 ) AS overdue_payment_accounts,
                 (
                     SELECT COUNT(*)
@@ -507,23 +506,22 @@ class PostgresCustomerSupportDashboardRepository:
             """
             SELECT
                 CASE
-                    WHEN payment.due_date < %(school_today)s THEN 'overdue'
+                    WHEN invoice.due_date < %(school_today)s THEN 'overdue'
                     ELSE 'due_soon'
                 END AS exception_kind,
-                payment.currency,
-                SUM(payment.amount) AS amount,
-                COUNT(DISTINCT payment.student_id) AS account_count
-            FROM msi_v2.payments payment
-            JOIN msi_v2.students student ON student.id = payment.student_id
-            WHERE payment.voided_at IS NULL
-              AND payment.status NOT IN ('paid', 'voided')
-              AND payment.due_date <= %(school_today)s + INTERVAL '7 days'
+                invoice.currency,
+                SUM(invoice.total_minor - invoice.paid_minor)::numeric / 100 AS amount,
+                COUNT(DISTINCT invoice.student_id) AS account_count
+            FROM msi_v2.invoices invoice
+            JOIN msi_v2.students student ON student.id = invoice.student_id
+            WHERE invoice.status IN ('issued', 'partially_paid', 'overdue')
+              AND invoice.due_date <= %(school_today)s + INTERVAL '7 days'
               AND (
                 %(all_schools)s
                 OR student.school_id = ANY(%(school_ids)s::bigint[])
               )
-            GROUP BY exception_kind, payment.currency
-            ORDER BY exception_kind, payment.currency
+            GROUP BY exception_kind, invoice.currency
+            ORDER BY exception_kind, invoice.currency
             """,
             parameters,
         ).fetchall()
@@ -543,28 +541,29 @@ class PostgresCustomerSupportDashboardRepository:
         rows = conn.execute(
             """
             SELECT
-                payment.id AS payment_id,
+                invoice.id AS payment_id,
                 student.id AS student_id,
                 student.legacy_student_row_id AS student_row_id,
                 student.student_code,
                 student.full_name AS student_name,
                 school.id AS school_id,
                 school.school_name,
-                payment.due_date,
-                payment.amount,
-                payment.currency,
-                %(school_today)s - payment.due_date AS days_overdue
-            FROM msi_v2.payments payment
-            JOIN msi_v2.students student ON student.id = payment.student_id
+                invoice.due_date,
+                (invoice.total_minor - invoice.paid_minor)::numeric / 100 AS amount,
+                invoice.currency,
+                %(school_today)s - invoice.due_date AS days_overdue
+            FROM msi_v2.invoices invoice
+            JOIN msi_v2.students student ON student.id = invoice.student_id
             JOIN msi_v2.schools school ON school.id = student.school_id
-            WHERE payment.voided_at IS NULL
-              AND payment.status NOT IN ('paid', 'voided')
-              AND payment.due_date < %(school_today)s
+            WHERE invoice.status IN ('issued', 'partially_paid', 'overdue')
+              AND invoice.due_date < %(school_today)s
               AND (
                 %(all_schools)s
                 OR school.id = ANY(%(school_ids)s::bigint[])
               )
-            ORDER BY payment.due_date, payment.amount DESC, payment.id
+            ORDER BY invoice.due_date,
+                     (invoice.total_minor - invoice.paid_minor) DESC,
+                     invoice.id
             LIMIT %(ticket_limit)s
             """,
             parameters,

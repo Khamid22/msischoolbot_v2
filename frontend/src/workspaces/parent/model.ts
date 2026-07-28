@@ -60,6 +60,7 @@ export type ParentAnnouncement = {
 
 export type ParentPayment = {
   paymentId: number;
+  invoiceId: number | null;
   studentRowId: number;
   subject: string;
   month: string;
@@ -70,6 +71,17 @@ export type ParentPayment = {
   dueDate: string;
   paidAt: string;
   notes: string;
+  balance: number;
+  canPayOnline: boolean;
+};
+
+export type ParentInvoiceCheckout = {
+  checkoutUrl: string;
+  merchantId: string;
+  invoiceId: number;
+  amountMinor: number;
+  currency: string;
+  callbackUrl: string;
 };
 
 export type TicketMessage = {

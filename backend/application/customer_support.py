@@ -17,6 +17,9 @@ from backend.modules.people.customer_support.admissions.use_cases import (
 from backend.modules.people.customer_support.dashboard.queries import (
     GetCustomerSupportDashboard,
 )
+from backend.modules.people.customer_support.payments.use_cases import (
+    CustomerSupportPayments,
+)
 from backend.modules.people.customer_support.scope import CustomerSupportScopeResolver
 from backend.modules.people.customer_support.teachers.queries import (
     CustomerSupportTeacherQueries,
@@ -69,6 +72,15 @@ def build_customer_support_admissions(
     )
 
 
+def build_customer_support_payments(
+    container: AppContainer,
+) -> CustomerSupportPayments:
+    return CustomerSupportPayments(
+        unit_of_work_factory=container.unit_of_work_factory,
+        scope_resolver=CustomerSupportScopeResolver(container.unit_of_work_factory),
+    )
+
+
 def build_public_admissions(container: AppContainer) -> PublicAdmissions:
     return PublicAdmissions(
         unit_of_work_factory=container.unit_of_work_factory,
@@ -80,6 +92,7 @@ def build_public_admissions(container: AppContainer) -> PublicAdmissions:
 __all__ = [
     "build_customer_support_admissions",
     "build_customer_support_dashboard",
+    "build_customer_support_payments",
     "build_customer_support_teacher_queries",
     "build_customer_support_tickets",
     "build_public_admissions",

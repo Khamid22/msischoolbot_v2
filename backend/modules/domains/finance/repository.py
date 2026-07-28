@@ -41,8 +41,13 @@ def list_student_payment_rows(conn, student_row_id):
             LEFT JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
             LEFT JOIN msi_v2.subjects sub ON sub.id = sp.subject_id
             WHERE st.legacy_student_row_id = %s
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM msi_v2.invoices migrated_invoice
+                  WHERE migrated_invoice.legacy_payment_id = p.id
+              )
         ),
-        admission_invoices AS (
+        canonical_invoices AS (
             SELECT
                 %s + invoice.id AS id,
                 student.legacy_student_row_id AS student_row_id,
@@ -55,7 +60,12 @@ def list_student_payment_rows(conn, student_row_id):
                     'School services'
                 ) AS subject,
                 to_char(invoice.billing_period, 'YYYY-MM') AS month_label,
-                (invoice.total_minor::numeric / 100)::float AS amount,
+                (
+                    CASE
+                        WHEN invoice.status = 'paid' THEN invoice.total_minor
+                        ELSE invoice.total_minor - invoice.paid_minor
+                    END::numeric / 100
+                )::float AS amount,
                 invoice.currency,
                 invoice.status,
                 invoice.due_date::text AS due_date,
@@ -77,7 +87,7 @@ def list_student_payment_rows(conn, student_row_id):
         FROM (
             SELECT * FROM legacy_payments
             UNION ALL
-            SELECT * FROM admission_invoices
+            SELECT * FROM canonical_invoices
         ) payment_record
         ORDER BY COALESCE(NULLIF(payment_record.due_date, '')::date, DATE '9999-12-31'),
                  payment_record.id
@@ -232,20 +242,8 @@ def update_student_payment_paid_row(conn, payment_id, *, paid_at, status, update
     )
 
 
-def delete_student_payment_row(conn, payment_id):
-    deleted = conn.execute(
-        """
-        DELETE FROM msi_v2.payments
-        WHERE id = %s
-        """,
-        (int(payment_id),),
-    )
-    return int(deleted.rowcount or 0)
-
-
 __all__ = [
     "NEW_INVOICE_PAYMENT_ID_OFFSET",
-    "delete_student_payment_row",
     "get_student_payment_row",
     "get_internal_student_id",
     "get_internal_student_group_id",

@@ -8,10 +8,7 @@ from backend.modules.domains.admissions.job_handlers import (
 
 MODULE = ModuleSpec(
     name="admissions",
-    job_handlers=(
-        ACTIVATION_COMPLETED_HANDLER,
-        GENERATE_INVOICES_HANDLER,
-    ),
+    job_handlers=(ACTIVATION_COMPLETED_HANDLER, GENERATE_INVOICES_HANDLER),
 )
 
 __all__ = ["MODULE"]

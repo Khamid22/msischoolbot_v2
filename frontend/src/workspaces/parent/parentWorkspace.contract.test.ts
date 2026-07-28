@@ -42,6 +42,7 @@ describe("Parent workspace navigation", () => {
 describe("Parent workspace routes and screens", () => {
   const workspace = source("ParentWorkspace.tsx");
   const support = source("screens/SupportScreen.tsx");
+  const payments = source("screens/PaymentsScreen.tsx");
 
   it("renders each destination as an independent feature", () => {
     for (const screen of [
@@ -59,5 +60,12 @@ describe("Parent workspace routes and screens", () => {
     assert.match(support, /ticket\.status === "resolved"/);
     assert.match(support, /\/parent\/support/);
     assert.match(support, /disabled=\{reply\.isPending\}/);
+  });
+
+  it("offers Payme only for a payable linked-child invoice", () => {
+    assert.match(payments, /payment\.canPayOnline && payment\.invoiceId/);
+    assert.match(payments, /account\[invoice_id\]/);
+    assert.match(payments, /\/payments\/\$\{payment\.invoiceId\}\/checkout/);
+    assert.doesNotMatch(payments, /settings\.key|merchantKey/);
   });
 });

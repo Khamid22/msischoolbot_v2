@@ -3,31 +3,24 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, time as datetime_time, timedelta
 from urllib import error as urlerror
 from urllib import request
 
 from backend.core.jobs import JobExecutionContext, JobHandlerSpec
 from backend.core.runtime.config import get_app_settings
-from backend.core.time import SCHOOL_TIMEZONE, school_now
-from backend.core.unit_of_work import UnitOfWorkFactory, commit_unit_of_work
-from backend.modules.domains.admissions import contracts, repository
-from backend.modules.domains.admissions.domain_types import AdmissionJobTopic, InvoiceKind
+from backend.core.unit_of_work import UnitOfWorkFactory
+from backend.modules.domains.admissions import repository
+from backend.modules.domains.admissions.domain_types import AdmissionJobTopic
 from backend.modules.domains.admissions.events import (
     ActivationCompletedPayload,
     GenerateInvoicesPayload,
 )
-from backend.modules.jobs.contracts import enqueue_on_connection
-from backend.modules.jobs.schemas import EnqueueJobCommand
-
-
-def _next_school_midnight() -> datetime:
-    tomorrow = school_now().date() + timedelta(days=1)
-    return datetime.combine(
-        tomorrow,
-        datetime_time(hour=0, minute=5),
-        tzinfo=SCHOOL_TIMEZONE,
-    ).astimezone(UTC)
+from backend.modules.domains.finance.job_handlers import (
+    GenerateInvoicesPayload as FinanceGenerateInvoicesPayload,
+)
+from backend.modules.domains.finance.job_handlers import (
+    generate_recurring_invoices as generate_finance_invoices,
+)
 
 
 def _send_telegram_message(chat_id: int, text: str) -> None:
@@ -86,36 +79,12 @@ def generate_recurring_invoices(
     payload: GenerateInvoicesPayload,
     context: JobExecutionContext,
 ) -> None:
-    del context
-    run_date = payload.run_date or school_now().date()
-    unit_of_work_factory = UnitOfWorkFactory(job_enqueuer=enqueue_on_connection)
-    with unit_of_work_factory.transaction() as unit_of_work:
-        rows = repository.list_due_recurring_admission_rows(
-            unit_of_work.conn,
-            run_date,
-        )
-        for row in rows:
-            contracts.issue_invoice(
-                unit_of_work.conn,
-                int(row["id"]),
-                due_date=run_date,
-                billing_period=run_date.replace(day=1),
-                invoice_kind=InvoiceKind.MONTHLY,
-                actor=contracts.AdmissionActor(staff_id=None, account_id=None),
-            )
-        unit_of_work.enqueue(
-            EnqueueJobCommand(
-                topic=AdmissionJobTopic.GENERATE_INVOICES.value,
-                payload={},
-                idempotency_key=(
-                    "admissions-generate-invoices:"
-                    f"{(run_date + timedelta(days=1)).isoformat()}"
-                ),
-                available_at=_next_school_midnight(),
-                max_attempts=10,
-            )
-        )
-        commit_unit_of_work(unit_of_work)
+    """Compatibility entrypoint; recurring billing is now owned by Finance."""
+
+    generate_finance_invoices(
+        FinanceGenerateInvoicesPayload(run_date=payload.run_date),
+        context,
+    )
 
 
 ACTIVATION_COMPLETED_HANDLER = JobHandlerSpec(

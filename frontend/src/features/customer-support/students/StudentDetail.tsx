@@ -12,7 +12,7 @@ import {
   UserRound,
   UsersRound,
 } from "lucide-react";
-import type { PaymentRecord, StudentDetail as StudentDetailModel } from "@/features/customer-support/model";
+import type { StudentDetail as StudentDetailModel } from "@/features/customer-support/model";
 import { ActivityTimeline } from "@/features/customer-support/shared/ActivityTimeline";
 import { dangerButton, DetailSection, Field, formatDate, primaryButton, secondaryButton } from "@/features/customer-support/shared/ui";
 import { StudentPaymentsSection } from "@/features/customer-support/students/StudentPaymentsSection";
@@ -25,9 +25,7 @@ export function StudentDetail({
   onLifecycle,
   onInvite,
   onAddPayment,
-  onEditPayment,
-  onSettle,
-  onVoid,
+  onConfigureBilling,
 }: {
   detail: StudentDetailModel;
   onEdit: () => void;
@@ -35,9 +33,7 @@ export function StudentDetail({
   onLifecycle: (reactivate: boolean) => void;
   onInvite: () => void;
   onAddPayment: () => void;
-  onEditPayment: (payment: PaymentRecord) => void;
-  onSettle: (payment: PaymentRecord, paid: boolean) => void;
-  onVoid: (payment: PaymentRecord) => void;
+  onConfigureBilling: () => void;
 }) {
   const { profile } = detail;
   const archived = profile.status === "archived";
@@ -257,7 +253,11 @@ export function StudentDetail({
         )}
       </DetailSection>
 
-      <StudentPaymentsSection detail={detail} onAdd={onAddPayment} onEdit={onEditPayment} onSettle={onSettle} onVoid={onVoid} />
+      <StudentPaymentsSection
+        detail={detail}
+        onAdd={onAddPayment}
+        onConfigure={onConfigureBilling}
+      />
       <DetailSection title="Activity" icon={<ShieldCheck className="h-4 w-4" aria-hidden="true" />}>
         <ActivityTimeline items={detail.activity} />
       </DetailSection>

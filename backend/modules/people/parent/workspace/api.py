@@ -10,7 +10,11 @@ from backend.core.access import ActorContext, get_actor_context, require_role
 from backend.core.api import ApiSuccess, api_error, api_success
 from backend.core.api.pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from backend.modules.people.parent.commands import ParentCommands
-from backend.modules.people.parent.contracts import TicketLifecycleError, TicketNotFoundError
+from backend.modules.people.parent.contracts import (
+    ParentPaymentError,
+    TicketLifecycleError,
+    TicketNotFoundError,
+)
 from backend.modules.people.parent.policies import (
     ParentAccessError,
     ParentRecordNotFoundError,
@@ -20,6 +24,7 @@ from backend.modules.people.parent.schemas import (
     CreateParentTicketRequest,
     ParentChildrenResponse,
     ParentChildResponse,
+    ParentInvoiceCheckoutResponse,
     ParentOverviewResponse,
     ParentPaymentsResponse,
     ParentPreferenceResponse,
@@ -47,6 +52,8 @@ def get_parent_commands(request: Request) -> ParentCommands:
 
 
 def _error(exc: Exception):
+    if isinstance(exc, ParentPaymentError):
+        return api_error(str(exc), code=exc.code, status_code=exc.status_code)
     if isinstance(exc, TicketNotFoundError | ParentRecordNotFoundError):
         return api_error(str(exc), code="parent_record_not_found", status_code=404)
     if isinstance(exc, ParentAccessError | PermissionError):
@@ -131,6 +138,43 @@ def list_payments(
     try:
         return api_success(
             queries.list_payments(actor, student_row_id=student_row_id)
+        )
+    except Exception as exc:
+        return _error(exc)
+
+
+@router.get(
+    "/payments/{invoice_id}/checkout",
+    response_model=ApiSuccess[ParentInvoiceCheckoutResponse],
+    operation_id="api_v1_parent_invoice_checkout",
+)
+def get_invoice_checkout(
+    invoice_id: int,
+    request: Request,
+    actor: ActorContext = Depends(get_actor_context),
+    queries: ParentQueries = Depends(get_parent_queries),
+):
+    try:
+        amount_minor, currency = queries.get_invoice_checkout(
+            actor,
+            invoice_id=invoice_id,
+        )
+        settings = request.app.state.container.settings.payme
+        if not settings.is_configured:
+            raise ParentPaymentError(
+                "Payme checkout is not configured.",
+                status_code=503,
+            )
+        callback_base = settings.callback_base_url.rstrip("/")
+        return api_success(
+            ParentInvoiceCheckoutResponse(
+                checkout_url=settings.checkout_url,
+                merchant_id=settings.merchant_id,
+                invoice_id=invoice_id,
+                amount_minor=amount_minor,
+                currency=currency,
+                callback_url=f"{callback_base}/parent/payments",
+            )
         )
     except Exception as exc:
         return _error(exc)

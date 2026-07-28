@@ -15,16 +15,19 @@ def get_payable_invoice_row(
     *,
     for_update: bool = False,
 ) -> Any:
-    lock = " FOR UPDATE OF invoice, admission" if for_update else ""
+    lock = " FOR UPDATE OF invoice" if for_update else ""
     return conn.execute(
         f"""
         SELECT invoice.*, admission.status AS admission_status,
-               admission.school_id, admission.service_start_date,
+               COALESCE(admission.school_id, student.school_id) AS school_id,
+               admission.service_start_date,
+               student.status AS student_status,
                contract.status AS contract_status,
                COALESCE(group_state.selected_count, 0) AS selected_group_count,
                COALESCE(group_state.available_count, 0) AS available_group_count
         FROM msi_v2.invoices invoice
-        JOIN msi_v2.admissions admission ON admission.id = invoice.admission_id
+        LEFT JOIN msi_v2.admissions admission ON admission.id = invoice.admission_id
+        LEFT JOIN msi_v2.students student ON student.id = invoice.student_id
         LEFT JOIN LATERAL (
             SELECT current_contract.status
             FROM msi_v2.admission_contracts current_contract
@@ -247,6 +250,8 @@ def refund_invoice_payment(
         UPDATE msi_v2.invoices
         SET paid_minor = GREATEST(0, paid_minor - %s),
             status = CASE
+                WHEN GREATEST(0, paid_minor - %s) = 0
+                     AND due_date < CURRENT_DATE THEN 'overdue'
                 WHEN GREATEST(0, paid_minor - %s) = 0 THEN 'issued'
                 ELSE 'partially_paid'
             END,
@@ -256,6 +261,7 @@ def refund_invoice_payment(
         WHERE id = %s
         """,
         (
+            int(row["amount_minor"]),
             int(row["amount_minor"]),
             int(row["amount_minor"]),
             int(row["invoice_id"]),

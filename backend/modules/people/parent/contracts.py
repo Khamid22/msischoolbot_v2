@@ -2,6 +2,7 @@
 
 from backend.modules.domains.academics.contracts import list_resources
 from backend.modules.domains.communications.contracts import list_announcements
+from backend.modules.domains.finance.contracts import BillingError as ParentPaymentError
 from backend.modules.domains.identity.contracts import set_account_session, url_for
 from backend.modules.domains.parent_relationships.contracts import (
     claim_parent_invite_code,
@@ -19,6 +20,7 @@ from backend.modules.people.parent.module import PERSON_MODULE
 
 __all__ = [
     "PERSON_MODULE",
+    "ParentPaymentError",
     "build_parent_workspace_cards",
     "claim_parent_invite_code",
     "list_announcements",

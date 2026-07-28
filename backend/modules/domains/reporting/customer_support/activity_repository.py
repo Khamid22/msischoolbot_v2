@@ -52,27 +52,33 @@ def load_recent_activity(
             UNION ALL
 
             SELECT
-                'payment:' || payment.id::text AS activity_id,
+                'payment:' || invoice.id::text AS activity_id,
                 'payment' AS activity_type,
                 CASE
-                    WHEN payment.voided_at IS NOT NULL THEN 'payment.voided'
-                    WHEN payment.status = 'paid' THEN 'payment.paid'
+                    WHEN invoice.status = 'voided' THEN 'payment.voided'
+                    WHEN invoice.status = 'paid' THEN 'payment.paid'
                     ELSE 'payment.updated'
                 END AS event_type,
-                student.full_name || ' · ' || payment.amount::text
-                    || ' ' || payment.currency AS summary,
+                student.full_name || ' · ' ||
+                    (
+                        CASE
+                            WHEN invoice.status = 'paid' THEN invoice.total_minor
+                            ELSE invoice.total_minor - invoice.paid_minor
+                        END::numeric / 100
+                    )::text
+                    || ' ' || invoice.currency AS summary,
                 school.id AS school_id,
                 school.school_name,
-                payment.id AS entity_id,
-                payment.created_by_staff_id AS actor_staff_id,
+                invoice.id AS entity_id,
+                invoice.created_by_staff_id AS actor_staff_id,
                 COALESCE(staff.display_name, staff.login, '') AS actor_name,
-                payment.updated_at AS occurred_at
-            FROM msi_v2.payments payment
-            JOIN msi_v2.students student ON student.id = payment.student_id
+                invoice.updated_at AS occurred_at
+            FROM msi_v2.invoices invoice
+            JOIN msi_v2.students student ON student.id = invoice.student_id
             JOIN msi_v2.schools school ON school.id = student.school_id
-            LEFT JOIN msi_v2.msi_staff staff ON staff.id = payment.created_by_staff_id
-            WHERE payment.updated_at >= %(period_started_at)s
-              AND payment.updated_at <= %(period_ended_at)s
+            LEFT JOIN msi_v2.msi_staff staff ON staff.id = invoice.created_by_staff_id
+            WHERE invoice.updated_at >= %(period_started_at)s
+              AND invoice.updated_at <= %(period_ended_at)s
               AND (
                 %(all_schools)s
                 OR school.id = ANY(%(school_ids)s::bigint[])

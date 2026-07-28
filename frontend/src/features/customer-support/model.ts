@@ -164,13 +164,17 @@ export type AdmissionCreated = {
 export type AdmissionInvoiceQueueItem = {
   invoiceId: number;
   invoiceNumber: string;
-  admissionId: number;
+  admissionId: number | null;
+  studentId: number | null;
+  studentRowId: number | null;
   schoolId: number;
   schoolName: string;
-  studentFullName: string;
-  parentFullName: string;
-  parentPhone: string;
+  studentName: string;
+  studentCode: string;
+  parentName: string;
   invoiceKind: string;
+  origin: "admission" | "student_billing" | "legacy_migration" | string;
+  billingPeriod: string;
   currency: string;
   totalMinor: number;
   paidMinor: number;
@@ -185,6 +189,60 @@ export type AdmissionInvoiceQueueItem = {
 export type AdmissionInvoiceQueue = {
   items: AdmissionInvoiceQueueItem[];
   total: number;
+};
+
+export type InvoiceLine = {
+  lineId: number;
+  groupId: number | null;
+  subjectId: number | null;
+  description: string;
+  amountMinor: number;
+};
+
+export type InvoiceSettlement = {
+  paymentId: number;
+  source: "manual" | "payme";
+  method: string;
+  amountMinor: number;
+  currency: string;
+  status: string;
+  reference: string;
+  reason: string;
+  paidAt: string;
+  reversedAt: string | null;
+  reversalReason: string;
+};
+
+export type UnifiedInvoiceDetail = AdmissionInvoiceQueueItem & {
+  lines: InvoiceLine[];
+  payments: InvoiceSettlement[];
+  voidReason: string;
+};
+
+export type BillingProfileItem = {
+  itemId: number;
+  groupId: number;
+  groupName: string;
+  subjectId: number;
+  subjectName: string;
+  description: string;
+  amountMinor: number;
+  activeFrom: string;
+  activeUntil: string | null;
+};
+
+export type BillingProfile = {
+  profileId: number;
+  studentId: number;
+  schoolId: number;
+  billingParentId: number | null;
+  billingDay: number;
+  currency: string;
+  startsOn: string;
+  endsOn: string | null;
+  status: "active" | "paused" | "ended";
+  version: number;
+  items: BillingProfileItem[];
 };
 
 export type SupportSchool = {

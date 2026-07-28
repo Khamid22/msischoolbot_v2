@@ -3,13 +3,31 @@
 from __future__ import annotations
 
 import os
+from datetime import date, datetime, time
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
 
-from backend.core.access import CurrentUser, get_current_user, require_role
+from backend.application.container import AppContainer
+from backend.application.customer_support import build_customer_support_payments
+from backend.core.access import (
+    ActorContext,
+    CurrentUser,
+    get_actor_context,
+    get_current_user,
+    require_role,
+)
 from backend.core.api import ApiSuccess, api_error, api_success
+from backend.core.time import SCHOOL_TIMEZONE
 from backend.modules.people.customer_support import contracts as service
+from backend.modules.people.customer_support.payments.contracts import (
+    AddPaidStudentInvoiceCommand,
+    BillingError,
+    InvoiceKind,
+    IssueStudentInvoiceCommand,
+    ManualPaymentMethod,
+    major_to_minor,
+)
 from backend.modules.people.customer_support.schemas import (
     CreatePaymentRequest,
     CreateStudentRequest,
@@ -371,9 +389,60 @@ def get_payments(student_id: int, user: CurrentUser = Depends(get_current_user))
 def create_payment(
     student_id: int,
     payload: CreatePaymentRequest,
+    request: Request,
     user: CurrentUser = Depends(get_current_user),
+    actor: ActorContext = Depends(get_actor_context),
 ):
-    return _call(service.create_payment, _actor(user), student_id, _payload(payload))
+    if payload.currency.strip().upper() != "UZS":
+        return api_error(
+            "New invoices support UZS only.",
+            code="unsupported_invoice_currency",
+            status_code=400,
+        )
+    due_date = date.fromisoformat(payload.due_date) if payload.due_date else date.today()
+    description = payload.month_label.strip() or "School services"
+    container: AppContainer = request.app.state.container
+    payments = build_customer_support_payments(container)
+    try:
+        if payload.paid_at:
+            paid_date = date.fromisoformat(payload.paid_at)
+            paid_at = datetime.combine(paid_date, time(hour=12), tzinfo=SCHOOL_TIMEZONE)
+            payments.add_paid_invoice(
+                actor,
+                AddPaidStudentInvoiceCommand(
+                    student_id=student_id,
+                    subject_id=payload.subject_id,
+                    description=description,
+                    amount_minor=major_to_minor(payload.amount),
+                    due_date=due_date,
+                    billing_period=due_date.replace(day=1),
+                    invoice_kind=InvoiceKind.MANUAL,
+                    expected_student_version=payload.expected_version,
+                    method=ManualPaymentMethod.OTHER,
+                    paid_at=paid_at,
+                    reference="legacy-customer-support-api",
+                    reason=payload.notes.strip() or "Recorded through compatibility API.",
+                ),
+            )
+        else:
+            payments.issue_invoice(
+                actor,
+                IssueStudentInvoiceCommand(
+                    student_id=student_id,
+                    subject_id=payload.subject_id,
+                    description=description,
+                    amount_minor=major_to_minor(payload.amount),
+                    due_date=due_date,
+                    billing_period=due_date.replace(day=1),
+                    invoice_kind=InvoiceKind.MANUAL,
+                    expected_student_version=payload.expected_version,
+                ),
+            )
+    except (BillingError, PermissionError, ValueError) as exc:
+        code = exc.code if isinstance(exc, BillingError) else "invalid_payment_request"
+        status_code = exc.status_code if isinstance(exc, BillingError) else 400
+        return api_error(str(exc), code=code, status_code=status_code)
+    return _call(service.list_student_payments, _actor(user), student_id)
 
 
 @router.patch(

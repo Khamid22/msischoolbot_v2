@@ -62,7 +62,7 @@ export default function CustomerSupportWorkspace({
       ) : activeView === "students" ? (
         <StudentsPage key="students" {...pageProps} csrfToken={csrfToken} />
       ) : activeView === "payments" ? (
-        <PaymentsPage key="payments" />
+        <PaymentsPage key="payments" csrfToken={csrfToken} />
       ) : activeView === "admissions" ? (
         <AdmissionsPage key="admissions" {...pageProps} csrfToken={csrfToken} />
       ) : activeView === "teachers" ? (

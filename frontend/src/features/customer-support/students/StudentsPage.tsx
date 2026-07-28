@@ -1,20 +1,20 @@
-import { Banknote, Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import { useCallback, useState } from "react";
 import {
   sendSupport,
   type ParentInviteResult,
-  type PaymentPayload,
-  type PaymentRecord,
   type StudentDetail,
   type StudentMutationResult,
+  type UnifiedInvoiceDetail,
 } from "@/features/customer-support/api";
 import { CredentialsDialog } from "@/features/customer-support/shared/CredentialsDialog";
 import { ReasonDialog } from "@/features/customer-support/shared/ReasonDialog";
 import { SupportPageLayout } from "@/features/customer-support/shared/SupportPageLayout";
-import { money, primaryButton, secondaryButton } from "@/features/customer-support/shared/ui";
+import { primaryButton, secondaryButton } from "@/features/customer-support/shared/ui";
 import { useSupportMutation } from "@/features/customer-support/shared/useSupportMutation";
 import { useSupportRecords } from "@/features/customer-support/shared/useSupportRecords";
 import { CreateStudentDialog, type CreateStudentValues } from "@/features/customer-support/students/CreateStudentDialog";
+import { BillingProfileDialog } from "@/features/customer-support/students/BillingProfileDialog";
 import { EditStudentDialog, type EditStudentValues } from "@/features/customer-support/students/EditStudentDialog";
 import { PaymentDialog, type PaymentValues } from "@/features/customer-support/students/PaymentDialog";
 import { StudentDetail as StudentDetailView } from "@/features/customer-support/students/StudentDetail";
@@ -27,8 +27,9 @@ type StudentDialog =
   | { type: "credentials"; title: string; result: StudentMutationResult["credentials"] }
   | { type: "invite"; result: ParentInviteResult }
   | { type: "replaceInvite" }
-  | { type: "reason"; action: "archive" | "reactivate" | "void"; title: string; payment?: PaymentRecord }
-  | { type: "payment"; payment?: PaymentRecord }
+  | { type: "reason"; action: "archive" | "reactivate"; title: string }
+  | { type: "payment" }
+  | { type: "billing" }
   | null;
 
 export function StudentsPage({
@@ -44,13 +45,11 @@ export function StudentsPage({
 }) {
   const controller = useSupportRecords("student");
   const [dialog, setDialog] = useState<StudentDialog>(null);
-  const [settlementTarget, setSettlementTarget] = useState<{ payment: PaymentRecord; paid: boolean } | null>(null);
   const { toast, showToast, clearToast } = useFloatingToast();
   const reportMutationError = useCallback((error: Error) => {
     const supportError = controller.reportError(error);
     if (["version_conflict", "active_dependencies", "school_scope_denied", "record_not_found"].includes(supportError.code)) {
       setDialog(null);
-      setSettlementTarget(null);
     }
     showToast(supportError.message, "error");
   }, [controller, showToast]);
@@ -137,69 +136,34 @@ export function StudentsPage({
     );
   }
 
-  function savePayment(values: PaymentValues, existing?: PaymentRecord) {
+  function savePayment(values: PaymentValues) {
     if (!detail) return;
-    const path = existing ? `/payments/${existing.id}` : `/students/${detail.profile.id}/payments`;
-    const body = existing
-      ? {
-          expectedVersion: existing.version,
-          monthLabel: values.monthLabel,
-          amount: values.amount,
-          currency: values.currency,
-          dueDate: values.dueDate,
-          notes: values.notes,
-          reason: "Customer Support payment correction",
-        }
-      : {
-          expectedVersion: detail.profile.version,
-          subjectId: values.subjectId,
-          monthLabel: values.monthLabel,
-          amount: values.amount,
-          currency: values.currency,
-          dueDate: values.dueDate,
-          paidAt: values.paidAt,
-          notes: values.notes,
-        };
+    const isPaid = Boolean(values.paidAt);
+    const path = `/payments/students/${detail.profile.id}/${isPaid ? "paid-invoices" : "invoices"}`;
+    const body = {
+      expectedStudentVersion: detail.profile.version,
+      subjectId: values.subjectId,
+      description: values.monthLabel,
+      amount: values.amount,
+      dueDate: values.dueDate,
+      billingPeriod: `${values.dueDate.slice(0, 7)}-01`,
+      invoiceKind: "manual",
+      ...(isPaid
+        ? {
+            method: values.method,
+            paidAt: `${values.paidAt}T12:00:00+05:00`,
+            reference: values.reference,
+            reason: values.reason,
+          }
+        : {}),
+    };
     void runMutation(
-      () => sendSupport<PaymentPayload>(path, existing ? "PATCH" : "POST", body, csrfToken),
-      (payments) => {
-        controller.setDetail({ ...detail, payments });
+      () => sendSupport<UnifiedInvoiceDetail>(path, "POST", body, csrfToken),
+      () => {
+        controller.reloadDetail();
         setDialog(null);
       },
-      existing ? "Payment updated." : "Payment created.",
-    );
-  }
-
-  function voidPayment(payment: PaymentRecord, reason: string) {
-    if (!detail) return;
-    void runMutation(
-      () => sendSupport<PaymentPayload>(`/payments/${payment.id}/void`, "POST", {
-        expectedVersion: payment.version,
-        reason,
-      }, csrfToken),
-      (payments) => {
-        controller.setDetail({ ...detail, payments });
-        setDialog(null);
-      },
-      "Payment voided.",
-    );
-  }
-
-  function settlePayment() {
-    if (!detail || !settlementTarget) return;
-    const { payment, paid } = settlementTarget;
-    void runMutation(
-      () => sendSupport<PaymentPayload>(`/payments/${payment.id}/settlement`, "POST", {
-        expectedVersion: payment.version,
-        paid,
-        paidAt: paid ? new Date().toISOString().slice(0, 10) : "",
-        reason: paid ? "Payment confirmed by Customer Support" : "Settlement correction by Customer Support",
-      }, csrfToken),
-      (payments) => {
-        controller.setDetail({ ...detail, payments });
-        setSettlementTarget(null);
-      },
-      paid ? "Payment marked paid." : "Payment marked unpaid.",
+      isPaid ? "Paid invoice recorded." : "Invoice issued.",
     );
   }
 
@@ -234,9 +198,7 @@ export function StudentsPage({
               else createInvite();
             }}
             onAddPayment={() => setDialog({ type: "payment" })}
-            onEditPayment={(payment) => setDialog({ type: "payment", payment })}
-            onSettle={(payment, paid) => setSettlementTarget({ payment, paid })}
-            onVoid={(payment) => setDialog({ type: "reason", action: "void", title: "Void payment", payment })}
+            onConfigureBilling={() => setDialog({ type: "billing" })}
           />
         ) : null}
       />
@@ -303,11 +265,19 @@ export function StudentsPage({
       ) : null}
       {dialog?.type === "payment" && detail ? (
         <PaymentDialog
-          payment={dialog.payment}
           activeSubjects={activeSubjects}
           saving={saving}
           onClose={() => setDialog(null)}
-          onSubmit={(values) => savePayment(values, dialog.payment)}
+          onSubmit={savePayment}
+        />
+      ) : null}
+      {dialog?.type === "billing" && detail ? (
+        <BillingProfileDialog
+          studentId={detail.profile.id}
+          activeEnrollments={activeSubjects}
+          csrfToken={csrfToken}
+          onClose={() => setDialog(null)}
+          onSaved={controller.reloadDetail}
         />
       ) : null}
       {dialog?.type === "reason" ? (
@@ -316,35 +286,8 @@ export function StudentsPage({
           saving={saving}
           constructive={dialog.action === "reactivate"}
           onClose={() => setDialog(null)}
-          onSubmit={(reason) => dialog.action === "void" && dialog.payment
-            ? voidPayment(dialog.payment, reason)
-            : submitLifecycle(dialog.action as "archive" | "reactivate", reason)}
+          onSubmit={(reason) => submitLifecycle(dialog.action, reason)}
         />
-      ) : null}
-      {settlementTarget ? (
-        <Modal
-          title={settlementTarget.paid ? "Mark payment as paid?" : "Mark payment as unpaid?"}
-          subtitle="The settlement status and audit history will be updated."
-          onClose={() => setSettlementTarget(null)}
-          size="sm"
-          mobileMode="fullscreen"
-        >
-          <ModalBody>
-            <div className="rounded-lg border border-border bg-muted p-4">
-              <p className="font-black text-foreground">{settlementTarget.payment.subject || "Subject"} · {settlementTarget.payment.month_label || "Payment"}</p>
-              <p className="mt-1 text-sm font-semibold text-muted-foreground">{money(settlementTarget.payment.amount, settlementTarget.payment.currency)}</p>
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            <div className="flex justify-end gap-2">
-              <button type="button" className={secondaryButton} onClick={() => setSettlementTarget(null)}>Cancel</button>
-              <button type="button" disabled={saving} className={primaryButton} onClick={settlePayment}>
-                <Banknote className="h-4 w-4" aria-hidden="true" />
-                Confirm
-              </button>
-            </div>
-          </ModalFooter>
-        </Modal>
       ) : null}
 
       <FloatingToast toast={toast} onClose={clearToast} />

@@ -82,7 +82,15 @@
 /api/v1/customer-support/parents/{parent_id}/children/{student_id} | DELETE
 /api/v1/customer-support/parents/{parent_id}/deactivate | POST
 /api/v1/customer-support/parents/{parent_id}/reactivate | POST
+/api/v1/customer-support/payments/invoice-payments/{payment_id}/reversal | POST
 /api/v1/customer-support/payments/invoices | GET
+/api/v1/customer-support/payments/invoices/{invoice_id} | GET
+/api/v1/customer-support/payments/invoices/{invoice_id}/manual-payments | POST
+/api/v1/customer-support/payments/invoices/{invoice_id}/void | POST
+/api/v1/customer-support/payments/students/{student_id}/billing-profile | GET
+/api/v1/customer-support/payments/students/{student_id}/billing-profile | PUT
+/api/v1/customer-support/payments/students/{student_id}/invoices | POST
+/api/v1/customer-support/payments/students/{student_id}/paid-invoices | POST
 /api/v1/customer-support/payments/{payment_id} | PATCH
 /api/v1/customer-support/payments/{payment_id}/settlement | POST
 /api/v1/customer-support/payments/{payment_id}/void | POST
@@ -117,6 +125,7 @@
 /api/v1/parent/children/{student_row_id} | GET
 /api/v1/parent/overview | GET
 /api/v1/parent/payments | GET
+/api/v1/parent/payments/{invoice_id}/checkout | GET
 /api/v1/parent/preferences | GET
 /api/v1/parent/preferences | PATCH
 /api/v1/parent/tickets | GET

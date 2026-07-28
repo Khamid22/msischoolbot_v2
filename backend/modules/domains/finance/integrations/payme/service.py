@@ -151,13 +151,26 @@ class PaymeMerchant:
                 "Noto'g'ri summa.",
                 "amount",
             )
-        is_payable = (
-            str(row["status"]) in {"issued", "partially_paid", "overdue"}
-            and str(row["contract_status"]) == "accepted"
-            and str(row["admission_status"]) == "awaiting_payment"
-            and int(row["selected_group_count"]) > 0
-            and int(row["selected_group_count"]) == int(row["available_group_count"])
-        )
+        is_open_invoice = str(row["status"]) in {
+            "issued",
+            "partially_paid",
+            "overdue",
+        }
+        if row["admission_id"] is not None:
+            is_payable = (
+                is_open_invoice
+                and str(row["contract_status"]) == "accepted"
+                and str(row["admission_status"]) == "awaiting_payment"
+                and int(row["selected_group_count"]) > 0
+                and int(row["selected_group_count"])
+                == int(row["available_group_count"])
+            )
+        else:
+            is_payable = (
+                is_open_invoice
+                and row["student_id"] is not None
+                and str(row["student_status"]) == "active"
+            )
         if not is_payable:
             raise _rpc_error(
                 -31008,
@@ -346,11 +359,12 @@ class PaymeMerchant:
                     "state": 2,
                 },
             )
-            activate_paid_admission(
-                unit_of_work.conn,
-                int(invoice["admission_id"]),
-                actor=AdmissionActor(staff_id=None, account_id=None),
-            )
+            if invoice["admission_id"] is not None:
+                activate_paid_admission(
+                    unit_of_work.conn,
+                    int(invoice["admission_id"]),
+                    actor=AdmissionActor(staff_id=None, account_id=None),
+                )
             commit_unit_of_work(unit_of_work)
         return {
             "transaction": str(performed["id"]),
@@ -415,10 +429,11 @@ class PaymeMerchant:
                         invoice_id,
                         for_update=True,
                     )
-                    repository.set_admission_after_refund(
-                        unit_of_work.conn,
-                        admission_id=int(invoice["admission_id"]),
-                    )
+                    if invoice["admission_id"] is not None:
+                        repository.set_admission_after_refund(
+                            unit_of_work.conn,
+                            admission_id=int(invoice["admission_id"]),
+                        )
             commit_unit_of_work(unit_of_work)
         return {
             "transaction": str(cancelled["id"]),

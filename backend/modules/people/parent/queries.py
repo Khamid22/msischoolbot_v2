@@ -9,7 +9,11 @@ from backend.core.access.domain_types import Capability
 from backend.core.api.pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from backend.core.unit_of_work import UnitOfWorkFactory
 from backend.modules.domains.communications.contracts import list_parent_announcements
-from backend.modules.domains.finance.contracts import PaymentRecord, list_payment_records
+from backend.modules.domains.finance.contracts import (
+    PaymentRecord,
+    list_payment_records,
+    parent_invoice_checkout_data,
+)
 from backend.modules.domains.parent_relationships.contracts import (
     get_parent_preference,
     list_parent_client_children,
@@ -207,6 +211,20 @@ class ParentQueries:
             items=[ParentPaymentRecordResponse.from_record(record) for record in records],
             summary=summary,
         )
+
+    def get_invoice_checkout(
+        self,
+        actor: ActorContext,
+        *,
+        invoice_id: int,
+    ) -> tuple[int, str]:
+        parent_id = require_parent_capability(actor, Capability.VIEW_PAYMENTS)
+        with self._unit_of_work_factory.read() as unit_of_work:
+            return parent_invoice_checkout_data(
+                unit_of_work.conn,
+                parent_id=parent_id,
+                invoice_id=invoice_id,
+            )
 
     def list_tickets(
         self,

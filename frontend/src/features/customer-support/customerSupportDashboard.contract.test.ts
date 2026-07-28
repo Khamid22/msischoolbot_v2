@@ -101,6 +101,8 @@ describe("Customer Support admissions and payments", () => {
   const detail = source("./admissions/AdmissionDetailPanel.tsx");
   const wizard = source("./admissions/AdmissionWizard.tsx");
   const payments = source("./payments/PaymentsPage.tsx");
+  const billingProfile = source("./students/BillingProfileDialog.tsx");
+  const students = source("./students/StudentsPage.tsx");
   const publicAdmission = source("../../workspaces/public_admission/pages/Admission.tsx");
 
   it("registers focused admission and invoice-ledger workspaces", () => {
@@ -123,6 +125,15 @@ describe("Customer Support admissions and payments", () => {
     assert.match(detail, /Audit history/);
     assert.match(admissions, /\/paid-invoice/);
     assert.match(admissions, /\/manual-payment/);
+  });
+
+  it("uses the unified ledger for current students and recurring billing", () => {
+    assert.match(students, /paid-invoices/);
+    assert.match(students, /expectedStudentVersion/);
+    assert.doesNotMatch(students, /Mark unpaid/);
+    assert.match(billingProfile, /billing-profile/);
+    assert.match(billingProfile, /Monthly amount in UZS/);
+    assert.match(payments, /invoice-payments\/\$\{paymentId\}\/reversal/);
   });
 
   it("keeps Payme confirmation out of the browser callback", () => {

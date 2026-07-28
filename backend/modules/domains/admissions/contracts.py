@@ -50,6 +50,11 @@ from backend.modules.domains.admissions.schemas import (
     UpdateAdmissionCommand,
     VoidInvoiceCommand,
 )
+from backend.modules.domains.finance.contracts import (
+    BillingProfileItemCommand,
+    EnsureStudentBillingProfileCommand,
+    ensure_student_billing_profile,
+)
 from backend.modules.domains.parent_relationships.contracts import (
     EnsureAdmissionParentCommand,
     ensure_admission_parent,
@@ -776,6 +781,29 @@ def activate_paid_admission(
                 _value(admission_row, "parent_telegram_username", "")
             ),
             preferred_language=str(admission_row["preferred_language"]),
+        ),
+    )
+    ensure_student_billing_profile(
+        conn,
+        EnsureStudentBillingProfileCommand(
+            student_id=student.student_id,
+            school_id=int(admission_row["school_id"]),
+            billing_parent_id=parent.parent_id,
+            billing_day=int(admission_row["billing_day"]),
+            starts_on=(
+                admission_row["service_start_date"]
+                or admission_row["first_due_date"]
+            ),
+            items=tuple(
+                BillingProfileItemCommand(
+                    group_id=int(group["group_id"]),
+                    subject_id=int(group["subject_id"]),
+                    description=str(group["subject_name"]),
+                    amount_minor=int(group["monthly_amount_minor"]),
+                )
+                for group in group_rows
+            ),
+            staff_id=actor.staff_id,
         ),
     )
     repository.link_invoice_to_people(

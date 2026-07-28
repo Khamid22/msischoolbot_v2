@@ -1,20 +1,16 @@
-import { Check, CircleDollarSign, Edit3, Plus, RefreshCw, XCircle } from "lucide-react";
-import type { PaymentRecord, StudentDetail } from "@/features/customer-support/model";
-import { dangerButton, DetailSection, formatDate, money, secondaryButton } from "@/features/customer-support/shared/ui";
+import { CalendarClock, CircleDollarSign, ExternalLink, Plus } from "lucide-react";
+import type { StudentDetail } from "@/features/customer-support/model";
+import { DetailSection, formatDate, money, secondaryButton } from "@/features/customer-support/shared/ui";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 
 export function StudentPaymentsSection({
   detail,
   onAdd,
-  onEdit,
-  onSettle,
-  onVoid,
+  onConfigure,
 }: {
   detail: StudentDetail;
   onAdd: () => void;
-  onEdit: (payment: PaymentRecord) => void;
-  onSettle: (payment: PaymentRecord, paid: boolean) => void;
-  onVoid: (payment: PaymentRecord) => void;
+  onConfigure: () => void;
 }) {
   const { items, totals, currency } = detail.payments;
   return (
@@ -22,10 +18,16 @@ export function StudentPaymentsSection({
       title="Payments"
       icon={<CircleDollarSign className="h-4 w-4" aria-hidden="true" />}
       action={(
-        <button type="button" onClick={onAdd} className={secondaryButton}>
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Add payment
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={onConfigure} className={secondaryButton}>
+            <CalendarClock className="h-4 w-4" aria-hidden="true" />
+            Billing schedule
+          </button>
+          <button type="button" onClick={onAdd} className={secondaryButton}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add invoice
+          </button>
+        </div>
       )}
     >
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -53,22 +55,10 @@ export function StudentPaymentsSection({
                   <StatusBadge status={payment.state} className="text-[0.625rem]" />
                 </div>
                 {!voided ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" className={secondaryButton} onClick={() => onEdit(payment)}>
-                      <Edit3 className="h-4 w-4" aria-hidden="true" />
-                      Edit
-                    </button>
-                    <button type="button" className={secondaryButton} onClick={() => onSettle(payment, payment.state !== "paid")}>
-                      {payment.state === "paid"
-                        ? <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                        : <Check className="h-4 w-4" aria-hidden="true" />}
-                      {payment.state === "paid" ? "Mark unpaid" : "Mark paid"}
-                    </button>
-                    <button type="button" className={dangerButton} onClick={() => onVoid(payment)}>
-                      <XCircle className="h-4 w-4" aria-hidden="true" />
-                      Void
-                    </button>
-                  </div>
+                  <a href="/customer-support/payments" className={`${secondaryButton} mt-3 w-fit`}>
+                    Manage in Payments
+                    <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                  </a>
                 ) : null}
               </article>
             );

@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, Clock3, CreditCard, TriangleAlert } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { CheckCircle2, Clock3, CreditCard, Loader2, TriangleAlert, WalletCards } from "lucide-react";
 import { getParent } from "@/workspaces/parent/api";
 import {
   EmptyState,
@@ -12,6 +12,7 @@ import {
 import type {
   ParentChild,
   ParentLanguage,
+  ParentInvoiceCheckout,
   ParentPayment,
   PaymentsPayload,
 } from "@/workspaces/parent/model";
@@ -34,6 +35,8 @@ export function PaymentsScreen({
       `/payments${selectedStudentId ? `?studentId=${selectedStudentId}` : ""}`,
       signal,
     ),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
   if (query.isLoading) {
     return <LoadingState label={isRu ? "Загрузка платежей" : "To‘lovlar yuklanmoqda"} />;
@@ -129,6 +132,13 @@ function PaymentRow({
   language: ParentLanguage;
 }) {
   const isRu = language === "ru";
+  const checkout = useMutation({
+    mutationFn: () => {
+      if (!payment.invoiceId) throw new Error(isRu ? "Счёт не найден." : "Hisob topilmadi.");
+      return getParent<ParentInvoiceCheckout>(`/payments/${payment.invoiceId}/checkout`);
+    },
+    onSuccess: (data) => submitPaymeCheckout(data, language),
+  });
   return (
     <article className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:items-center">
       <div className="min-w-0 flex-1">
@@ -139,11 +149,62 @@ function PaymentRow({
             .join(" · ")}
         </p>
       </div>
-      <p className="shrink-0 text-base font-black tabular-nums text-foreground">
-        {formatMoney(payment.amount, payment.currency)}
-      </p>
+      <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+        <p className="text-base font-black tabular-nums text-foreground">
+          {formatMoney(payment.amount, payment.currency)}
+        </p>
+        {payment.canPayOnline && payment.invoiceId ? (
+          <button
+            type="button"
+            disabled={checkout.isPending}
+            onClick={() => checkout.mutate()}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-black text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none"
+          >
+            {checkout.isPending
+              ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+              : <WalletCards className="h-4 w-4" aria-hidden="true" />}
+            {isRu ? "Оплатить через Payme" : "Payme orqali to‘lash"}
+          </button>
+        ) : null}
+        {checkout.isError ? (
+          <p role="alert" className="max-w-xs text-xs font-bold text-destructive">
+            {checkout.error instanceof Error
+              ? checkout.error.message
+              : isRu ? "Не удалось открыть Payme." : "Payme ochilmadi."}
+          </p>
+        ) : null}
+      </div>
     </article>
   );
+}
+
+function submitPaymeCheckout(
+  checkout: ParentInvoiceCheckout,
+  language: ParentLanguage,
+) {
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = checkout.checkoutUrl;
+  form.style.display = "none";
+  const fields: Record<string, string> = {
+    merchant: checkout.merchantId,
+    amount: String(checkout.amountMinor),
+    "account[invoice_id]": String(checkout.invoiceId),
+    lang: language,
+    callback: checkout.callbackUrl,
+    callback_timeout: "1500",
+    description: `MSI School · invoice ${checkout.invoiceId}`,
+  };
+  Object.entries(fields).forEach(([name, value]) => {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value;
+    form.append(input);
+  });
+  document.body.append(form);
+  form.submit();
+  form.remove();
 }
 
 function paymentStateLabel(state: string, language: ParentLanguage) {

@@ -42,6 +42,7 @@ class ParentLessonResponse(ApiModel):
 
 class ParentPaymentRecordResponse(ApiModel):
     payment_id: int
+    invoice_id: int | None = None
     student_row_id: int
     subject: str
     month: str
@@ -52,6 +53,8 @@ class ParentPaymentRecordResponse(ApiModel):
     due_date: str
     paid_at: str
     notes: str
+    balance: float = 0
+    can_pay_online: bool = False
 
     @classmethod
     def from_record(cls, record: PaymentRecord) -> ParentPaymentRecordResponse:
@@ -104,6 +107,15 @@ class ParentPaymentsResponse(ApiModel):
     summary: ParentPaymentSummaryResponse = Field(
         default_factory=ParentPaymentSummaryResponse
     )
+
+
+class ParentInvoiceCheckoutResponse(ApiModel):
+    checkout_url: str
+    merchant_id: str
+    invoice_id: int
+    amount_minor: int
+    currency: str
+    callback_url: str
 
 
 class ParentTicketMessageResponse(ApiModel):

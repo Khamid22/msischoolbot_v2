@@ -1,10 +1,10 @@
 import math
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
+from typing import Any
 
 from backend.core.database import connect_auth_db
 from backend.modules.domains.finance import repository
 from backend.modules.domains.organization import canonical
-
 
 VALID_PAYMENT_STATUSES = {"paid", "due", "debt", "upcoming", "voided"}
 
@@ -14,7 +14,7 @@ def _connect():
 
 
 def _utc_now_iso():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _normalize_status(value):
@@ -137,7 +137,7 @@ def _payment_bucket(record):
 def summarize_payment_records(records, progress=None):
     progress = progress if isinstance(progress, dict) else {}
     currency = "UZS"
-    buckets = {
+    buckets: dict[str, list[dict[str, Any]]] = {
         "monthly_history": [],
         "debts": [],
         "due_payments": [],
@@ -344,29 +344,8 @@ def set_student_payment_paid(payment_id, paid=True, paid_at=None):
     }
 
 
-def delete_student_payment(payment_id):
-    payment_id = int(payment_id or 0)
-    if payment_id <= 0:
-        raise ValueError("Payment record is required.")
-
-    with _connect() as conn:
-        row = repository.get_student_payment_row(conn, payment_id)
-        if not row:
-            return None
-        student_id = int(row["student_row_id"])
-        removed = repository.delete_student_payment_row(conn, payment_id)
-        conn.commit()
-        rows = repository.list_student_payment_rows(conn, student_id) if removed else []
-
-    return {
-        "student_row_id": student_id,
-        "payments": [_payment_record_from_row(payment_row) for payment_row in rows],
-    }
-
-
 __all__ = [
     "create_student_payment",
-    "delete_student_payment",
     "set_student_payment_paid",
     "list_student_payments",
     "payment_summary_for_student",

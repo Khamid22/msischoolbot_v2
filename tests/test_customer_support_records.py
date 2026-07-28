@@ -420,7 +420,9 @@ def test_frontend_contract_is_split_search_first_and_strongly_typed():
     assert "excludeParentId: String(parentId)" in link_dialog
     assert "} while (cursor);" in link_dialog
     assert "excludedIds" not in link_dialog
-    assert "/payments/${payment.id}/void" in students
+    assert "/payments/students/${detail.profile.id}/" in students
+    assert "paid-invoices" in students
+    assert "Mark unpaid" not in students
     assert "Replace the pending invitation?" in students
     assert "Parent invitations" in student_detail
     assert "/customer-support/parents?recordId=" in student_detail

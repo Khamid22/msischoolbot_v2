@@ -8,12 +8,13 @@ import math
 import secrets
 import string
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
 
 from backend.core.database import connect_auth_db
-from backend.modules.domains.support_cases import (
-    customer_records_repository_contracts as repository,
+from backend.modules.domains.finance.contracts import (
+    find_migrated_invoice_id,
+    list_compatibility_payment_records,
 )
 from backend.modules.domains.identity.contracts import (
     ProvisionStudentAccountCommand,
@@ -23,7 +24,12 @@ from backend.modules.domains.identity.contracts import (
 from backend.modules.domains.organization import contracts as organization_contract
 from backend.modules.domains.parent_relationships.contracts import (
     CreateParentInviteCommand,
+)
+from backend.modules.domains.parent_relationships.contracts import (
     create_parent_invite as create_parent_invite_contract,
+)
+from backend.modules.domains.support_cases import (
+    customer_records_repository_contracts as repository,
 )
 
 
@@ -50,6 +56,11 @@ class ScopeError(CustomerSupportError):
 class VersionConflictError(CustomerSupportError):
     status_code = 409
     code = "version_conflict"
+
+
+class MigratedPaymentError(CustomerSupportError):
+    status_code = 409
+    code = "payment_uses_invoice_ledger"
 
 
 class DependencyConflictError(CustomerSupportError):
@@ -94,11 +105,11 @@ def _row_dict(row: Any) -> dict[str, Any]:
 
 
 def _json_value(value: Any) -> Any:
-    if isinstance(value, (datetime, date)):
+    if isinstance(value, datetime | date):
         return value.isoformat()
     if isinstance(value, dict):
         return {str(key): _json_value(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return [_json_value(item) for item in value]
     return value
 
@@ -215,8 +226,8 @@ def _decode_cursor(value: str) -> tuple[str, str, int]:
         if not name or kind not in {"student", "parent"} or record_id <= 0:
             raise ValueError("invalid cursor fields")
         return name, kind, record_id
-    except (ValueError, TypeError, json.JSONDecodeError):
-        raise CustomerSupportError("The records cursor is invalid.")
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        raise CustomerSupportError("The records cursor is invalid.") from exc
 
 
 def _temporary_password(length: int = 12) -> str:
@@ -368,6 +379,40 @@ def _payments_payload(rows: list[Any]):
     return {"items": payments, "totals": totals, "currency": currency}
 
 
+def _canonical_payment_rows(conn, student: Any) -> list[dict[str, Any]]:
+    legacy_student_row_id = int(student["legacy_student_row_id"] or 0)
+    if legacy_student_row_id <= 0:
+        return []
+    rows = list_compatibility_payment_records(
+        conn,
+        student_id=int(student["id"]),
+        student_row_id=legacy_student_row_id,
+    )
+    return [
+        {
+            "id": row.payment_id,
+            "student_id": row.student_id,
+            "group_id": None,
+            "subject_id": None,
+            "subject": row.subject,
+            "month_label": row.month_label,
+            "amount": row.amount,
+            "currency": row.currency,
+            "status": row.status,
+            "due_date": row.due_date,
+            "paid_at": row.paid_at,
+            "notes": row.notes,
+            "version": row.version,
+            "voided_at": row.voided_at,
+            "void_reason": row.void_reason,
+            "created_by_staff_id": row.created_by_staff_id,
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+        }
+        for row in rows
+    ]
+
+
 def _activity(rows: list[Any]):
     return [
         {
@@ -396,7 +441,7 @@ def _student_detail(conn, scope: SchoolScope, student_id: int):
         _public_row(row)
         for row in repository.list_student_parent_invite_rows(conn, student_id)
     ]
-    payments = _payments_payload(repository.list_payment_rows(conn, student_id=student_id))
+    payments = _payments_payload(_canonical_payment_rows(conn, student))
     activity = _activity(repository.list_audit_rows(
         conn, entity_types=["student", "student_account"], entity_id=student_id
     ))
@@ -827,8 +872,8 @@ def create_parent_invite(
 def list_student_payments(actor: SupportActor, student_id: int):
     with _connect() as conn:
         scope = load_scope(conn, actor)
-        _ensure_student_visible(conn, scope, student_id)
-        return _payments_payload(repository.list_payment_rows(conn, student_id=student_id))
+        student = _ensure_student_visible(conn, scope, student_id)
+        return _payments_payload(_canonical_payment_rows(conn, student))
 
 
 def _positive_amount(value: Any) -> float:
@@ -849,7 +894,7 @@ def _date_value(value: Any, label: str, *, timestamp: bool = False) -> str:
     if not parsed:
         raise CustomerSupportError(f"{label} is not a valid date.")
     if timestamp:
-        return datetime.combine(parsed, datetime.min.time(), tzinfo=timezone.utc).isoformat()
+        return datetime.combine(parsed, datetime.min.time(), tzinfo=UTC).isoformat()
     return parsed.isoformat()
 
 
@@ -913,6 +958,15 @@ def _payment_context(conn, actor: SupportActor, payment_id: int):
     payment = repository.get_payment_row(conn, payment_id)
     if not payment:
         raise NotFoundError("Payment was not found.")
+    migrated_invoice_id = find_migrated_invoice_id(
+        conn,
+        legacy_payment_id=payment_id,
+    )
+    if migrated_invoice_id is not None:
+        raise MigratedPaymentError(
+            "This payment is managed in the invoice ledger. "
+            "Use a reversal or invoice void instead."
+        )
     _ensure_student_visible(conn, scope, int(payment["student_id"]))
     return scope, payment
 
