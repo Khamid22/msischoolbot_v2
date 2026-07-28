@@ -100,7 +100,6 @@ export function TicketsPage({
     getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
   });
   const tickets = queue.data?.pages.flatMap((page) => page.items) || [];
-  const actorStaffId = queue.data?.pages[0]?.actorStaffId || null;
 
   useEffect(() => {
     const normalizedSearch = searchInput.trim();
@@ -256,7 +255,6 @@ export function TicketsPage({
           <TicketDetailPanel
             ticketId={selectedId}
             csrfToken={csrfToken}
-            currentStaffId={actorStaffId}
             onBack={() => setSelectedId(null)}
           />
         </section>

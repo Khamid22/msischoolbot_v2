@@ -56,6 +56,7 @@ describe("Customer Support operational dashboard", () => {
 describe("Customer Support ticket queue", () => {
   const page = source("./tickets/TicketsPage.tsx");
   const filters = source("./tickets/TicketQueueFilters.tsx");
+  const detail = source("./tickets/TicketDetailPanel.tsx");
 
   it("keeps only search and filter controls visible above the queue", () => {
     assert.match(filters, /role="search"/);
@@ -81,5 +82,15 @@ describe("Customer Support ticket queue", () => {
     assert.match(page, /params\.set\("q", search\)/);
     assert.match(page, /params\.set\("slaState", slaState\)/);
     assert.match(page, /params\.set\("assignedToMe", "true"\)/);
+  });
+
+  it("limits an open ticket to flag, escalate, and resolve actions", () => {
+    assert.match(detail, /aria-label="Flag ticket priority"/);
+    assert.match(detail, /label: "Escalate"/);
+    assert.match(detail, /label: "Resolve"/);
+    assert.doesNotMatch(detail, /label: "Start work"/);
+    assert.doesNotMatch(detail, /Assign to me|UserCheck|UserMinus/);
+    assert.doesNotMatch(detail, /Waiting on parent|Resume SLA/);
+    assert.doesNotMatch(detail, /\/assignment|\/waiting-state/);
   });
 });

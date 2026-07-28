@@ -6,10 +6,6 @@ import {
   Flag,
   Loader2,
   MessageSquareReply,
-  UserCheck,
-  UserMinus,
-  PauseCircle,
-  PlayCircle,
 } from "lucide-react";
 import { FormEvent } from "react";
 import {
@@ -33,7 +29,6 @@ const STATUS_ACTIONS: Array<{
   label: string;
   icon: typeof CheckCircle2;
 }> = [
-  { status: "in_progress", label: "Start work", icon: MessageSquareReply },
   { status: "escalated", label: "Escalate", icon: CornerUpRight },
   { status: "resolved", label: "Resolve", icon: CheckCircle2 },
 ];
@@ -41,12 +36,10 @@ const STATUS_ACTIONS: Array<{
 export function TicketDetailPanel({
   ticketId,
   csrfToken,
-  currentStaffId,
   onBack,
 }: {
   ticketId: number | null;
   csrfToken: string;
-  currentStaffId: number | null;
   onBack: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -88,29 +81,11 @@ export function TicketDetailPanel({
     ),
     onSuccess: refresh,
   });
-  const assignment = useMutation({
-    mutationFn: (assignedStaffId: number | null) => sendSupport(
-      `/tickets/${ticketId}/assignment`,
-      "PATCH",
-      { assignedStaffId },
-      csrfToken,
-    ),
-    onSuccess: refresh,
-  });
   const priority = useMutation({
     mutationFn: (nextPriority: SupportTicketPriority) => sendSupport(
       `/tickets/${ticketId}/priority`,
       "PATCH",
       { priority: nextPriority },
-      csrfToken,
-    ),
-    onSuccess: refresh,
-  });
-  const waiting = useMutation({
-    mutationFn: (isWaiting: boolean) => sendSupport(
-      `/tickets/${ticketId}/waiting-state`,
-      "PATCH",
-      { isWaiting },
       csrfToken,
     ),
     onSuccess: refresh,
@@ -144,7 +119,7 @@ export function TicketDetailPanel({
 
   const { ticket, messages } = query.data;
   const isResolved = ticket.status === "resolved";
-  const mutationError = reply.error || status.error || assignment.error || priority.error || waiting.error;
+  const mutationError = reply.error || status.error || priority.error;
 
   function submitReply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -185,72 +160,39 @@ export function TicketDetailPanel({
 
         {!isResolved ? (
           <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
-          {currentStaffId ? (
-            ticket.assignedStaffId === currentStaffId ? (
-              <button
-                type="button"
-                className={secondaryButton}
-                disabled={assignment.isPending}
-                onClick={() => assignment.mutate(null)}
+            <label className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-black text-foreground">
+              <Flag className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <span>Flag:</span>
+              <select
+                aria-label="Flag ticket priority"
+                value={ticket.priority}
+                disabled={priority.isPending}
+                onChange={(event) => priority.mutate(
+                  event.target.value as SupportTicketPriority,
+                )}
+                className="bg-transparent capitalize outline-none"
               >
-                <UserMinus className="h-4 w-4" />
-                Unassign
-              </button>
-            ) : (
-              <button
-                type="button"
-                className={secondaryButton}
-                disabled={assignment.isPending}
-                onClick={() => assignment.mutate(currentStaffId)}
-              >
-                <UserCheck className="h-4 w-4" />
-                Assign to me
-              </button>
-            )
-          ) : null}
-          <label className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-black text-foreground">
-            <Flag className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            <span className="sr-only">Ticket priority</span>
-            <select
-              value={ticket.priority}
-              disabled={priority.isPending}
-              onChange={(event) => priority.mutate(event.target.value as SupportTicketPriority)}
-              className="bg-transparent capitalize outline-none"
-            >
-              <option value="urgent">Urgent</option>
-              <option value="high">High</option>
-              <option value="normal">Normal</option>
-              <option value="low">Low</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            className={secondaryButton}
-            disabled={waiting.isPending}
-            onClick={() => waiting.mutate(!ticket.isWaitingOnRequester)}
-          >
-            {ticket.isWaitingOnRequester ? (
-              <PlayCircle className="h-4 w-4" aria-hidden="true" />
-            ) : (
-              <PauseCircle className="h-4 w-4" aria-hidden="true" />
-            )}
-            {ticket.isWaitingOnRequester ? "Resume SLA" : "Waiting on parent"}
-          </button>
-          {STATUS_ACTIONS.filter((action) => action.status !== ticket.status).map((action) => {
-            const Icon = action.icon;
-            return (
-              <button
-                key={action.status}
-                type="button"
-                className={action.status === "resolved" ? primaryButton : secondaryButton}
-                disabled={status.isPending}
-                onClick={() => status.mutate(action.status)}
-              >
-                <Icon className="h-4 w-4" />
-                {action.label}
-              </button>
-            );
-          })}
+                <option value="urgent">Urgent</option>
+                <option value="high">High</option>
+                <option value="normal">Normal</option>
+                <option value="low">Low</option>
+              </select>
+            </label>
+            {STATUS_ACTIONS.map((action) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.status}
+                  type="button"
+                  className={action.status === "resolved" ? primaryButton : secondaryButton}
+                  disabled={status.isPending || action.status === ticket.status}
+                  onClick={() => status.mutate(action.status)}
+                >
+                  <Icon className="h-4 w-4" />
+                  {action.label}
+                </button>
+              );
+            })}
           </div>
         ) : null}
 
