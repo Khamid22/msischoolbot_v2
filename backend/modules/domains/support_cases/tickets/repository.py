@@ -198,6 +198,7 @@ def list_support_ticket_rows(
         END
     """
     search_pattern = f"%{str(search_text or '').strip()}%"
+    cursor_timestamp = str(cursor_updated_at or "").strip() or None
     return conn.execute(
         f"""
         {_ticket_row_select()}
@@ -217,7 +218,7 @@ def list_support_ticket_rows(
                 OR st.student_code ILIKE %s
           )
           AND (
-                %s = ''
+                %s::timestamptz IS NULL
                 OR {status_rank} > %s
                 OR (
                     {status_rank} = %s
@@ -251,11 +252,11 @@ def list_support_ticket_rows(
             search_pattern,
             search_pattern,
             search_pattern,
-            str(cursor_updated_at or ""),
+            cursor_timestamp,
             int(cursor_status_rank),
             int(cursor_status_rank),
-            str(cursor_updated_at or ""),
-            str(cursor_updated_at or ""),
+            cursor_timestamp,
+            cursor_timestamp,
             int(cursor_id),
             int(limit),
         ),

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, Query, Request
 
 from backend.application.container import AppContainer
@@ -39,6 +41,7 @@ from backend.modules.people.customer_support.tickets.schemas import (
 from backend.modules.people.customer_support.tickets.use_cases import CustomerSupportTickets
 
 router = APIRouter(prefix="/tickets")
+LOGGER = logging.getLogger(__name__)
 
 
 def get_ticket_use_cases(request: Request) -> CustomerSupportTickets:
@@ -53,7 +56,14 @@ def _error(exc: Exception):
         return api_error(str(exc), code="ticket_scope_denied", status_code=403)
     if isinstance(exc, TicketLifecycleError):
         return api_error(str(exc), code="ticket_lifecycle_conflict", status_code=409)
-    return api_error(str(exc), code="invalid_ticket_request", status_code=400)
+    if isinstance(exc, ValueError):
+        return api_error(str(exc), code="invalid_ticket_request", status_code=400)
+    LOGGER.exception("Unexpected Customer Support ticket failure")
+    return api_error(
+        "Tickets could not be loaded. Please try again.",
+        code="ticket_service_error",
+        status_code=500,
+    )
 
 
 @router.get(

@@ -52,3 +52,34 @@ describe("Customer Support operational dashboard", () => {
     assert.ok(actionIndex > 0 && exceptionIndex > actionIndex && chartIndex > exceptionIndex);
   });
 });
+
+describe("Customer Support ticket queue", () => {
+  const page = source("./tickets/TicketsPage.tsx");
+  const filters = source("./tickets/TicketQueueFilters.tsx");
+
+  it("keeps only search and filter controls visible above the queue", () => {
+    assert.match(filters, /role="search"/);
+    assert.match(filters, /Search parent or ticket topic/);
+    assert.match(filters, /aria-expanded=\{isOpen\}/);
+    assert.match(filters, />Filter</);
+    assert.equal((page.match(/<select/g) || []).length, 0);
+    assert.doesNotMatch(page, /ShieldCheck/);
+  });
+
+  it("uses a compact dismissible filter popover with active-filter feedback", () => {
+    assert.match(filters, /useDismissibleLayer/);
+    assert.match(filters, /role="dialog"/);
+    assert.match(filters, /w-\[min\(22rem,calc\(100vw-2rem\)\)\]/);
+    assert.match(filters, /activeFilterCount/);
+    assert.match(filters, /Results update immediately/);
+    assert.match(filters, /Reset/);
+  });
+
+  it("searches while typing and preserves URL-backed queue filters", () => {
+    assert.match(page, /window\.setTimeout\(\(\) =>/);
+    assert.match(page, /}, 300\)/);
+    assert.match(page, /params\.set\("q", search\)/);
+    assert.match(page, /params\.set\("slaState", slaState\)/);
+    assert.match(page, /params\.set\("assignedToMe", "true"\)/);
+  });
+});

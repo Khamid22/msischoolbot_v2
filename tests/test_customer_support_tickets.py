@@ -14,6 +14,9 @@ from backend.modules.domains.support_cases.tickets.domain_types import (
     TicketCategory,
     TicketStatus,
 )
+from backend.modules.domains.support_cases.tickets.repository import (
+    list_support_ticket_rows,
+)
 from backend.modules.people.customer_support.tickets.commands import (
     TicketMutationResult,
 )
@@ -29,6 +32,22 @@ from backend.modules.people.customer_support.workspace.tickets_api import (
 )
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}
+
+
+class _EmptyRows:
+    def fetchall(self):
+        return []
+
+
+class _CapturingConnection:
+    def __init__(self):
+        self.query = ""
+        self.params = ()
+
+    def execute(self, query, params):
+        self.query = query
+        self.params = tuple(params)
+        return _EmptyRows()
 
 
 def _session(role: str) -> str:
@@ -112,10 +131,42 @@ class _TicketUseCases:
         )
 
 
+class _BrokenTicketUseCases:
+    def list_tickets(self, actor, query):
+        raise RuntimeError("database implementation detail")
+
+
 @pytest.mark.parametrize("cursor", ["not-base64", "W10", "WzAsIiIsMV0"])
 def test_ticket_cursor_rejects_invalid_or_incomplete_values(cursor):
     with pytest.raises(ValueError, match="cursor is invalid"):
         _decode_cursor(cursor)
+
+
+def test_first_ticket_page_uses_null_for_absent_timestamp_cursor():
+    connection = _CapturingConnection()
+
+    list_support_ticket_rows(
+        connection,
+        search_text="",
+        selected_school_id=None,
+        allowed_school_ids=(3,),
+        all_schools=False,
+        status="",
+        category="",
+        priority="",
+        sla_state="",
+        assigned_staff_id=None,
+        is_unassigned=False,
+        cursor_status_rank=-1,
+        cursor_updated_at="",
+        cursor_id=0,
+        limit=25,
+    )
+
+    assert "%s::timestamptz IS NULL" in connection.query
+    assert connection.params[20] is None
+    assert connection.params[23] is None
+    assert connection.params[24] is None
 
 
 def test_customer_support_ticket_queue_is_scoped_and_camel_case(app, client):
@@ -134,6 +185,20 @@ def test_customer_support_ticket_queue_is_scoped_and_camel_case(app, client):
         client.cookies.set("session", _session("parent"))
         denied = client.get("/api/v1/customer-support/tickets", headers=XHR)
         assert denied.status_code == 403
+    finally:
+        app.dependency_overrides.pop(get_ticket_use_cases, None)
+
+
+def test_customer_support_ticket_queue_hides_unexpected_database_errors(app, client):
+    app.dependency_overrides[get_ticket_use_cases] = lambda: _BrokenTicketUseCases()
+    try:
+        client.cookies.set("session", _session("customer_support"))
+        response = client.get("/api/v1/customer-support/tickets", headers=XHR)
+
+        assert response.status_code == 500
+        assert response.json()["code"] == "ticket_service_error"
+        assert response.json()["message"] == "Tickets could not be loaded. Please try again."
+        assert "database implementation detail" not in response.text
     finally:
         app.dependency_overrides.pop(get_ticket_use_cases, None)
 

@@ -4,11 +4,9 @@ import {
   Inbox,
   Loader2,
   Plus,
-  Search,
-  ShieldCheck,
   TicketCheck,
 } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getSupport,
   type SupportContext,
@@ -17,35 +15,25 @@ import {
   type SupportTicketSlaState,
   type SupportTicketStatus,
 } from "@/features/customer-support/api";
-import { inputClass } from "@/features/customer-support/shared/ui";
 import { TicketDetailPanel } from "@/features/customer-support/tickets/TicketDetailPanel";
+import {
+  TicketQueueFilters,
+  type TicketQueueFilterValues,
+} from "@/features/customer-support/tickets/TicketQueueFilters";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 
-const TICKET_STATUSES: Array<{ value: "" | SupportTicketStatus; label: string }> = [
-  { value: "", label: "All statuses" },
-  { value: "new", label: "New" },
-  { value: "in_progress", label: "In progress" },
-  { value: "escalated", label: "Escalated" },
-  { value: "resolved", label: "Resolved" },
-];
 const SUPPORT_TICKET_PAGE_SIZE = 25;
-const TICKET_CATEGORIES = [
-  "complaint",
-  "direct_contact",
-  "payment",
-  "teacher",
-  "lesson_quality",
-  "schedule",
-  "attendance",
-  "technical",
-  "account",
-  "other",
-] as const;
 
 function readTicketFilters() {
   const params = new URLSearchParams(window.location.search);
+  const assignment: TicketQueueFilterValues["assignment"] =
+    params.get("assignedToMe") === "true"
+      ? "mine"
+      : params.get("unassigned") === "true"
+        ? "unassigned"
+        : "";
   return {
     selectedId: Number(params.get("ticketId") || 0) || null,
     search: params.get("q") || "",
@@ -54,21 +42,15 @@ function readTicketFilters() {
     category: params.get("category") || "",
     priority: (params.get("priority") || "") as "" | SupportTicketPriority,
     slaState: (params.get("slaState") || "") as "" | SupportTicketSlaState,
-    assignment: params.get("assignedToMe") === "true"
-      ? "mine"
-      : params.get("unassigned") === "true"
-        ? "unassigned"
-        : "",
+    assignment,
   };
 }
 
 export function TicketsPage({
-  authLogin,
   title,
   description,
   csrfToken,
 }: {
-  authLogin: string;
   title: string;
   description: string;
   csrfToken: string;
@@ -121,6 +103,16 @@ export function TicketsPage({
   const actorStaffId = queue.data?.pages[0]?.actorStaffId || null;
 
   useEffect(() => {
+    const normalizedSearch = searchInput.trim();
+    if (normalizedSearch === search) return;
+    const timeout = window.setTimeout(() => {
+      setSearch(normalizedSearch);
+      setSelectedId(null);
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [search, searchInput]);
+
+  useEffect(() => {
     const params = new URLSearchParams();
     if (search) params.set("q", search);
     if (status) params.set("status", status);
@@ -138,150 +130,34 @@ export function TicketsPage({
     );
   }, [assignment, category, priority, schoolId, search, selectedId, slaState, status]);
 
-  function submitSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function applySearch() {
     setSearch(searchInput.trim());
+    setSelectedId(null);
+  }
+
+  function updateFilters(filters: TicketQueueFilterValues) {
+    setStatus(filters.status);
+    setSchoolId(filters.schoolId);
+    setCategory(filters.category);
+    setPriority(filters.priority);
+    setSlaState(filters.slaState);
+    setAssignment(filters.assignment);
     setSelectedId(null);
   }
 
   return (
     <div className="flex min-w-0 flex-col gap-4 overflow-x-hidden">
-      <PageHeader
-        title={title}
-        subtitle={description}
-        badge={(
-          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[0.6875rem] font-black uppercase tracking-wide text-primary">
-            Customer Support
-          </span>
-        )}
-        actions={authLogin ? (
-          <span className="inline-flex min-h-10 max-w-full items-center gap-2 rounded-lg border border-border bg-muted px-3 text-xs font-black text-muted-foreground">
-            <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
-            <span className="truncate">{authLogin}</span>
-          </span>
-        ) : undefined}
-      />
+      <PageHeader title={title} subtitle={description} />
 
-      <form
-        onSubmit={submitSearch}
-        className="grid gap-3 rounded-lg border border-border bg-card p-3 shadow-sm sm:grid-cols-2 xl:grid-cols-4"
-      >
-        <label className="relative min-w-0 sm:col-span-2 xl:col-span-2">
-          <span className="sr-only">Search tickets</span>
-          <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
-          <input
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            className={`${inputClass} pl-10`}
-            placeholder="Parent or topic"
-            maxLength={200}
-          />
-        </label>
-        <label>
-          <span className="sr-only">Ticket status</span>
-          <select
-            value={status}
-            onChange={(event) => {
-              setStatus(event.target.value as "" | SupportTicketStatus);
-              setSelectedId(null);
-            }}
-            className={inputClass}
-          >
-            {TICKET_STATUSES.map((option) => (
-              <option key={option.value || "all"} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span className="sr-only">School</span>
-          <select
-            value={schoolId}
-            onChange={(event) => {
-              setSchoolId(event.target.value);
-              setSelectedId(null);
-            }}
-            className={inputClass}
-            disabled={context.isLoading}
-          >
-            <option value="">All assigned schools</option>
-            {context.data?.schools.map((school) => (
-              <option key={school.id} value={school.id}>{school.school_name}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span className="sr-only">Ticket category</span>
-          <select
-            value={category}
-            onChange={(event) => {
-              setCategory(event.target.value);
-              setSelectedId(null);
-            }}
-            className={inputClass}
-          >
-            <option value="">All categories</option>
-            {TICKET_CATEGORIES.map((value) => (
-              <option key={value} value={value}>{value.split("_").join(" ")}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span className="sr-only">Priority</span>
-          <select
-            value={priority}
-            onChange={(event) => {
-              setPriority(event.target.value as "" | SupportTicketPriority);
-              setSelectedId(null);
-            }}
-            className={inputClass}
-          >
-            <option value="">All priorities</option>
-            <option value="urgent">Urgent</option>
-            <option value="high">High</option>
-            <option value="normal">Normal</option>
-            <option value="low">Low</option>
-          </select>
-        </label>
-        <label>
-          <span className="sr-only">SLA state</span>
-          <select
-            value={slaState}
-            onChange={(event) => {
-              setSlaState(event.target.value as "" | SupportTicketSlaState);
-              setSelectedId(null);
-            }}
-            className={inputClass}
-          >
-            <option value="">All SLA states</option>
-            <option value="breached">Breached</option>
-            <option value="due_soon">Due soon</option>
-            <option value="paused">Waiting on parent</option>
-            <option value="on_track">On track</option>
-          </select>
-        </label>
-        <label>
-          <span className="sr-only">Assignment</span>
-          <select
-            value={assignment}
-            onChange={(event) => {
-              setAssignment(event.target.value);
-              setSelectedId(null);
-            }}
-            className={inputClass}
-          >
-            <option value="">Any assignment</option>
-            <option value="mine">Assigned to me</option>
-            <option value="unassigned">Unassigned</option>
-          </select>
-        </label>
-        <button
-          type="submit"
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-black text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:col-span-2 xl:col-span-4"
-        >
-          <Search className="h-4 w-4" />
-          Search
-        </button>
-      </form>
+      <TicketQueueFilters
+        searchInput={searchInput}
+        filters={{ status, schoolId, category, priority, slaState, assignment }}
+        schools={context.data?.schools || []}
+        isSchoolLoading={context.isLoading}
+        onSearchInputChange={setSearchInput}
+        onSearch={applySearch}
+        onFiltersChange={updateFilters}
+      />
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(20rem,0.72fr)_minmax(0,1.55fr)]">
         <section

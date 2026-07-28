@@ -73,6 +73,8 @@ def test_parent_payment_and_ticket_queries_run_in_read_only_postgres():
             all_schools=True,
             status="",
             category="",
+            priority="",
+            sla_state="",
             assigned_staff_id=None,
             is_unassigned=False,
             cursor_status_rank=-1,
