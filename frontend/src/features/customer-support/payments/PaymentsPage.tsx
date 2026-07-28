@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, CreditCard, Loader2, ReceiptText, RotateCcw, Search, X } from "lucide-react";
+import { Ban, Clock3, CreditCard, Loader2, ReceiptText, RotateCcw, Search, X } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { getSupport, sendSupport } from "@/features/customer-support/api";
@@ -26,11 +26,18 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [origin, setOrigin] = useState("all");
+  const [enforcement, setEnforcement] = useState("all");
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<number | null>(null);
   const query = useQuery({
-    queryKey: ["customer-support", "payments", search, status, origin],
+    queryKey: ["customer-support", "payments", search, status, origin, enforcement],
     queryFn: ({ signal }) => {
-      const params = new URLSearchParams({ q: search, status, origin, limit: "100" });
+      const params = new URLSearchParams({
+        q: search,
+        status,
+        origin,
+        enforcement,
+        limit: "100",
+      });
       return getSupport<AdmissionInvoiceQueue>(`/payments/invoices?${params}`, signal);
     },
   });
@@ -114,7 +121,7 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
           </span>
         )}
       />
-      <div className="grid gap-3 rounded-xl border border-border bg-card p-3 shadow-sm lg:grid-cols-[1fr_12rem_13rem]">
+      <div className="grid gap-3 rounded-xl border border-border bg-card p-3 shadow-sm lg:grid-cols-[1fr_11rem_12rem_12rem]">
         <label className="relative">
           <span className="sr-only">Search invoices</span>
           <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
@@ -135,6 +142,18 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
           {["issued", "partially_paid", "overdue", "paid", "voided"].map((value) => (
             <option key={value} value={value}>{value.replace(/_/g, " ")}</option>
           ))}
+        </select>
+        <select
+          className={inputClass}
+          value={enforcement}
+          onChange={(event) => setEnforcement(event.target.value)}
+          aria-label="Billing access state"
+        >
+          <option value="all">All access states</option>
+          <option value="countdown">48-hour countdown</option>
+          <option value="held">Payment-only</option>
+          <option value="cleared">Access restored</option>
+          <option value="not_scheduled">Not scheduled</option>
         </select>
         <select
           className={inputClass}
@@ -234,6 +253,19 @@ function InvoiceList({
                 <span className="mt-1 inline-flex rounded-full bg-muted px-2 py-1 text-[0.625rem] font-black uppercase text-muted-foreground">
                   {invoice.status.replace(/_/g, " ")}
                 </span>
+                {invoice.enforcementState ? (
+                  <span className={`ml-1 mt-1 inline-flex rounded-full px-2 py-1 text-[0.625rem] font-black uppercase ${
+                    invoice.enforcementState === "held"
+                      ? "bg-destructive/10 text-destructive"
+                      : invoice.enforcementState === "countdown"
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-primary/10 text-primary"
+                  }`}>
+                    {invoice.enforcementState === "held"
+                      ? "payment only"
+                      : invoice.enforcementState.replace(/_/g, " ")}
+                  </span>
+                ) : null}
               </div>
             </button>
           ))}
@@ -320,6 +352,25 @@ function InvoiceDetailPanel({
             </div>
           ))}
         </dl>
+        {invoice.enforcementState && invoice.paymentDeadlineAt ? (
+          <div className={`flex items-start gap-3 rounded-lg border p-3 ${
+            invoice.enforcementState === "held"
+              ? "border-destructive/30 bg-destructive/5"
+              : "border-amber-300 bg-amber-50"
+          }`}>
+            <Clock3 className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+            <div>
+              <p className="text-sm font-black">
+                {invoice.enforcementState === "held"
+                  ? "Household is in payment-only mode"
+                  : "48-hour payment countdown"}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Deadline {formatDate(invoice.paymentDeadlineAt, true)}
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         {mutationError ? (
           <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm font-bold text-destructive">

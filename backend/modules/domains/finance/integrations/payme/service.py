@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from time import time
 from typing import Any
 
+from backend.core.clock import SystemClock
 from backend.core.runtime.config import PaymeSettings
 from backend.core.unit_of_work import UnitOfWorkFactory, commit_unit_of_work
 from backend.modules.domains.admissions.contracts import (
@@ -14,6 +15,7 @@ from backend.modules.domains.admissions.contracts import (
     activate_paid_admission,
 )
 from backend.modules.domains.finance.integrations.payme import repository
+from backend.modules.domains.finance.enforcement import reconcile_invoice_enforcement
 
 PAYME_ACCOUNT_FIELD = "invoice_id"
 PAYME_TIMEOUT_REASON = 4
@@ -344,6 +346,11 @@ class PaymeMerchant:
                 invoice_id=int(row["invoice_id"]),
                 amount_minor=int(row["amount_minor"]),
             )
+            reconcile_invoice_enforcement(
+                unit_of_work.conn,
+                invoice_id=int(row["invoice_id"]),
+                now=SystemClock().now(),
+            )
             performed = repository.perform_transaction(
                 unit_of_work.conn,
                 provider_transaction_id=provider_transaction_id,
@@ -424,6 +431,11 @@ class PaymeMerchant:
                     reason=reason,
                 )
                 if invoice_id:
+                    reconcile_invoice_enforcement(
+                        unit_of_work.conn,
+                        invoice_id=invoice_id,
+                        now=SystemClock().now(),
+                    )
                     invoice = repository.get_payable_invoice_row(
                         unit_of_work.conn,
                         invoice_id,

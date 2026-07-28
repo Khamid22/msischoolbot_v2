@@ -8,6 +8,9 @@ from pydantic import Field, field_validator
 
 from backend.core.api import ApiModel
 from backend.modules.domains.finance.domain_types import (
+    BillingAccessMode,
+    BillingEnforcementState,
+    BillingHoldTarget,
     BillingProfileStatus,
     InvoiceKind,
     InvoiceOrigin,
@@ -66,6 +69,9 @@ class InvoiceSummary(BillingModel):
     due_date: date
     issued_at: datetime | None = None
     paid_at: datetime | None = None
+    enforcement_state: BillingEnforcementState | None = None
+    countdown_started_at: datetime | None = None
+    payment_deadline_at: datetime | None = None
     version: int
 
 
@@ -172,9 +178,45 @@ class BillingProfileResult(BillingModel):
     items: list[BillingProfileItemResult] = Field(default_factory=list)
 
 
+class BillingAccessInvoice(BillingModel):
+    invoice_id: int
+    invoice_number: str
+    student_id: int
+    student_row_id: int | None = None
+    student_name: str
+    student_code: str
+    total_minor: int
+    paid_minor: int
+    balance_minor: int
+    currency: str
+    deadline_at: datetime
+    target_type: BillingHoldTarget | None = None
+    can_view_invoice: bool
+    can_pay_online: bool
+
+
+class BillingAccessStudent(BillingModel):
+    student_id: int
+    student_name: str
+    student_code: str
+    target_type: BillingHoldTarget
+
+
+class BillingAccessStatus(BillingModel):
+    mode: BillingAccessMode = BillingAccessMode.NORMAL
+    countdown_deadline_at: datetime | None = None
+    remaining_seconds: int = Field(default=0, ge=0)
+    blocking_invoice_count: int = Field(default=0, ge=0)
+    invoices: list[BillingAccessInvoice] = Field(default_factory=list)
+    affected_students: list[BillingAccessStudent] = Field(default_factory=list)
+
+
 __all__ = [
     "AddPaidStudentInvoiceCommand",
     "BillingItemInput",
+    "BillingAccessInvoice",
+    "BillingAccessStatus",
+    "BillingAccessStudent",
     "BillingProfileItemResult",
     "BillingProfileResult",
     "ConfigureBillingProfileCommand",

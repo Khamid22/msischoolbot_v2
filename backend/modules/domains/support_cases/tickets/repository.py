@@ -1,78 +1,6 @@
 import json
 
-
-def _ticket_row_select():
-    return """
-        SELECT
-            t.id,
-            t.parent_id AS parent_admin_id,
-            COALESCE(st.id, 0) AS student_id,
-            COALESCE(st.legacy_student_row_id, 0) AS student_row_id,
-            COALESCE(sch.id, 0) AS school_id,
-            t.category,
-            t.topic,
-            COALESCE(opening.body, '') AS message,
-            t.status,
-            t.priority,
-            t.first_response_target_minutes,
-            t.resolution_target_minutes,
-            to_char(
-                t.first_response_due_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
-            ) AS first_response_due_at,
-            to_char(
-                t.resolution_due_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
-            ) AS resolution_due_at,
-            to_char(
-                t.first_responded_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
-            ) AS first_responded_at,
-            to_char(
-                t.waiting_on_requester_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
-            ) AS waiting_on_requester_at,
-            t.requester_wait_seconds,
-            COALESCE(latest_staff.body, '') AS reply,
-            to_char(t.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
-            to_char(t.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at,
-            to_char(
-                t.updated_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
-            ) AS cursor_updated_at,
-            COALESCE(to_char(t.resolved_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '') AS resolved_at,
-            t.assigned_to_staff_id,
-            COALESCE(assigned.login, assigned.display_name, '') AS assigned_to,
-            COALESCE(p.display_name, '') AS parent_login,
-            COALESCE(p.display_name, '') AS parent_display_name,
-            COALESCE(p.phone, '') AS parent_phone,
-            '' AS parent_email,
-            COALESCE(p.telegram_username, '') AS parent_telegram_username,
-            COALESCE(st.full_name, '') AS student_name,
-            COALESCE(st.student_code, '') AS student_code,
-            COALESCE(sch.school_name, '') AS school_name
-        FROM msi_v2.support_tickets t
-        LEFT JOIN msi_v2.parents p ON p.id = t.parent_id
-        LEFT JOIN msi_v2.students st ON st.id = t.student_id
-        LEFT JOIN msi_v2.schools sch ON sch.id = st.school_id
-        LEFT JOIN msi_v2.msi_staff assigned ON assigned.id = t.assigned_to_staff_id
-        LEFT JOIN LATERAL (
-            SELECT body
-            FROM msi_v2.ticket_messages msg
-            WHERE msg.ticket_id = t.id
-              AND msg.author_type = 'parent'
-            ORDER BY msg.created_at ASC, msg.id ASC
-            LIMIT 1
-        ) opening ON true
-        LEFT JOIN LATERAL (
-            SELECT body
-            FROM msi_v2.ticket_messages msg
-            WHERE msg.ticket_id = t.id
-              AND msg.author_type <> 'parent'
-            ORDER BY msg.created_at DESC, msg.id DESC
-            LIMIT 1
-        ) latest_staff ON true
-    """
+from backend.modules.domains.support_cases.tickets.read_sql import ticket_row_select
 
 
 def list_parent_complaint_rows(conn, parent_admin_id=0):
@@ -84,7 +12,7 @@ def list_parent_complaint_rows(conn, parent_admin_id=0):
     where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
     return conn.execute(
         f"""
-        {_ticket_row_select()}
+        {ticket_row_select()}
         {where_clause}
         ORDER BY
             CASE t.status
@@ -104,7 +32,7 @@ def list_parent_complaint_rows(conn, parent_admin_id=0):
 def get_parent_complaint_row(conn, complaint_id):
     return conn.execute(
         f"""
-        {_ticket_row_select()}
+        {ticket_row_select()}
         WHERE t.id = %s
         """,
         (int(complaint_id),),
@@ -121,7 +49,7 @@ def get_parent_ticket_row(
     lock_clause = " FOR UPDATE OF t" if for_update else ""
     return conn.execute(
         f"""
-        {_ticket_row_select()}
+        {ticket_row_select()}
         WHERE t.id = %s
           AND t.parent_id = %s
         {lock_clause}
@@ -134,7 +62,7 @@ def get_ticket_row(conn, *, ticket_id, for_update=False):
     lock_clause = " FOR UPDATE OF t" if for_update else ""
     return conn.execute(
         f"""
-        {_ticket_row_select()}
+        {ticket_row_select()}
         WHERE t.id = %s
         {lock_clause}
         """,
@@ -201,7 +129,7 @@ def list_support_ticket_rows(
     cursor_timestamp = str(cursor_updated_at or "").strip() or None
     return conn.execute(
         f"""
-        {_ticket_row_select()}
+        {ticket_row_select()}
         WHERE (%s OR sch.id = ANY(%s::bigint[]))
           AND (%s::bigint IS NULL OR sch.id = %s)
           AND (%s = '' OR t.status = %s)
@@ -284,6 +212,7 @@ def insert_parent_complaint_row(
     status,
     created_at,
     updated_at,
+    requester_account_id=None,
 ):
     student_id = _resolve_student_v2_id(conn, student_row_id)
     inserted = conn.execute(
@@ -310,6 +239,7 @@ def insert_parent_complaint_row(
         )
         INSERT INTO msi_v2.support_tickets (
             parent_id,
+            requester_account_id,
             student_id,
             category,
             topic,
@@ -323,6 +253,7 @@ def insert_parent_complaint_row(
             updated_at
         )
         SELECT
+            %s,
             %s,
             %s,
             %s,
@@ -344,6 +275,7 @@ def insert_parent_complaint_row(
         (
             student_id,
             int(parent_admin_id),
+            int(requester_account_id) if requester_account_id else None,
             student_id,
             str(category or "other").strip(),
             str(topic or "").strip(),
@@ -362,6 +294,7 @@ def insert_parent_complaint_row(
             author_login="",
             body=message,
             created_at=created_at,
+            author_account_id=requester_account_id,
         )
     return inserted
 
@@ -430,12 +363,21 @@ def list_complaint_message_rows(conn, complaint_id):
             msg.id,
             ticket_id AS complaint_id,
             author_type AS author_role,
-            COALESCE(staff.login, parent.display_name, '') AS author_login,
+            COALESCE(
+                staff.login,
+                parent.display_name,
+                account_student.full_name,
+                ''
+            ) AS author_login,
             body,
             to_char(msg.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
         FROM msi_v2.ticket_messages msg
         LEFT JOIN msi_v2.msi_staff staff ON staff.id = msg.author_staff_id
         LEFT JOIN msi_v2.parents parent ON parent.id = msg.author_parent_id
+        LEFT JOIN msi_v2.student_profiles account_profile
+          ON account_profile.account_id = msg.author_account_id
+        LEFT JOIN msi_v2.students account_student
+          ON account_student.id = account_profile.student_id
         WHERE msg.ticket_id = %s
         ORDER BY msg.created_at ASC, msg.id ASC
         """,
@@ -451,6 +393,7 @@ def insert_complaint_message_row(
     author_login,
     body,
     created_at,
+    author_account_id=None,
 ):
     author_type = _author_type(author_role)
     return conn.execute(
@@ -460,6 +403,7 @@ def insert_complaint_message_row(
             author_type,
             author_staff_id,
             author_parent_id,
+            author_account_id,
             body,
             created_at
         )
@@ -481,6 +425,7 @@ def insert_complaint_message_row(
                 LIMIT 1
             ) ELSE NULL END,
             %s,
+            %s,
             %s::timestamptz
         RETURNING id
         """,
@@ -492,6 +437,7 @@ def insert_complaint_message_row(
             str(author_login or "").strip(),
             author_type,
             int(complaint_id),
+            int(author_account_id) if author_account_id else None,
             str(body or "").strip(),
             str(created_at or "").strip(),
         ),

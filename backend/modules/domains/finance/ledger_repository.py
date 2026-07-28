@@ -19,12 +19,16 @@ def list_scoped_invoice_rows(
     query: str,
     status: str,
     origin: str,
-    limit: int,
+    enforcement: str = "all",
+    limit: int = 50,
 ) -> list[Any]:
     search = f"%{query.strip()}%"
     return conn.execute(
         """
         SELECT invoice.*,
+               enforcement.state AS enforcement_state,
+               enforcement.countdown_started_at,
+               enforcement.deadline_at AS payment_deadline_at,
                student.legacy_student_row_id,
                COALESCE(student.full_name, admission.student_full_name, '') AS student_name,
                COALESCE(student.student_code, '') AS student_code,
@@ -36,11 +40,18 @@ def list_scoped_invoice_rows(
         LEFT JOIN msi_v2.admissions admission ON admission.id = invoice.admission_id
         LEFT JOIN msi_v2.students student ON student.id = invoice.student_id
         LEFT JOIN msi_v2.parents parent ON parent.id = invoice.parent_id
+        LEFT JOIN msi_v2.invoice_enforcement_schedules enforcement
+          ON enforcement.invoice_id = invoice.id
         JOIN msi_v2.schools school
           ON school.id = COALESCE(student.school_id, admission.school_id)
         WHERE (%s OR school.id = ANY(%s::bigint[]))
           AND (%s = 'all' OR invoice.status = %s)
           AND (%s = 'all' OR invoice.origin = %s)
+          AND (
+              %s = 'all'
+              OR (%s = 'not_scheduled' AND enforcement.id IS NULL)
+              OR enforcement.state = %s
+          )
           AND (
               %s = ''
               OR invoice.invoice_number ILIKE %s
@@ -67,6 +78,9 @@ def list_scoped_invoice_rows(
             status,
             origin,
             origin,
+            enforcement,
+            enforcement,
+            enforcement,
             query.strip(),
             search,
             search,
@@ -87,6 +101,9 @@ def get_invoice_row(
     return conn.execute(
         f"""
         SELECT invoice.*,
+               enforcement.state AS enforcement_state,
+               enforcement.countdown_started_at,
+               enforcement.deadline_at AS payment_deadline_at,
                student.legacy_student_row_id,
                COALESCE(student.full_name, admission.student_full_name, '') AS student_name,
                COALESCE(student.student_code, '') AS student_code,
@@ -97,6 +114,8 @@ def get_invoice_row(
         LEFT JOIN msi_v2.admissions admission ON admission.id = invoice.admission_id
         LEFT JOIN msi_v2.students student ON student.id = invoice.student_id
         LEFT JOIN msi_v2.parents parent ON parent.id = invoice.parent_id
+        LEFT JOIN msi_v2.invoice_enforcement_schedules enforcement
+          ON enforcement.invoice_id = invoice.id
         JOIN msi_v2.schools school
           ON school.id = COALESCE(student.school_id, admission.school_id)
         WHERE invoice.id = %s

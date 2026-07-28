@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Request
 
 from backend.core.web.request_context import session
 from backend.core.web.rendering import generate_csrf
+from backend.core.web.responses import redirect
 
 from backend.core.web.rendering import render_react_page
 
@@ -76,6 +77,34 @@ def register_student_page_routes(app):
             record_student_activity(student_db_id)
 
     students = APIRouter(dependencies=[Depends(track_student_activity)])
+
+    def render_student_account_page(page: str, *, title: str):
+        if current_auth_role() != "student":
+            return redirect(url_for("student.home"))
+        return render_react_page(
+            page,
+            {
+                "authLogin": current_auth_login(),
+                "csrfToken": generate_csrf(),
+                "logoutUrl": url_for("student.logout"),
+            },
+            title=title,
+            description="MSI School student account.",
+        )
+
+    @students.get("/student/payments")
+    def student_payments():
+        return render_student_account_page(
+            "student-payments",
+            title="Payments · MSI School",
+        )
+
+    @students.get("/student/support")
+    def student_support():
+        return render_student_account_page(
+            "student-support",
+            title="Support · MSI School",
+        )
 
     register_student_routes(students, render_student_panel=render_student_panel)
     register_dashboard_routes(students)

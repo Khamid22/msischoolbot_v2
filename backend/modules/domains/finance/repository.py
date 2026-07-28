@@ -100,6 +100,20 @@ def list_student_payment_rows(conn, student_row_id):
     ).fetchall()
 
 
+def list_canonical_student_payment_rows(conn, student_id):
+    row = conn.execute(
+        """
+        SELECT legacy_student_row_id
+        FROM msi_v2.students
+        WHERE id = %s
+        """,
+        (int(student_id),),
+    ).fetchone()
+    if not row or row["legacy_student_row_id"] is None:
+        return []
+    return list_student_payment_rows(conn, int(row["legacy_student_row_id"]))
+
+
 def get_student_payment_row(conn, payment_id):
     return conn.execute(
         f"""
@@ -248,6 +262,7 @@ __all__ = [
     "get_internal_student_id",
     "get_internal_student_group_id",
     "insert_student_payment_row",
+    "list_canonical_student_payment_rows",
     "list_student_payment_rows",
     "update_student_payment_paid_row",
 ]

@@ -183,6 +183,9 @@ export type AdmissionInvoiceQueueItem = {
   dueDate: string;
   issuedAt: string | null;
   paidAt: string | null;
+  enforcementState: "scheduled" | "countdown" | "held" | "cleared" | "cancelled" | null;
+  countdownStartedAt: string | null;
+  paymentDeadlineAt: string | null;
   version: number;
 };
 

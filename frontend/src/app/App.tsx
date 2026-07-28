@@ -13,6 +13,8 @@ const pageMap = {
   "student-rating": lazy(() => import("@/workspaces/student/pages/Rating")),
   "student-aap": lazy(() => import("@/workspaces/student/pages/AAP")),
   "student-ar": lazy(() => import("@/workspaces/student/pages/AR")),
+  "student-payments": lazy(() => import("@/workspaces/student/pages/Payments")),
+  "student-support": lazy(() => import("@/workspaces/student/pages/Support")),
   "parent-home": lazy(() => import("@/workspaces/parent/pages/ParentHome")),
   "ceo-home": lazy(() => import("@/workspaces/ceo/pages/Home")),
   "customer-support-home": lazy(() => import("@/workspaces/customer_support/pages/Home")),
@@ -43,7 +45,8 @@ function isWorkspacePath(pathname: string) {
     pathname === "/hr-manager" || pathname.startsWith("/hr-manager/") ||
     pathname === "/customer-support" || pathname.startsWith("/customer-support/") ||
     pathname.startsWith("/ceo/recruitment") ||
-    pathname === "/parent" || pathname.startsWith("/parent/");
+    pathname === "/parent" || pathname.startsWith("/parent/") ||
+    pathname === "/student" || pathname.startsWith("/student/");
 }
 
 class AppErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {

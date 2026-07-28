@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from backend.core.clock import SystemClock
 from backend.core.unit_of_work import Connection
 from backend.modules.domains.finance import billing_profile_repository
+from backend.modules.domains.finance import enforcement
 from backend.modules.domains.finance import ledger_repository as repository
 from backend.modules.domains.finance.domain_types import PaymentStatus
 from backend.modules.domains.finance.policies import (
@@ -111,6 +113,11 @@ def issue_student_invoice(
         staff_id=actor.staff_id,
         account_id=actor.account_id,
     )
+    enforcement.start_invoice_enforcement(
+        conn,
+        invoice_id=invoice_id,
+        now=SystemClock().now(),
+    )
     return get_invoice(conn, invoice_id, scope=scope)
 
 
@@ -149,6 +156,11 @@ def record_manual_payment(
         staff_id=actor.staff_id,
     )
     repository.recompute_invoice_settlement(conn, invoice_id)
+    enforcement.reconcile_invoice_enforcement(
+        conn,
+        invoice_id=invoice_id,
+        now=SystemClock().now(),
+    )
     repository.insert_audit_event(
         conn,
         event_type="finance.manual_payment_recorded",
@@ -224,6 +236,11 @@ def reverse_invoice_payment(
     ):
         raise BillingError("Payment changed. Reload and try again.", status_code=409)
     repository.recompute_invoice_settlement(conn, invoice.invoice_id)
+    enforcement.reconcile_invoice_enforcement(
+        conn,
+        invoice_id=invoice.invoice_id,
+        now=SystemClock().now(),
+    )
     repository.insert_audit_event(
         conn,
         event_type="finance.manual_payment_reversed",
@@ -265,6 +282,11 @@ def void_student_invoice(
         detail={"reason": command.reason},
         staff_id=actor.staff_id,
         account_id=actor.account_id,
+    )
+    enforcement.reconcile_invoice_enforcement(
+        conn,
+        invoice_id=invoice_id,
+        now=SystemClock().now(),
     )
     return get_invoice(conn, invoice_id, scope=scope)
 

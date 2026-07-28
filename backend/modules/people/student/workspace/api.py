@@ -13,6 +13,8 @@ from backend.modules.people.student.contracts import (
     office_hours_router,
     record_student_activity,
 )
+from backend.modules.people.student.billing_api import router as billing_router
+from backend.modules.people.student.support_api import router as support_router
 from backend.core.access import get_current_user
 from backend.core.access.roles import normalize_role
 
@@ -40,8 +42,10 @@ router = APIRouter(
     dependencies=[Depends(get_current_user), Depends(track_student_activity)],
 )
 router.include_router(activity_router)
+router.include_router(billing_router)
 router.include_router(chat_router)
 router.include_router(comments_router)
 router.include_router(office_hours_router)
+router.include_router(support_router)
 
 __all__ = ["router"]

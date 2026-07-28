@@ -11,6 +11,7 @@ from backend.core.unit_of_work import Connection
 from backend.modules.domains.finance import billing_profile_repository
 from backend.modules.domains.finance import ledger_repository as repository
 from backend.modules.domains.finance.domain_types import (
+    BillingEnforcementState,
     BillingProfileStatus,
     InvoiceKind,
     InvoiceOrigin,
@@ -71,6 +72,13 @@ def _invoice_summary(row: Mapping[str, Any]) -> InvoiceSummary:
         due_date=values["due_date"],
         issued_at=values.get("issued_at"),
         paid_at=values.get("paid_at"),
+        enforcement_state=(
+            BillingEnforcementState(str(values["enforcement_state"]))
+            if values.get("enforcement_state")
+            else None
+        ),
+        countdown_started_at=values.get("countdown_started_at"),
+        payment_deadline_at=values.get("payment_deadline_at"),
         version=int(values["version"]),
     )
 
@@ -82,14 +90,22 @@ def list_invoices(
     query: str = "",
     status: str = "all",
     origin: str = "all",
+    enforcement: str = "all",
     limit: int = 50,
 ) -> InvoicePage:
     allowed_statuses = {"all", *(item.value for item in InvoiceStatus)}
     allowed_origins = {"all", *(item.value for item in InvoiceOrigin)}
+    allowed_enforcement_states = {
+        "all",
+        "not_scheduled",
+        *(item.value for item in BillingEnforcementState),
+    }
     if status not in allowed_statuses:
         raise BillingError("Invoice status filter is invalid.")
     if origin not in allowed_origins:
         raise BillingError("Invoice origin filter is invalid.")
+    if enforcement not in allowed_enforcement_states:
+        raise BillingError("Billing enforcement filter is invalid.")
     rows = repository.list_scoped_invoice_rows(
         conn,
         school_ids=scope.school_ids,
@@ -97,6 +113,7 @@ def list_invoices(
         query=query,
         status=status,
         origin=origin,
+        enforcement=enforcement,
         limit=limit,
     )
     return InvoicePage(

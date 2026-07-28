@@ -54,10 +54,45 @@ class BillingProfileStatus(StrEnum):
 class BillingJobTopic(StrEnum):
     GENERATE_INVOICES = "finance.generate_invoices"
     RECONCILE_LEGACY_PAYMENTS = "finance.reconcile_legacy_payments"
+    BOOTSTRAP_ENFORCEMENT = "finance.bootstrap_billing_enforcement"
+    PROCESS_ENFORCEMENT_STAGE = "finance.process_billing_enforcement_stage"
+    SEND_BILLING_NOTIFICATION = "finance.send_billing_notification"
+    RECONCILE_ENFORCEMENT = "finance.reconcile_billing_enforcement"
+
+
+class BillingEnforcementState(StrEnum):
+    SCHEDULED = "scheduled"
+    COUNTDOWN = "countdown"
+    HELD = "held"
+    CLEARED = "cleared"
+    CANCELLED = "cancelled"
+
+
+class BillingAccessMode(StrEnum):
+    NORMAL = "normal"
+    PAYMENT_ONLY = "payment_only"
+
+
+class BillingNotificationStage(StrEnum):
+    INITIAL = "initial"
+    TWENTY_FOUR_HOURS = "twenty_four_hours"
+    SIX_HOURS = "six_hours"
+    HELD = "held"
+    RESTORED = "restored"
+
+
+class BillingHoldTarget(StrEnum):
+    DEBTOR_STUDENT = "debtor_student"
+    LINKED_PARENT = "linked_parent"
+    HOUSEHOLD_STUDENT = "household_student"
 
 
 __all__ = [
     "BillingJobTopic",
+    "BillingAccessMode",
+    "BillingEnforcementState",
+    "BillingHoldTarget",
+    "BillingNotificationStage",
     "BillingProfileStatus",
     "InvoiceKind",
     "InvoiceOrigin",

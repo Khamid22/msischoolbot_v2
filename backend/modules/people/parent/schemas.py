@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from backend.core.api import ApiModel
-from backend.modules.domains.finance.contracts import PaymentRecord
+from backend.modules.domains.finance.contracts import BillingAccessStatus, PaymentRecord
 from backend.modules.domains.support_cases.tickets.contracts import (
     TicketCategory,
     TicketData,
@@ -116,6 +116,10 @@ class ParentInvoiceCheckoutResponse(ApiModel):
     amount_minor: int
     currency: str
     callback_url: str
+
+
+class ParentBillingStatusResponse(BillingAccessStatus):
+    pass
 
 
 class ParentTicketMessageResponse(ApiModel):

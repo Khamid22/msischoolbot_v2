@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
+from backend.core.time import SCHOOL_TIMEZONE
 from backend.modules.domains.finance.domain_types import InvoiceStatus, PaymentStatus
 
 UZS_MINOR_FACTOR = 100
+PAYMENT_WINDOW_HOURS = 48
+TWENTY_FOUR_HOUR_REMINDER = timedelta(hours=24)
+SIX_HOUR_REMINDER = timedelta(hours=6)
 
 
 class BillingError(ValueError):
@@ -71,9 +76,33 @@ def ensure_payment_can_be_reversed(status: PaymentStatus) -> None:
         raise BillingError("Only a completed payment can be reversed.")
 
 
+def enforcement_deadline(*, issued_at: datetime, due_date: date) -> datetime:
+    """Give every enforceable invoice a complete 48-hour payment window."""
+
+    normalized_issued_at = issued_at.astimezone(UTC)
+    requested_deadline = datetime.combine(
+        due_date,
+        time(hour=23, minute=59, second=59),
+        tzinfo=SCHOOL_TIMEZONE,
+    ).astimezone(UTC)
+    return max(
+        normalized_issued_at + timedelta(hours=PAYMENT_WINDOW_HOURS),
+        requested_deadline,
+    )
+
+
+def enforcement_start(deadline_at: datetime) -> datetime:
+    return deadline_at.astimezone(UTC) - timedelta(hours=PAYMENT_WINDOW_HOURS)
+
+
 __all__ = [
     "BillingError",
+    "PAYMENT_WINDOW_HOURS",
+    "SIX_HOUR_REMINDER",
+    "TWENTY_FOUR_HOUR_REMINDER",
     "UZS_MINOR_FACTOR",
+    "enforcement_deadline",
+    "enforcement_start",
     "ensure_invoice_accepts_payment",
     "ensure_invoice_can_be_voided",
     "ensure_payment_can_be_reversed",

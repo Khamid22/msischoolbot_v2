@@ -57,6 +57,7 @@ class CustomerSupportPayments:
         query: str = "",
         status: str = "all",
         origin: str = "all",
+        enforcement: str = "all",
         limit: int = 50,
     ) -> InvoicePage:
         scoped_actor = self._scoped_actor(actor)
@@ -67,6 +68,7 @@ class CustomerSupportPayments:
                 query=query,
                 status=status,
                 origin=origin,
+                enforcement=enforcement,
                 limit=limit,
             )
 

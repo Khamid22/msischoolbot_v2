@@ -46,6 +46,30 @@ PASSWORD_CHANGE_ALLOWED_PATHS = frozenset(
         "/login",
     }
 )
+PAYMENT_ONLY_EXACT_PATHS = frozenset(
+    {
+        "/logout",
+        "/parent/payments",
+        "/parent/support",
+        "/student/payments",
+        "/student/support",
+        "/api/v1/identity/current",
+        "/api/v1/parent/billing-status",
+    }
+)
+PAYMENT_ONLY_PATH_PREFIXES = (
+    "/static/",
+    "/parent/payments/",
+    "/parent/support/",
+    "/student/payments/",
+    "/student/support/",
+    "/api/v1/parent/payments",
+    "/api/v1/parent/tickets",
+    "/api/v1/student/billing",
+    "/api/v1/student/payments",
+    "/api/v1/student/support",
+    "/api/v1/integrations/payme/merchant",
+)
 
 
 def _is_api_request(request: Request, path: str) -> bool:
@@ -195,6 +219,64 @@ def _password_change_rejection(request: Request, path: str) -> Response | None:
     return RedirectResponse(url="/account/security", status_code=302)
 
 
+def _payment_only_path_allowed(path: str) -> bool:
+    return path in PAYMENT_ONLY_EXACT_PATHS or path.startswith(
+        PAYMENT_ONLY_PATH_PREFIXES
+    )
+
+
+def _billing_access_rejection(request: Request, path: str) -> Response | None:
+    if _payment_only_path_allowed(path):
+        return None
+    role = normalize_role(
+        request.session.get("canonical_role") or request.session.get("account_role")
+    )
+    if role not in {"student", "parent"}:
+        return None
+    try:
+        account_id = int(request.session.get("account_id") or 0)
+    except (TypeError, ValueError):
+        return None
+    if account_id <= 0:
+        return None
+    if bool(getattr(request.app.state, "testing", False)):
+        return None
+    try:
+        from backend.core.unit_of_work import UnitOfWorkFactory
+        from backend.modules.domains.finance.contracts import account_has_billing_hold
+
+        with UnitOfWorkFactory().read() as unit_of_work:
+            is_held = account_has_billing_hold(
+                unit_of_work.conn,
+                account_id=account_id,
+            )
+    except Exception:
+        return None
+    if not is_held:
+        return None
+    if _is_api_request(request, path):
+        return JSONResponse(
+            {
+                "status": "error",
+                "message": "Payment is required to restore full account access.",
+                "code": "billing_payment_required",
+                "data": {
+                    "accessMode": "payment_only",
+                    "paymentsUrl": (
+                        "/parent/payments"
+                        if role == "parent"
+                        else "/student/payments"
+                    ),
+                },
+            },
+            status_code=423,
+        )
+    return RedirectResponse(
+        url="/parent/payments" if role == "parent" else "/student/payments",
+        status_code=303,
+    )
+
+
 def _security_send(
     request: Request,
     path: str,
@@ -236,6 +318,7 @@ class AuthAndSecurityMiddleware:
                 _role_rejection(request, path)
                 or _canonical_account_rejection(request, path)
                 or _password_change_rejection(request, path)
+                or _billing_access_rejection(request, path)
             )
         if rejection is not None:
             await rejection(scope, receive, send)

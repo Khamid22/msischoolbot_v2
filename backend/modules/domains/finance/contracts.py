@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
+from backend.core.clock import SystemClock
 from backend.core.unit_of_work import Connection
 from backend.modules.domains.finance import (
     billing_profile_repository,
     commands,
+    enforcement,
+    enforcement_repository,
     ledger_repository,
     queries,
     repository,
@@ -22,6 +25,7 @@ from backend.modules.domains.finance.policies import BillingError, major_to_mino
 from backend.modules.domains.finance.queries import BillingSchoolScope
 from backend.modules.domains.finance.schemas import (
     AddPaidStudentInvoiceCommand,
+    BillingAccessStatus,
     BillingItemInput,
     BillingProfileResult,
     ConfigureBillingProfileCommand,
@@ -92,6 +96,33 @@ class EnsureStudentBillingProfileCommand:
     staff_id: int | None = None
 
 
+def _payment_record_from_row(row) -> PaymentRecord:
+    item = payment_row_to_record(row)
+    payment_id = int(item["id"])
+    is_invoice = payment_id >= repository.NEW_INVOICE_PAYMENT_ID_OFFSET
+    is_outstanding = str(item["state"]) in {"debt", "due", "upcoming"}
+    return PaymentRecord(
+        payment_id=payment_id,
+        invoice_id=(
+            payment_id - repository.NEW_INVOICE_PAYMENT_ID_OFFSET
+            if is_invoice
+            else None
+        ),
+        student_row_id=int(item["student_row_id"]),
+        subject=str(item["subject"]),
+        month=str(item["month"]),
+        amount=float(item["amount"]),
+        currency=str(item["currency"]),
+        status=str(item["status"]),
+        state=str(item["state"]),
+        due_date=str(item["due_date"]),
+        paid_at=str(item["paid_at"]),
+        notes=str(item["notes"]),
+        balance=float(item["amount"]) if is_outstanding else 0,
+        can_pay_online=is_invoice and is_outstanding,
+    )
+
+
 def ensure_student_billing_profile(
     conn: Connection,
     command: EnsureStudentBillingProfileCommand,
@@ -137,39 +168,21 @@ def list_payment_records(
     *,
     student_row_id: int,
 ) -> tuple[PaymentRecord, ...]:
-    records = []
-    for row in repository.list_student_payment_rows(conn, student_row_id):
-        item = payment_row_to_record(row)
-        records.append(
-            PaymentRecord(
-                payment_id=int(item["id"]),
-                invoice_id=(
-                    int(item["id"]) - repository.NEW_INVOICE_PAYMENT_ID_OFFSET
-                    if int(item["id"]) >= repository.NEW_INVOICE_PAYMENT_ID_OFFSET
-                    else None
-                ),
-                student_row_id=int(item["student_row_id"]),
-                subject=str(item["subject"]),
-                month=str(item["month"]),
-                amount=float(item["amount"]),
-                currency=str(item["currency"]),
-                status=str(item["status"]),
-                state=str(item["state"]),
-                due_date=str(item["due_date"]),
-                paid_at=str(item["paid_at"]),
-                notes=str(item["notes"]),
-                balance=(
-                    float(item["amount"])
-                    if str(item["state"]) in {"debt", "due", "upcoming"}
-                    else 0
-                ),
-                can_pay_online=(
-                    int(item["id"]) >= repository.NEW_INVOICE_PAYMENT_ID_OFFSET
-                    and str(item["state"]) in {"debt", "due", "upcoming"}
-                ),
-            )
-        )
-    return tuple(records)
+    return tuple(
+        _payment_record_from_row(row)
+        for row in repository.list_student_payment_rows(conn, student_row_id)
+    )
+
+
+def list_student_account_payment_records(
+    conn: Connection,
+    *,
+    student_id: int,
+) -> tuple[PaymentRecord, ...]:
+    return tuple(
+        _payment_record_from_row(row)
+        for row in repository.list_canonical_student_payment_rows(conn, student_id)
+    )
 
 
 def list_compatibility_payment_records(
@@ -228,6 +241,7 @@ def list_invoices(
     query: str = "",
     status: str = "all",
     origin: str = "all",
+    enforcement: str = "all",
     limit: int = 50,
 ) -> InvoicePage:
     return queries.list_invoices(
@@ -236,6 +250,7 @@ def list_invoices(
         query=query,
         status=status,
         origin=origin,
+        enforcement=enforcement,
         limit=limit,
     )
 
@@ -352,9 +367,40 @@ def parent_invoice_checkout_data(
     )
 
 
+def get_account_billing_access(
+    conn: Connection,
+    *,
+    account_id: int,
+    now: datetime | None = None,
+) -> BillingAccessStatus:
+    return enforcement.account_billing_access(
+        conn,
+        account_id=account_id,
+        now=now or SystemClock().now(),
+    )
+
+
+def account_has_billing_hold(conn: Connection, *, account_id: int) -> bool:
+    return enforcement_repository.account_has_active_hold(conn, account_id)
+
+
+def student_invoice_checkout_data(
+    conn: Connection,
+    *,
+    student_id: int,
+    invoice_id: int,
+) -> tuple[int, str]:
+    return enforcement.student_invoice_checkout_data(
+        conn,
+        student_id=student_id,
+        invoice_id=invoice_id,
+    )
+
+
 __all__ = [
     "AddPaidStudentInvoiceCommand",
     "BillingActor",
+    "BillingAccessStatus",
     "BillingError",
     "BillingProfileItemCommand",
     "BillingProfileResult",
@@ -373,18 +419,22 @@ __all__ = [
     "ReverseInvoicePaymentCommand",
     "VoidStudentInvoiceCommand",
     "add_paid_student_invoice",
+    "account_has_billing_hold",
     "configure_billing_profile",
     "ensure_student_billing_profile",
     "find_migrated_invoice_id",
     "get_billing_profile",
+    "get_account_billing_access",
     "get_invoice",
     "issue_student_invoice",
     "list_compatibility_payment_records",
     "list_invoices",
     "list_payment_records",
+    "list_student_account_payment_records",
     "major_to_minor",
     "parent_invoice_checkout_data",
     "record_manual_invoice_payment",
     "reverse_invoice_payment",
+    "student_invoice_checkout_data",
     "void_student_invoice",
 ]

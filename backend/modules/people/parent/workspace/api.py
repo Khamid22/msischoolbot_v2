@@ -22,6 +22,7 @@ from backend.modules.people.parent.policies import (
 from backend.modules.people.parent.queries import ParentQueries
 from backend.modules.people.parent.schemas import (
     CreateParentTicketRequest,
+    ParentBillingStatusResponse,
     ParentChildrenResponse,
     ParentChildResponse,
     ParentInvoiceCheckoutResponse,
@@ -139,6 +140,21 @@ def list_payments(
         return api_success(
             queries.list_payments(actor, student_row_id=student_row_id)
         )
+    except Exception as exc:
+        return _error(exc)
+
+
+@router.get(
+    "/billing-status",
+    response_model=ApiSuccess[ParentBillingStatusResponse],
+    operation_id="api_v1_parent_billing_status",
+)
+def get_billing_status(
+    actor: ActorContext = Depends(get_actor_context),
+    queries: ParentQueries = Depends(get_parent_queries),
+):
+    try:
+        return api_success(queries.get_billing_status(actor))
     except Exception as exc:
         return _error(exc)
 

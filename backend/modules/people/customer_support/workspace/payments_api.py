@@ -119,6 +119,7 @@ def list_invoices(
     q: Annotated[str, Query(max_length=200)] = "",
     status: Annotated[str, Query(max_length=40)] = "all",
     origin: Annotated[str, Query(max_length=40)] = "all",
+    enforcement: Annotated[str, Query(max_length=40)] = "all",
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ):
     try:
@@ -128,6 +129,7 @@ def list_invoices(
                 query=q,
                 status=status,
                 origin=origin,
+                enforcement=enforcement,
                 limit=limit,
             )
         )

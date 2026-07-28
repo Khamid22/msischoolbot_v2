@@ -40,6 +40,7 @@ class ParentCommands:
                 category=request.category,
                 topic=request.topic,
                 message=request.message,
+                account_id=actor.account_id,
             )
             commit_unit_of_work(unit_of_work)
         return ParentTicketResponse.from_data(ticket)
@@ -57,6 +58,7 @@ class ParentCommands:
                 parent_id=parent_id,
                 ticket_id=ticket_id,
                 body=request.body,
+                account_id=actor.account_id,
             )
             commit_unit_of_work(unit_of_work)
         return ParentTicketResponse.from_data(ticket)

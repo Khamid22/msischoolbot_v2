@@ -14,7 +14,7 @@ from backend.core.unit_of_work import Connection
 from backend.modules.domains.parent_relationships.contracts import (
     parent_can_access_student_on_connection,
 )
-from backend.modules.domains.support_cases.tickets import repository
+from backend.modules.domains.support_cases.tickets import account_repository, repository
 from backend.modules.domains.support_cases.tickets.domain_types import (
     TicketCategory,
     TicketPriority,
@@ -233,6 +233,7 @@ def create_parent_ticket(
     category: TicketCategory | str,
     topic: str,
     message: str,
+    account_id: int | None = None,
 ) -> TicketData:
     if not parent_can_access_student_on_connection(
         conn,
@@ -251,6 +252,7 @@ def create_parent_ticket(
         status=TicketStatus.NEW.value,
         created_at=timestamp.isoformat(),
         updated_at=timestamp.isoformat(),
+        requester_account_id=account_id,
     )
     if inserted is None:
         raise RuntimeError("Ticket could not be created.")
@@ -259,7 +261,7 @@ def create_parent_ticket(
         ticket_id=int(inserted["id"]),
         event_type="support_ticket.created",
         actor_staff_id=None,
-        actor_account_id=None,
+        actor_account_id=account_id,
         detail={"parent_id": int(parent_id), "student_row_id": int(student_row_id)},
         created_at=timestamp,
     )
@@ -272,6 +274,7 @@ def reply_to_parent_ticket(
     parent_id: int,
     ticket_id: int,
     body: str,
+    account_id: int | None = None,
 ) -> TicketData:
     row = repository.get_parent_ticket_row(
         conn,
@@ -298,6 +301,7 @@ def reply_to_parent_ticket(
         author_login="",
         body=_validate_message(body),
         created_at=timestamp.isoformat(),
+        author_account_id=account_id,
     )
     repository.update_ticket_state_row(
         conn,
@@ -312,11 +316,127 @@ def reply_to_parent_ticket(
         ticket_id=ticket_id,
         event_type="support_ticket.parent_replied",
         actor_staff_id=None,
-        actor_account_id=None,
+        actor_account_id=account_id,
         detail={"parent_id": int(parent_id)},
         created_at=timestamp,
     )
     return get_parent_ticket(conn, parent_id=parent_id, ticket_id=ticket_id)
+
+
+def list_student_tickets(
+    conn: Connection,
+    *,
+    account_id: int,
+    limit: int = DEFAULT_PAGE_SIZE,
+) -> tuple[TicketData, ...]:
+    rows = account_repository.list_account_ticket_rows(
+        conn,
+        requester_account_id=account_id,
+    )
+    return tuple(_ticket(conn, row) for row in rows[: normalize_page_size(limit)])
+
+
+def get_student_ticket(
+    conn: Connection,
+    *,
+    account_id: int,
+    ticket_id: int,
+) -> TicketData:
+    row = account_repository.get_account_ticket_row(
+        conn,
+        requester_account_id=account_id,
+        ticket_id=ticket_id,
+    )
+    if row is None:
+        raise TicketNotFoundError("Ticket was not found.")
+    return _ticket(conn, row)
+
+
+def create_student_ticket(
+    conn: Connection,
+    *,
+    account_id: int,
+    student_id: int,
+    category: TicketCategory | str,
+    topic: str,
+    message: str,
+) -> TicketData:
+    timestamp = _now()
+    inserted = account_repository.insert_account_ticket_row(
+        conn,
+        requester_account_id=account_id,
+        student_id=student_id,
+        category=normalize_ticket_category(category),
+        topic=_validate_topic(topic),
+        message=_validate_message(message, minimum=5),
+        created_at=timestamp,
+    )
+    if inserted is None:
+        raise RuntimeError("Ticket could not be created.")
+    ticket_id = int(inserted["id"])
+    repository.insert_ticket_audit_event(
+        conn,
+        ticket_id=ticket_id,
+        event_type="support_ticket.student_created",
+        actor_staff_id=None,
+        actor_account_id=account_id,
+        detail={"student_id": student_id},
+        created_at=timestamp,
+    )
+    return get_student_ticket(conn, account_id=account_id, ticket_id=ticket_id)
+
+
+def reply_to_student_ticket(
+    conn: Connection,
+    *,
+    account_id: int,
+    ticket_id: int,
+    body: str,
+) -> TicketData:
+    row = account_repository.get_account_ticket_row(
+        conn,
+        requester_account_id=account_id,
+        ticket_id=ticket_id,
+        for_update=True,
+    )
+    if row is None:
+        raise TicketNotFoundError("Ticket was not found.")
+    current_status = TicketStatus(normalize_ticket_status(row["status"]))
+    if current_status is TicketStatus.RESOLVED:
+        raise TicketLifecycleError("Resolved tickets are read-only. Create a new ticket.")
+    timestamp = _now()
+    repository.set_ticket_waiting_on_requester_row(
+        conn,
+        ticket_id=ticket_id,
+        is_waiting=False,
+        changed_at=timestamp,
+    )
+    account_repository.insert_account_ticket_message_row(
+        conn,
+        ticket_id=ticket_id,
+        author_account_id=account_id,
+        author_type="student",
+        body=_validate_message(body),
+        created_at=timestamp,
+    )
+    repository.update_ticket_state_row(
+        conn,
+        ticket_id=ticket_id,
+        status=current_status.value,
+        assigned_staff_id=row["assigned_to_staff_id"],
+        resolved_at=None,
+        updated_at=timestamp,
+    )
+    repository.insert_ticket_audit_event(
+        conn,
+        ticket_id=ticket_id,
+        event_type="support_ticket.student_replied",
+        actor_staff_id=None,
+        actor_account_id=account_id,
+        detail={},
+        created_at=timestamp,
+    )
+    return get_student_ticket(conn, account_id=account_id, ticket_id=ticket_id)
 
 
 def list_support_tickets(

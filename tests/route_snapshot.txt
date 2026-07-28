@@ -121,6 +121,7 @@
 /api/v1/hr/analytics/dashboard | GET
 /api/v1/hr/analytics/options | GET
 /api/v1/integrations/payme/merchant | POST
+/api/v1/parent/billing-status | GET
 /api/v1/parent/children | GET
 /api/v1/parent/children/{student_row_id} | GET
 /api/v1/parent/overview | GET
@@ -199,6 +200,7 @@
 /api/v1/recruitment/teachers/{kind}/{record_id}/close | POST
 /api/v1/recruitment/trash/purge | POST
 /api/v1/student/activity/ping | GET
+/api/v1/student/billing-status | GET
 /api/v1/student/chat/messages | GET
 /api/v1/student/chat/messages | POST
 /api/v1/student/chat/messages/{msg_id} | DELETE
@@ -207,8 +209,14 @@
 /api/v1/student/office-hours/bookings | GET
 /api/v1/student/office-hours/bookings | POST
 /api/v1/student/office-hours/bookings/{booking_id} | PATCH
+/api/v1/student/payments | GET
+/api/v1/student/payments/{invoice_id}/checkout | GET
 /api/v1/student/resources/{resource_id}/comments | GET
 /api/v1/student/resources/{resource_id}/comments | POST
+/api/v1/student/support/tickets | GET
+/api/v1/student/support/tickets | POST
+/api/v1/student/support/tickets/{ticket_id} | GET
+/api/v1/student/support/tickets/{ticket_id}/messages | POST
 /api/v1/system/status | GET
 /auth/telegram | POST
 /ceo | GET
@@ -282,6 +290,8 @@
 /search | POST
 /static | -
 /student | GET
+/student/payments | GET
+/student/support | GET
 /support | GET
 /sw.js | GET
 /teacher | GET

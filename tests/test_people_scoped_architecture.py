@@ -85,6 +85,8 @@ EXPECTED_DOMAINS = {
         Domain.ORGANIZATION,
         Domain.STUDENT_RECORDS,
         Domain.ACADEMICS,
+        Domain.FINANCE,
+        Domain.SUPPORT_CASES,
         Domain.COMMUNICATIONS,
         Domain.REPORTING,
     },

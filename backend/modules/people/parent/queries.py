@@ -11,6 +11,7 @@ from backend.core.unit_of_work import UnitOfWorkFactory
 from backend.modules.domains.communications.contracts import list_parent_announcements
 from backend.modules.domains.finance.contracts import (
     PaymentRecord,
+    get_account_billing_access,
     list_payment_records,
     parent_invoice_checkout_data,
 )
@@ -29,6 +30,7 @@ from backend.modules.people.parent.policies import (
 from backend.modules.people.parent.schemas import (
     ParentAcademicIndicatorResponse,
     ParentAnnouncementResponse,
+    ParentBillingStatusResponse,
     ParentChildrenResponse,
     ParentChildResponse,
     ParentLessonResponse,
@@ -140,6 +142,17 @@ class ParentQueries:
         if preference is None:
             raise ParentRecordNotFoundError("Parent account was not found.")
         return ParentPreferenceResponse(**preference.__dict__)
+
+    def get_billing_status(self, actor: ActorContext) -> ParentBillingStatusResponse:
+        require_parent_capability(actor, Capability.VIEW_PAYMENTS)
+        if actor.account_id is None:
+            raise ParentRecordNotFoundError("Parent account was not found.")
+        with self._unit_of_work_factory.read() as unit_of_work:
+            status = get_account_billing_access(
+                unit_of_work.conn,
+                account_id=actor.account_id,
+            )
+        return ParentBillingStatusResponse.model_validate(status.model_dump())
 
     def get_child(
         self,

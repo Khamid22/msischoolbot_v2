@@ -107,6 +107,8 @@ PERSON_ACCESS_DEFAULTS: dict[Role, PersonAccessDefaults] = {
                 Capability.VIEW_OWN_ATTENDANCE,
                 Capability.VIEW_OWN_GRADES,
                 Capability.VIEW_RESOURCES,
+                Capability.VIEW_PAYMENTS,
+                Capability.CONTACT_SUPPORT,
                 Capability.USE_STUDENT_CHAT,
             }
         ),
@@ -116,7 +118,9 @@ PERSON_ACCESS_DEFAULTS: dict[Role, PersonAccessDefaults] = {
                 Domain.ORGANIZATION,
                 Domain.STUDENT_RECORDS,
                 Domain.ACADEMICS,
+                Domain.FINANCE,
                 Domain.COMMUNICATIONS,
+                Domain.SUPPORT_CASES,
                 Domain.REPORTING,
             }
         ),

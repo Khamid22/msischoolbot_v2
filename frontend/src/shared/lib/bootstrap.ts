@@ -8,6 +8,8 @@ export type ReactPageName =
   | "student-aap"
   | "student-ar"
   | "student-office-hours"
+  | "student-payments"
+  | "student-support"
   | "parent-home"
   | "public-admission"
   | "ceo-home"
@@ -44,6 +46,8 @@ const REACT_PAGES = new Set<ReactPageName>([
   "student-aap",
   "student-ar",
   "student-office-hours",
+  "student-payments",
+  "student-support",
   "parent-home",
   "public-admission",
   "ceo-home",
