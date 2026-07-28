@@ -23,6 +23,7 @@ DOMAINS_ROOT = Path("backend/modules/domains")
 EXPECTED_DOMAINS = {
     PersonType.CEO: {
         Domain.IDENTITY,
+        Domain.ADMISSIONS,
         Domain.ORGANIZATION,
         Domain.REPORTING,
         Domain.FINANCE,
@@ -59,6 +60,8 @@ EXPECTED_DOMAINS = {
     },
     PersonType.CUSTOMER_SUPPORT: {
         Domain.IDENTITY,
+        Domain.ADMISSIONS,
+        Domain.ACADEMICS,
         Domain.ORGANIZATION,
         Domain.STUDENT_RECORDS,
         Domain.PARENT_RELATIONSHIPS,
@@ -191,6 +194,7 @@ def test_cross_domain_repository_imports_are_rejected():
 def test_all_domains_register_without_application_conditionals():
     assert {module.name for module in DOMAIN_MODULES} == {
         "identity",
+        "admissions",
         "organization",
         "student_records",
         "parent_relationships",

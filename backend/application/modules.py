@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from backend.application.module_spec import ModuleSpec
 from backend.modules.domains.academics.module import MODULE as ACADEMICS_MODULE
+from backend.modules.domains.admissions.module import MODULE as ADMISSIONS_MODULE
 from backend.modules.domains.communications.module import MODULE as COMMUNICATIONS_MODULE
 from backend.modules.domains.finance.module import MODULE as FINANCE_MODULE
 from backend.modules.domains.identity.module import MODULE as IDENTITY_MODULE
@@ -21,6 +22,7 @@ from backend.modules.jobs.handlers import JobHandlerRegistry
 from backend.modules.jobs.module import MODULE as JOBS_MODULE
 
 DOMAIN_MODULES: tuple[ModuleSpec, ...] = (
+    ADMISSIONS_MODULE,
     IDENTITY_MODULE,
     ORGANIZATION_MODULE,
     STUDENT_RECORDS_MODULE,

@@ -1,15 +1,21 @@
 from fastapi import APIRouter
 
-from backend.modules.people.academic_director.workspace.api import router as academic_director_router
-from backend.modules.people.ceo.workspace.api import router as ceo_router
-from backend.modules.people.customer_support.workspace.api import router as customer_support_router
-from backend.modules.people.head_of_department.workspace.api import router as head_of_department_router
-from backend.modules.people.parent.workspace.api import router as parent_router
-from backend.modules.people.student.workspace.api import router as student_router
+from backend.application.module_spec import ModuleSpec
+from backend.modules.domains.admissions.public_api import router as public_admissions_router
+from backend.modules.domains.finance.integrations.payme.api import router as payme_router
 from backend.modules.domains.recruitment.api import router as recruitment_router
 from backend.modules.domains.recruitment.handoff_api import router as recruitment_handoff_router
 from backend.modules.domains.reporting.recruitment.api import router as hr_analytics_router
-from backend.application.module_spec import ModuleSpec
+from backend.modules.people.academic_director.workspace.api import (
+    router as academic_director_router,
+)
+from backend.modules.people.ceo.workspace.api import router as ceo_router
+from backend.modules.people.customer_support.workspace.api import router as customer_support_router
+from backend.modules.people.head_of_department.workspace.api import (
+    router as head_of_department_router,
+)
+from backend.modules.people.parent.workspace.api import router as parent_router
+from backend.modules.people.student.workspace.api import router as student_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -23,6 +29,8 @@ API_MODULES = (
     ModuleSpec("recruitment", recruitment_router),
     ModuleSpec("recruitment_handoffs", recruitment_handoff_router),
     ModuleSpec("hr_analytics", hr_analytics_router),
+    ModuleSpec("public_admissions", public_admissions_router),
+    ModuleSpec("payme", payme_router),
 )
 
 for module_spec in API_MODULES:

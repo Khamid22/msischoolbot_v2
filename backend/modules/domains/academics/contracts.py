@@ -1,5 +1,11 @@
 """Public academic use cases used by person orchestration modules."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from backend.core.unit_of_work import Connection
+from backend.modules.domains.academics import admission_repository
 from backend.modules.domains.academics.assessments.service import record_exam_from_payload
 from backend.modules.domains.academics.attendance.service import record_attendance_from_payload
 from backend.modules.domains.academics.calendar.service import (
@@ -110,6 +116,33 @@ from backend.modules.domains.academics.timetable.operations import (
 )
 
 
+@dataclass(frozen=True)
+class ActivateAdmissionEnrollmentsCommand:
+    student_id: int
+    group_ids: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class ActivateAdmissionEnrollmentsResult:
+    legacy_enrollment_ids: tuple[int, ...]
+
+
+def activate_admission_enrollments(
+    conn: Connection,
+    command: ActivateAdmissionEnrollmentsCommand,
+) -> ActivateAdmissionEnrollmentsResult:
+    if command.student_id <= 0 or not command.group_ids:
+        raise ValueError("A student and at least one group are required.")
+    enrollment_ids = admission_repository.activate_group_enrollments(
+        conn,
+        student_id=command.student_id,
+        group_ids=command.group_ids,
+    )
+    return ActivateAdmissionEnrollmentsResult(
+        legacy_enrollment_ids=enrollment_ids,
+    )
+
+
 def list_office_hours_teachers():
     from backend.modules.domains.teacher_records.contracts import list_teachers
 
@@ -117,6 +150,8 @@ def list_office_hours_teachers():
 
 
 __all__ = [
+    "ActivateAdmissionEnrollmentsCommand",
+    "ActivateAdmissionEnrollmentsResult",
     "AcademicConflictError",
     "AcademicManagementAcademicContextDelta",
     "AcademicManagementAcademicContextPayload",
@@ -148,6 +183,7 @@ __all__ = [
     "HeadOfDepartmentCreated",
     "HeadOfDepartmentPasswordReset",
     "add_resource_comment",
+    "activate_admission_enrollments",
     "build_subject_leaderboard",
     "build_students_by_subject_group",
     "collect_subject_dashboards_from_cache",

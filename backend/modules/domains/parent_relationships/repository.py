@@ -83,6 +83,67 @@ def _resolve_student_v2_id(conn, student_row_id, *, for_update=False):
     return int(row["id"]) if row else None
 
 
+def find_unique_active_parent_by_phone(conn, normalized_phone: str):
+    return conn.execute(
+        """
+        SELECT id, display_name, phone, telegram_username
+        FROM msi_v2.parents
+        WHERE status = 'active'
+          AND regexp_replace(phone, '[^0-9]+', '', 'g') = %s
+        ORDER BY id
+        LIMIT 2
+        FOR UPDATE
+        """,
+        (normalized_phone,),
+    ).fetchall()
+
+
+def insert_admission_parent(
+    conn,
+    *,
+    display_name: str,
+    phone: str,
+    telegram_username: str,
+    preferred_language: str,
+) -> int:
+    row = conn.execute(
+        """
+        INSERT INTO msi_v2.parents (
+            display_name, phone, telegram_username, preferred_language,
+            status, version, created_at, updated_at
+        )
+        VALUES (%s, %s, %s, %s, 'active', 1, now(), now())
+        RETURNING id
+        """,
+        (
+            display_name,
+            phone,
+            _clean_username(telegram_username),
+            preferred_language,
+        ),
+    ).fetchone()
+    return int(row["id"]) if row else 0
+
+
+def ensure_active_parent_student_link(
+    conn,
+    *,
+    parent_id: int,
+    student_id: int,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO msi_v2.parent_student_links (
+            parent_id, student_id, relationship, status, created_at
+        )
+        VALUES (%s, %s, 'parent', 'active', now())
+        ON CONFLICT (parent_id, student_id)
+        DO UPDATE SET status = 'active'
+        """,
+        (int(parent_id), int(student_id)),
+    )
+
+
 def link_parent_from_invite(
     conn,
     *,

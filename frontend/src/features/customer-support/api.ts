@@ -57,6 +57,23 @@ export async function sendSupport<T>(path: string, method: string, body: unknown
   return parseResponse<T>(response);
 }
 
+export async function sendSupportForm<T>(
+  path: string,
+  formData: FormData,
+  csrfToken: string,
+) {
+  const response = await fetch(`/api/v1/customer-support${path}`, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      "X-Requested-With": "XMLHttpRequest",
+      "X-CSRF-Token": csrfToken,
+    },
+    body: formData,
+  });
+  return parseResponse<T>(response);
+}
+
 export async function deleteSupport<T>(path: string, csrfToken: string) {
   const response = await fetch(`/api/v1/customer-support${path}`, {
     method: "DELETE",

@@ -22,16 +22,21 @@ from backend.modules.people.customer_support.schemas import (
     VersionOnlyRequest,
     VoidPaymentRequest,
 )
-from backend.modules.people.customer_support.workspace.teachers_api import (
-    router as teachers_router,
+from backend.modules.people.customer_support.workspace.admissions_api import (
+    router as admissions_router,
 )
 from backend.modules.people.customer_support.workspace.dashboard_api import (
     router as dashboard_router,
 )
+from backend.modules.people.customer_support.workspace.payments_api import (
+    router as payments_router,
+)
+from backend.modules.people.customer_support.workspace.teachers_api import (
+    router as teachers_router,
+)
 from backend.modules.people.customer_support.workspace.tickets_api import (
     router as tickets_router,
 )
-
 
 router = APIRouter(
     prefix="/customer-support",
@@ -40,6 +45,8 @@ router = APIRouter(
 router.include_router(teachers_router)
 router.include_router(tickets_router)
 router.include_router(dashboard_router)
+router.include_router(admissions_router)
+router.include_router(payments_router)
 
 
 def _actor(user: CurrentUser) -> service.SupportActor:

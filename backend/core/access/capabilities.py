@@ -32,6 +32,7 @@ PERSON_ACCESS_DEFAULTS: dict[Role, PersonAccessDefaults] = {
                 Capability.MANAGE_RESOURCES,
                 Capability.MANAGE_COMPLAINTS,
                 Capability.MANAGE_PAYMENTS,
+                Capability.MANAGE_ADMISSIONS,
                 Capability.MANAGE_RECRUITMENT,
                 Capability.VIEW_GLOBAL_REPORTS,
                 Capability.VIEW_FINANCE_SUMMARY,
@@ -44,6 +45,7 @@ PERSON_ACCESS_DEFAULTS: dict[Role, PersonAccessDefaults] = {
         allowed_domains=frozenset(
             {
                 Domain.IDENTITY,
+                Domain.ADMISSIONS,
                 Domain.ORGANIZATION,
                 Domain.REPORTING,
                 Domain.FINANCE,
@@ -64,6 +66,7 @@ PERSON_ACCESS_DEFAULTS: dict[Role, PersonAccessDefaults] = {
                 Capability.MANAGE_STUDENTS,
                 Capability.MANAGE_PARENTS,
                 Capability.MANAGE_PAYMENTS,
+                Capability.MANAGE_ADMISSIONS,
                 Capability.MANAGE_COMPLAINTS,
                 Capability.VIEW_TICKETS,
                 Capability.REPLY_TICKETS,
@@ -81,6 +84,8 @@ PERSON_ACCESS_DEFAULTS: dict[Role, PersonAccessDefaults] = {
         allowed_domains=frozenset(
             {
                 Domain.IDENTITY,
+                Domain.ADMISSIONS,
+                Domain.ACADEMICS,
                 Domain.ORGANIZATION,
                 Domain.STUDENT_RECORDS,
                 Domain.PARENT_RELATIONSHIPS,

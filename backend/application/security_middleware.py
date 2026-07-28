@@ -32,7 +32,12 @@ PUBLIC_PATHS = frozenset(
 STATE_CHANGING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 # These endpoints authenticate their payload instead of relying on the ambient
 # session cookie, so they do not gain anything from a forged cross-site request.
-SAME_ORIGIN_EXEMPT_PATHS = frozenset({"/auth/telegram"})
+SAME_ORIGIN_EXEMPT_PATHS = frozenset(
+    {
+        "/auth/telegram",
+        "/api/v1/integrations/payme/merchant",
+    }
+)
 PASSWORD_CHANGE_ALLOWED_PATHS = frozenset(
     {
         "/account/security",
@@ -84,7 +89,14 @@ def _same_origin_rejection(request: Request, path: str) -> Response | None:
 
 
 def _is_public_path(path: str) -> bool:
-    return path in PUBLIC_PATHS or path.startswith("/static/") or path.startswith("/parent/invite/")
+    return (
+        path in PUBLIC_PATHS
+        or path.startswith("/static/")
+        or path.startswith("/parent/invite/")
+        or path.startswith("/admissions/")
+        or path.startswith("/api/v1/public/admissions/")
+        or path == "/api/v1/integrations/payme/merchant"
+    )
 
 
 def _role_rejection(request: Request, path: str) -> Response | None:

@@ -3,7 +3,6 @@
 import ast
 from pathlib import Path
 
-
 WORKSPACE_NAMES = {
     "ceo",
     "academic_director",
@@ -174,7 +173,11 @@ def test_frontend_uses_workspace_feature_and_shared_boundaries():
     actual_workspaces = {
         path.name for path in (source_root / "workspaces").iterdir() if path.is_dir()
     }
-    assert actual_workspaces == FRONTEND_WORKSPACE_NAMES | {"academic_shared", "shared"}
+    assert actual_workspaces == FRONTEND_WORKSPACE_NAMES | {
+        "academic_shared",
+        "public_admission",
+        "shared",
+    }
 
 
 def test_frontend_teacher_academy_uses_api_v1_contracts():

@@ -29,6 +29,43 @@ class CustomerSupportCapabilitySpec:
 
 CUSTOMER_SUPPORT_CAPABILITIES = (
     CustomerSupportCapabilitySpec(
+        section=CustomerSupportSection.ADMISSIONS,
+        read_capabilities=frozenset({Capability.MANAGE_ADMISSIONS}),
+        write_capabilities=frozenset(
+            {
+                Capability.MANAGE_ADMISSIONS,
+                Capability.MANAGE_PAYMENTS,
+                Capability.MANAGE_STUDENT_RECORDS,
+                Capability.MANAGE_PARENT_RECORDS,
+            }
+        ),
+        allowed_domains=frozenset(
+            {
+                Domain.ADMISSIONS,
+                Domain.ACADEMICS,
+                Domain.COMMUNICATIONS,
+                Domain.FINANCE,
+                Domain.IDENTITY,
+                Domain.ORGANIZATION,
+                Domain.PARENT_RELATIONSHIPS,
+                Domain.STUDENT_RECORDS,
+            }
+        ),
+    ),
+    CustomerSupportCapabilitySpec(
+        section=CustomerSupportSection.PAYMENTS,
+        read_capabilities=frozenset({Capability.MANAGE_PAYMENTS}),
+        write_capabilities=frozenset({Capability.MANAGE_PAYMENTS}),
+        allowed_domains=frozenset(
+            {
+                Domain.ADMISSIONS,
+                Domain.FINANCE,
+                Domain.ORGANIZATION,
+                Domain.STUDENT_RECORDS,
+            }
+        ),
+    ),
+    CustomerSupportCapabilitySpec(
         section=CustomerSupportSection.DASHBOARD,
         read_capabilities=frozenset({Capability.VIEW_DASHBOARD}),
         write_capabilities=frozenset(),

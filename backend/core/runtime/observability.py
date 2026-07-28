@@ -4,11 +4,19 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
-
 
 LOGGER = logging.getLogger("msi.http")
 _SENSITIVE_HEADERS = {"authorization", "cookie", "set-cookie", "x-api-key"}
+_ADMISSION_TOKEN_PATH = re.compile(
+    r"(?P<prefix>/(?:api/v1/public/)?admissions/)[^/?]+"
+)
+
+
+def redact_sensitive_path(value: str) -> str:
+    """Keep route shape observable without logging admission bearer tokens."""
+    return _ADMISSION_TOKEN_PATH.sub(r"\g<prefix>[redacted]", str(value or ""))
 
 
 def _env_float(name: str, default: float) -> float:
@@ -49,6 +57,8 @@ def _filter_sensitive_event(event, _hint):
             }
         if "data" in request:
             request["data"] = "[Filtered]"
+        if "url" in request:
+            request["url"] = redact_sensitive_path(str(request["url"]))
         request.pop("cookies", None)
     user = event.get("user") if isinstance(event, dict) else None
     if isinstance(user, dict):
@@ -96,11 +106,15 @@ class RequestMetricsMiddleware:
                     "http_request request_id=%s method=%s path=%s status=%s duration_ms=%s response_bytes=%s",
                     request_id or "unavailable",
                     scope.get("method", ""),
-                    scope.get("path", ""),
+                    redact_sensitive_path(str(scope.get("path", ""))),
                     status_code,
                     elapsed_ms,
                     response_bytes,
                 )
 
 
-__all__ = ["RequestMetricsMiddleware", "configure_error_reporting"]
+__all__ = [
+    "RequestMetricsMiddleware",
+    "configure_error_reporting",
+    "redact_sensitive_path",
+]

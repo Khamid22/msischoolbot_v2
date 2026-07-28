@@ -16,6 +16,7 @@ const pageMap = {
   "parent-home": lazy(() => import("@/workspaces/parent/pages/ParentHome")),
   "ceo-home": lazy(() => import("@/workspaces/ceo/pages/Home")),
   "customer-support-home": lazy(() => import("@/workspaces/customer_support/pages/Home")),
+  "public-admission": lazy(() => import("@/workspaces/public_admission/pages/Admission")),
   "academic-director-home": lazy(() => import("@/workspaces/academic_director/pages/Home")),
   "academic-director-academy": lazy(() => import("@/workspaces/academic_director/pages/TeacherAcademy")),
   "academic-director-head-of-departments": lazy(() => import("@/workspaces/academic_director/pages/HeadOfDepartments")),

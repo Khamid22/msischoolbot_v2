@@ -6,7 +6,9 @@ from enum import StrEnum
 
 
 class CustomerSupportSection(StrEnum):
+    ADMISSIONS = "admissions"
     DASHBOARD = "dashboard"
+    PAYMENTS = "payments"
     PARENTS = "parents"
     TEACHERS = "teachers"
     TICKETS = "tickets"

@@ -9,6 +9,7 @@ export type ReactPageName =
   | "student-ar"
   | "student-office-hours"
   | "parent-home"
+  | "public-admission"
   | "ceo-home"
   | "customer-support-home"
   | "academic-director-home"
@@ -44,6 +45,7 @@ const REACT_PAGES = new Set<ReactPageName>([
   "student-ar",
   "student-office-hours",
   "parent-home",
+  "public-admission",
   "ceo-home",
   "customer-support-home",
   "academic-director-home",
@@ -65,6 +67,9 @@ const REACT_PAGES = new Set<ReactPageName>([
 ]);
 
 export function inferPageFromPath(pathname: string): ReactPageName | null {
+  if (/^\/admissions\/[^/]+\/?$/.test(pathname)) {
+    return "public-admission";
+  }
   if (/^\/teacher\/?$/.test(pathname)) {
     return "teacher-home";
   }

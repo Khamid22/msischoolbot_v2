@@ -1,7 +1,191 @@
 export type SupportRecordKind = "student" | "parent";
-export type SupportWorkspaceView = "dashboard" | "payments" | "parents" | "students" | "teachers" | "tickets";
+export type SupportWorkspaceView = "dashboard" | "admissions" | "payments" | "parents" | "students" | "teachers" | "tickets";
 export type SupportRecordStatus = "active" | "disabled" | "archived";
 export type SupportLanguage = "uz" | "ru" | "en";
+
+export type AdmissionStatus =
+  | "draft"
+  | "contract_sent"
+  | "contract_submitted"
+  | "awaiting_payment"
+  | "active"
+  | "cancelled"
+  | "expired"
+  | "payment_review";
+export type AdmissionContractStatus =
+  | "draft"
+  | "sent"
+  | "submitted"
+  | "accepted"
+  | "rejected"
+  | "superseded";
+export type AdmissionInvoiceStatus =
+  | "draft"
+  | "issued"
+  | "partially_paid"
+  | "paid"
+  | "overdue"
+  | "voided";
+
+export type AdmissionGroupOption = {
+  groupId: number;
+  schoolId: number;
+  schoolName: string;
+  groupName: string;
+  subjectId: number;
+  subjectName: string;
+};
+
+export type AdmissionGroup = {
+  groupId: number;
+  groupName: string;
+  subjectId: number;
+  subjectName: string;
+  monthlyAmountMinor: number;
+};
+
+export type AdmissionContract = {
+  contractId: number;
+  version: number;
+  status: AdmissionContractStatus;
+  originalFileName: string;
+  originalMimeType: string;
+  originalSizeBytes: number;
+  signedFileName: string;
+  signedMimeType: string;
+  signedSizeBytes: number | null;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  rejectionReason: string;
+};
+
+export type AdmissionInvoicePayment = {
+  paymentId: number;
+  source: "payme" | "manual";
+  method: string;
+  amountMinor: number;
+  currency: string;
+  status: string;
+  reference: string;
+  reason: string;
+  paidAt: string;
+};
+
+export type AdmissionInvoice = {
+  invoiceId: number;
+  invoiceNumber: string;
+  invoiceKind: "first" | "monthly" | "manual";
+  billingPeriod: string;
+  currency: string;
+  totalMinor: number;
+  paidMinor: number;
+  balanceMinor: number;
+  status: AdmissionInvoiceStatus;
+  dueDate: string;
+  issuedAt: string | null;
+  paidAt: string | null;
+  version: number;
+  lines: Array<{
+    lineId: number;
+    groupId: number | null;
+    subjectId: number | null;
+    description: string;
+    amountMinor: number;
+  }>;
+  payments: AdmissionInvoicePayment[];
+};
+
+export type AdmissionAuditEvent = {
+  eventId: number;
+  eventType: string;
+  entityType: string;
+  entityId: number;
+  detailSummary: string;
+  actorStaffId: number | null;
+  createdAt: string;
+};
+
+export type AdmissionSummary = {
+  admissionId: number;
+  schoolId: number;
+  schoolName: string;
+  studentFullName: string;
+  parentFullName: string;
+  parentPhone: string;
+  status: AdmissionStatus;
+  contractStatus: AdmissionContractStatus | null;
+  firstInvoiceStatus: AdmissionInvoiceStatus | null;
+  firstDueDate: string;
+  updatedAt: string;
+};
+
+export type AdmissionPage = {
+  items: AdmissionSummary[];
+  total: number;
+};
+
+export type AdmissionDetail = {
+  admissionId: number;
+  schoolId: number;
+  schoolName: string;
+  studentFullName: string;
+  studentPhone: string;
+  parentFullName: string;
+  parentPhone: string;
+  parentTelegramUsername: string;
+  preferredLanguage: "uz" | "ru";
+  serviceStartDate: string | null;
+  firstDueDate: string;
+  billingDay: number;
+  currency: string;
+  status: AdmissionStatus;
+  version: number;
+  activatedStudentId: number | null;
+  activatedParentId: number | null;
+  activatedAt: string | null;
+  cancellationReason: string;
+  groups: AdmissionGroup[];
+  contract: AdmissionContract | null;
+  invoices: AdmissionInvoice[];
+  auditEvents: AdmissionAuditEvent[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdmissionCreated = {
+  admission: AdmissionDetail;
+  admissionLink: {
+    accessToken: string;
+    expiresAt: string;
+  };
+  publicUrl: string;
+};
+
+export type AdmissionInvoiceQueueItem = {
+  invoiceId: number;
+  invoiceNumber: string;
+  admissionId: number;
+  schoolId: number;
+  schoolName: string;
+  studentFullName: string;
+  parentFullName: string;
+  parentPhone: string;
+  invoiceKind: string;
+  currency: string;
+  totalMinor: number;
+  paidMinor: number;
+  balanceMinor: number;
+  status: AdmissionInvoiceStatus;
+  dueDate: string;
+  issuedAt: string | null;
+  paidAt: string | null;
+  version: number;
+};
+
+export type AdmissionInvoiceQueue = {
+  items: AdmissionInvoiceQueueItem[];
+  total: number;
+};
 
 export type SupportSchool = {
   id: number;

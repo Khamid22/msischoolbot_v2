@@ -8,6 +8,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from backend.core.unit_of_work import Connection
+from backend.modules.domains.identity.contracts import (
+    ProvisionParentAccountCommand,
+    provision_parent_account,
+)
 from backend.modules.domains.parent_relationships import repository
 
 
@@ -30,6 +34,22 @@ class ParentPreference:
     parent_id: int
     display_name: str
     preferred_language: str
+
+
+@dataclass(frozen=True)
+class EnsureAdmissionParentCommand:
+    student_id: int
+    full_name: str
+    phone: str
+    telegram_username: str
+    preferred_language: str
+
+
+@dataclass(frozen=True)
+class EnsureAdmissionParentResult:
+    parent_id: int
+    account_id: int
+    was_reused: bool
 
 
 def _token_hash(invite_code: str) -> str:
@@ -73,6 +93,55 @@ def create_parent_invite(
                 canonical_student_id=student_id,
             )
     raise RuntimeError("Could not generate a unique parent invite code")
+
+
+def ensure_admission_parent(
+    conn: Connection,
+    command: EnsureAdmissionParentCommand,
+) -> EnsureAdmissionParentResult:
+    normalized_phone = "".join(character for character in command.phone if character.isdigit())
+    if len(normalized_phone) < 5:
+        raise ValueError("A valid parent phone number is required.")
+    matches = repository.find_unique_active_parent_by_phone(conn, normalized_phone)
+    if len(matches) > 1:
+        raise ValueError(
+            "More than one active parent uses this phone number. "
+            "Customer Support must review the identity before activation."
+        )
+    was_reused = bool(matches)
+    if matches:
+        parent_id = int(matches[0]["id"])
+    else:
+        parent_id = repository.insert_admission_parent(
+            conn,
+            display_name=" ".join(command.full_name.strip().split()),
+            phone=command.phone.strip(),
+            telegram_username=command.telegram_username,
+            preferred_language=command.preferred_language,
+        )
+    if parent_id <= 0:
+        raise RuntimeError("The parent record could not be created.")
+    repository.ensure_active_parent_student_link(
+        conn,
+        parent_id=parent_id,
+        student_id=command.student_id,
+    )
+    account = provision_parent_account(
+        conn,
+        ProvisionParentAccountCommand(
+            parent_id=parent_id,
+            full_name=command.full_name,
+            phone=command.phone,
+            telegram_username=command.telegram_username,
+        ),
+    )
+    if account.account_id <= 0:
+        raise RuntimeError("The parent identity could not be provisioned.")
+    return EnsureAdmissionParentResult(
+        parent_id=parent_id,
+        account_id=account.account_id,
+        was_reused=was_reused,
+    )
 
 
 def parent_can_access_student_on_connection(
@@ -162,9 +231,12 @@ def resolve_parent_child_dashboard(*args, **kwargs):
 __all__ = [
     "CreateParentInviteCommand",
     "CreateParentInviteResult",
+    "EnsureAdmissionParentCommand",
+    "EnsureAdmissionParentResult",
     "ParentPreference",
     "claim_parent_invite_code",
     "create_parent_invite",
+    "ensure_admission_parent",
     "list_parent_client_children",
     "load_parent_invite_code_payload",
     "parent_account_exists",

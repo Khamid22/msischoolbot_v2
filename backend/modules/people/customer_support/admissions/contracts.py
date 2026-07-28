@@ -1,0 +1,53 @@
+"""Public Customer Support admission interface."""
+
+from backend.modules.domains.admissions.contracts import (
+    AddPaidInvoiceCommand,
+    AdmissionDetail,
+    AdmissionError,
+    AdmissionGroupOption,
+    AdmissionLink,
+    AdmissionPage,
+    AdmissionStatus,
+    CancelAdmissionCommand,
+    ContractStatus,
+    CreateAdmissionCommand,
+    Invoice,
+    InvoiceKind,
+    InvoiceQueuePage,
+    InvoiceStatus,
+    ManualPaymentCommand,
+    ManualPaymentMethod,
+    PublicAdmission,
+    ReverseManualPaymentCommand,
+    ReviewContractCommand,
+    UpdateAdmissionCommand,
+    VoidInvoiceCommand,
+)
+from backend.modules.people.customer_support.admissions.use_cases import (
+    CustomerSupportAdmissions,
+)
+
+__all__ = [
+    "AdmissionDetail",
+    "AdmissionError",
+    "AdmissionGroupOption",
+    "AdmissionLink",
+    "AdmissionPage",
+    "AdmissionStatus",
+    "AddPaidInvoiceCommand",
+    "CancelAdmissionCommand",
+    "ContractStatus",
+    "CreateAdmissionCommand",
+    "CustomerSupportAdmissions",
+    "Invoice",
+    "InvoiceKind",
+    "InvoiceStatus",
+    "InvoiceQueuePage",
+    "ManualPaymentCommand",
+    "ManualPaymentMethod",
+    "PublicAdmission",
+    "ReverseManualPaymentCommand",
+    "ReviewContractCommand",
+    "UpdateAdmissionCommand",
+    "VoidInvoiceCommand",
+]

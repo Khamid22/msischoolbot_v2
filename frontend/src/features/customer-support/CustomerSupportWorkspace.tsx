@@ -1,8 +1,9 @@
-import { ContactRound, CreditCard, GraduationCap, LayoutDashboard, TicketCheck, UsersRound } from "lucide-react";
+import { ClipboardCheck, ContactRound, CreditCard, GraduationCap, LayoutDashboard, TicketCheck, UsersRound } from "lucide-react";
 import type { SupportWorkspaceView } from "@/features/customer-support/model";
 import { DashboardPage } from "@/features/customer-support/dashboard/DashboardPage";
 import { ParentsPage } from "@/features/customer-support/parents/ParentsPage";
-import { PaymentsPlaceholder } from "@/features/customer-support/placeholders/PaymentsPlaceholder";
+import { AdmissionsPage } from "@/features/customer-support/admissions/AdmissionsPage";
+import { PaymentsPage } from "@/features/customer-support/payments/PaymentsPage";
 import { StudentsPage } from "@/features/customer-support/students/StudentsPage";
 import { TeachersPage } from "@/features/customer-support/teachers/TeachersPage";
 import { TicketsPage } from "@/features/customer-support/tickets/TicketsPage";
@@ -16,9 +17,10 @@ type Props = {
   view?: string;
 };
 
-const VALID_VIEWS = new Set<SupportWorkspaceView>(["dashboard", "payments", "parents", "students", "teachers", "tickets"]);
+const VALID_VIEWS = new Set<SupportWorkspaceView>(["dashboard", "admissions", "payments", "parents", "students", "teachers", "tickets"]);
 const CUSTOMER_SUPPORT_NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", href: "/customer-support/dashboard", icon: LayoutDashboard },
+  { key: "admissions", label: "Admissions", href: "/customer-support/admissions", icon: ClipboardCheck },
   { key: "payments", label: "Payments", href: "/customer-support/payments", icon: CreditCard },
   { key: "parents", label: "Parents", href: "/customer-support/parents", icon: UsersRound },
   { key: "students", label: "Students", href: "/customer-support/students", icon: GraduationCap },
@@ -60,7 +62,9 @@ export default function CustomerSupportWorkspace({
       ) : activeView === "students" ? (
         <StudentsPage key="students" {...pageProps} csrfToken={csrfToken} />
       ) : activeView === "payments" ? (
-        <PaymentsPlaceholder key="payments" {...pageProps} />
+        <PaymentsPage key="payments" />
+      ) : activeView === "admissions" ? (
+        <AdmissionsPage key="admissions" {...pageProps} csrfToken={csrfToken} />
       ) : activeView === "teachers" ? (
         <TeachersPage key="teachers" {...pageProps} />
       ) : activeView === "tickets" ? (

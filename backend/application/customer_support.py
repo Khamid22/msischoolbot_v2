@@ -1,6 +1,7 @@
 """Application composition for Customer Support use cases."""
 
 from backend.application.container import AppContainer
+from backend.modules.domains.admissions.public_service import PublicAdmissions
 from backend.modules.domains.reporting.customer_support.postgres_repository import (
     PostgresCustomerSupportDashboardRepository,
 )
@@ -9,6 +10,9 @@ from backend.modules.domains.reporting.customer_support.queries import (
 )
 from backend.modules.domains.teacher_records.support_queries import (
     PostgresTeacherSupportReader,
+)
+from backend.modules.people.customer_support.admissions.use_cases import (
+    CustomerSupportAdmissions,
 )
 from backend.modules.people.customer_support.dashboard.queries import (
     GetCustomerSupportDashboard,
@@ -54,8 +58,29 @@ def build_customer_support_dashboard(
     )
 
 
+def build_customer_support_admissions(
+    container: AppContainer,
+) -> CustomerSupportAdmissions:
+    return CustomerSupportAdmissions(
+        unit_of_work_factory=container.unit_of_work_factory,
+        scope_resolver=CustomerSupportScopeResolver(container.unit_of_work_factory),
+        storage_settings=container.settings.storage,
+        public_base_url=container.settings.payme.callback_base_url,
+    )
+
+
+def build_public_admissions(container: AppContainer) -> PublicAdmissions:
+    return PublicAdmissions(
+        unit_of_work_factory=container.unit_of_work_factory,
+        payme_settings=container.settings.payme,
+        storage_settings=container.settings.storage,
+    )
+
+
 __all__ = [
+    "build_customer_support_admissions",
     "build_customer_support_dashboard",
     "build_customer_support_teacher_queries",
     "build_customer_support_tickets",
+    "build_public_admissions",
 ]

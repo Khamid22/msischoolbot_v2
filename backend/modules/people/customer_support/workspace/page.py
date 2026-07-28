@@ -3,8 +3,8 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import RedirectResponse
 
-from backend.core.web.workspace_rendering import render_role_home
 from backend.core.access.pages import require_role
+from backend.core.web.workspace_rendering import render_role_home
 
 
 def register_customer_support_page_routes(app):
@@ -25,6 +25,19 @@ def register_customer_support_page_routes(app):
             title="Customer Support Dashboard",
             description="Monitor Customer Support operations.",
             view="dashboard",
+        )
+
+    @router.get(
+        "/customer-support/admissions",
+        operation_id="customer_support_admissions",
+    )
+    def customer_support_admissions():
+        return render_role_home(
+            "customer-support-home",
+            "customer_support",
+            title="Admissions",
+            description="Prepare contracts, collect the first payment, and activate enrollment.",
+            view="admissions",
         )
 
     @router.get(

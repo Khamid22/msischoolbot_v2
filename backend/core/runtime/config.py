@@ -83,6 +83,22 @@ class TelegramSettings:
 
 
 @dataclass(frozen=True)
+class PaymeSettings:
+    environment: str
+    merchant_id: str
+    login: str
+    key: str = field(repr=False)
+    checkout_url: str
+    callback_base_url: str
+    request_body_max_bytes: int
+    transaction_timeout_seconds: int
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.merchant_id and self.login and self.key)
+
+
+@dataclass(frozen=True)
 class PlatformSettings:
     """Deprecated aggregate retained for compatibility with older callers."""
 
@@ -107,6 +123,7 @@ class AppSettings:
     redis: RedisSettings
     storage: StorageSettings
     telegram: TelegramSettings
+    payme: PaymeSettings
     observability: ObservabilitySettings
 
     @property
@@ -230,6 +247,38 @@ def _telegram_settings() -> TelegramSettings:
     )
 
 
+def _payme_settings(environment: str) -> PaymeSettings:
+    payme_environment = getenv("PAYME_ENVIRONMENT", "test").strip().casefold() or "test"
+    if payme_environment not in {"test", "production"}:
+        raise RuntimeError("PAYME_ENVIRONMENT must be either 'test' or 'production'.")
+    if environment == "production" and payme_environment == "test":
+        merchant_id = ""
+        login = ""
+        key = ""
+    else:
+        merchant_id = getenv("PAYME_MERCHANT_ID", "").strip()
+        login = getenv("PAYME_MERCHANT_LOGIN", "").strip()
+        key = getenv("PAYME_MERCHANT_KEY", "").strip()
+    default_checkout = (
+        "https://checkout.paycom.uz/"
+        if payme_environment == "production"
+        else "https://test.paycom.uz/"
+    )
+    return PaymeSettings(
+        environment=payme_environment,
+        merchant_id=merchant_id,
+        login=login,
+        key=key,
+        checkout_url=getenv("PAYME_CHECKOUT_URL", default_checkout).strip() or default_checkout,
+        callback_base_url=getenv("PUBLIC_BASE_URL", "").strip().rstrip("/"),
+        request_body_max_bytes=max(1024, _int_env("PAYME_REQUEST_BODY_MAX_BYTES", 65536)),
+        transaction_timeout_seconds=max(
+            60,
+            _int_env("PAYME_TRANSACTION_TIMEOUT_SECONDS", 43200),
+        ),
+    )
+
+
 def get_app_settings() -> AppSettings:
     """Read and validate the typed settings shared by web and worker processes."""
 
@@ -246,6 +295,7 @@ def get_app_settings() -> AppSettings:
         ),
         storage=_storage_settings(),
         telegram=_telegram_settings(),
+        payme=_payme_settings(environment),
         observability=ObservabilitySettings(
             sentry_dsn=getenv("SENTRY_DSN", "").strip(),
             slow_request_ms=max(0.0, _float_env("HTTP_SLOW_REQUEST_MS", 500.0)),
@@ -276,6 +326,7 @@ __all__ = [
     "AppSettings",
     "DatabaseSettings",
     "ObservabilitySettings",
+    "PaymeSettings",
     "PlatformSettings",
     "RedisSettings",
     "SessionSettings",

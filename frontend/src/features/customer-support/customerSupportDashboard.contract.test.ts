@@ -94,3 +94,42 @@ describe("Customer Support ticket queue", () => {
     assert.doesNotMatch(detail, /\/assignment|\/waiting-state/);
   });
 });
+
+describe("Customer Support admissions and payments", () => {
+  const workspace = source("./CustomerSupportWorkspace.tsx");
+  const admissions = source("./admissions/AdmissionsPage.tsx");
+  const detail = source("./admissions/AdmissionDetailPanel.tsx");
+  const wizard = source("./admissions/AdmissionWizard.tsx");
+  const payments = source("./payments/PaymentsPage.tsx");
+  const publicAdmission = source("../../workspaces/public_admission/pages/Admission.tsx");
+
+  it("registers focused admission and invoice-ledger workspaces", () => {
+    assert.match(workspace, /<AdmissionsPage/);
+    assert.match(workspace, /<PaymentsPage/);
+    assert.match(admissions, /Admission queue/);
+    assert.match(payments, /Invoice ledger/);
+  });
+
+  it("derives subjects from school-scoped groups and keeps amounts in minor units", () => {
+    assert.match(wizard, /Subjects are derived from the selected groups/);
+    assert.match(wizard, /monthlyAmountMinor: Math\.round\(amountUzs \* 100\)/);
+    assert.match(wizard, /Select only one group for each subject/);
+  });
+
+  it("supports contract review, manual settlement, atomic paid invoices, and audit history", () => {
+    assert.match(detail, /Accept and issue invoice/);
+    assert.match(detail, /Record manual payment/);
+    assert.match(detail, /Add paid invoice and activate/);
+    assert.match(detail, /Audit history/);
+    assert.match(admissions, /\/paid-invoice/);
+    assert.match(admissions, /\/manual-payment/);
+  });
+
+  it("keeps Payme confirmation out of the browser callback", () => {
+    assert.match(publicAdmission, /account\[invoice_id\]/);
+    assert.match(publicAdmission, /method="POST"/);
+    assert.match(publicAdmission, /action=\{data\.checkoutUrl\}/);
+    assert.doesNotMatch(publicAdmission, /confirmPayment|performTransaction/);
+    assert.match(publicAdmission, /mutation\.isError/);
+  });
+});

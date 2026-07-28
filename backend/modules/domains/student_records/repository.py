@@ -13,6 +13,71 @@ DB-3 owns student query access here while the physical schema remains
 _DEFAULT_SCHOOL_KEY = "school5"
 
 
+def acquire_student_identifier_lock(conn):
+    from backend.modules.domains.student_records.policies import (
+        STUDENT_IDENTIFIER_ADVISORY_LOCK_ID,
+    )
+
+    conn.execute(
+        "SELECT pg_advisory_xact_lock(%s)",
+        (STUDENT_IDENTIFIER_ADVISORY_LOCK_ID,),
+    )
+
+
+def next_legacy_student_row_id(conn) -> int:
+    row = conn.execute(
+        "SELECT nextval('msi_v2.legacy_student_row_id_seq') AS next_id"
+    ).fetchone()
+    return int(row["next_id"])
+
+
+def next_student_code(conn, prefix: str = "MSI") -> str:
+    normalized_prefix = str(prefix or "MSI").strip().upper() or "MSI"
+    rows = conn.execute(
+        """
+        SELECT student_code
+        FROM msi_v2.students
+        WHERE upper(student_code) LIKE %s
+        """,
+        (f"{normalized_prefix}%",),
+    ).fetchall()
+    prefix_length = len(normalized_prefix)
+    highest_number = 0
+    for row in rows:
+        student_code = str(row["student_code"] or "").strip().upper()
+        suffix = student_code[prefix_length:] if student_code.startswith(normalized_prefix) else ""
+        if suffix.isdigit():
+            highest_number = max(highest_number, int(suffix))
+    return f"{normalized_prefix}{highest_number + 1:05d}"
+
+
+def insert_admission_student(
+    conn,
+    *,
+    student_code: str,
+    full_name: str,
+    school_id: int,
+    legacy_student_row_id: int,
+) -> int:
+    row = conn.execute(
+        """
+        INSERT INTO msi_v2.students (
+            student_code, full_name, school_id, status,
+            legacy_student_row_id, version, created_at, updated_at
+        )
+        VALUES (%s, %s, %s, 'active', %s, 1, now(), now())
+        RETURNING id
+        """,
+        (
+            student_code,
+            full_name,
+            int(school_id),
+            int(legacy_student_row_id),
+        ),
+    ).fetchone()
+    return int(row["id"]) if row else 0
+
+
 def _normalize_school_key(school_key):
     normalized = str(school_key or "").strip().casefold()
     if normalized in {"school_5", "school-5", "school 5", "school5"}:

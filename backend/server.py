@@ -21,6 +21,7 @@ from backend.core.runtime.config import AppSettings, get_app_settings, get_web_s
 from backend.core.runtime.observability import (
     RequestMetricsMiddleware,
     configure_error_reporting,
+    redact_sensitive_path,
 )
 from backend.core.web.error_pages import internal_server_error_page
 from backend.core.web.request_context import RequestContextMiddleware, prime_body_state
@@ -72,7 +73,7 @@ def handle_unexpected_error(request_obj: Request, exc: Exception) -> Response:
         "Unhandled error request_id=%s method=%s path=%s type=%s detail=%s",
         request_id or "unavailable",
         request_obj.method,
-        request_obj.url.path,
+        redact_sensitive_path(request_obj.url.path),
         type(exc).__name__,
         error_summary or "(no detail)",
     )

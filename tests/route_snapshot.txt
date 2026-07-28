@@ -15,6 +15,7 @@
 /academic-director/timetable | GET
 /academic_director | GET
 /account/security | GET
+/admissions/{access_token} | GET
 /api/v1/academic-director/academic/attendance | POST
 /api/v1/academic-director/academic/calendar-closures | GET
 /api/v1/academic-director/academic/calendar-closures | POST
@@ -59,6 +60,20 @@
 /api/v1/auth/telegram-link | DELETE
 /api/v1/auth/telegram-link | GET
 /api/v1/auth/telegram-link | POST
+/api/v1/customer-support/admissions | GET
+/api/v1/customer-support/admissions | POST
+/api/v1/customer-support/admissions/groups | GET
+/api/v1/customer-support/admissions/invoices/{invoice_id}/manual-payment | POST
+/api/v1/customer-support/admissions/invoices/{invoice_id}/void | POST
+/api/v1/customer-support/admissions/payments/{payment_id}/reverse | POST
+/api/v1/customer-support/admissions/{admission_id} | GET
+/api/v1/customer-support/admissions/{admission_id} | PATCH
+/api/v1/customer-support/admissions/{admission_id}/cancel | POST
+/api/v1/customer-support/admissions/{admission_id}/contract | POST
+/api/v1/customer-support/admissions/{admission_id}/contract/download | GET
+/api/v1/customer-support/admissions/{admission_id}/contract/review | POST
+/api/v1/customer-support/admissions/{admission_id}/paid-invoice | POST
+/api/v1/customer-support/admissions/{admission_id}/send | POST
 /api/v1/customer-support/context | GET
 /api/v1/customer-support/dashboard | GET
 /api/v1/customer-support/parents/{parent_id} | GET
@@ -67,6 +82,7 @@
 /api/v1/customer-support/parents/{parent_id}/children/{student_id} | DELETE
 /api/v1/customer-support/parents/{parent_id}/deactivate | POST
 /api/v1/customer-support/parents/{parent_id}/reactivate | POST
+/api/v1/customer-support/payments/invoices | GET
 /api/v1/customer-support/payments/{payment_id} | PATCH
 /api/v1/customer-support/payments/{payment_id}/settlement | POST
 /api/v1/customer-support/payments/{payment_id}/void | POST
@@ -96,6 +112,7 @@
 /api/v1/head-of-department/teacher-academy/{academy_teacher_id}/status | POST
 /api/v1/hr/analytics/dashboard | GET
 /api/v1/hr/analytics/options | GET
+/api/v1/integrations/payme/merchant | POST
 /api/v1/parent/children | GET
 /api/v1/parent/children/{student_row_id} | GET
 /api/v1/parent/overview | GET
@@ -107,6 +124,9 @@
 /api/v1/parent/tickets/{ticket_id} | GET
 /api/v1/parent/tickets/{ticket_id}/messages | POST
 /api/v1/parent/updates | GET
+/api/v1/public/admissions/{access_token} | GET
+/api/v1/public/admissions/{access_token}/contract | POST
+/api/v1/public/admissions/{access_token}/contract/download | GET
 /api/v1/recruitment/academy-intakes/{academy_teacher_id}/onboard | POST
 /api/v1/recruitment/active-teacher-intakes/{teacher_id}/provision-account | POST
 /api/v1/recruitment/appointments | GET
@@ -193,6 +213,7 @@
 /ceo/recruitment/settings | GET
 /ceo/recruitment/tasks | GET
 /customer-support | GET
+/customer-support/admissions | GET
 /customer-support/dashboard | GET
 /customer-support/parents | GET
 /customer-support/payments | GET

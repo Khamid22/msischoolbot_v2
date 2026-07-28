@@ -40,6 +40,19 @@ class ProvisionStudentAccountResult:
 
 
 @dataclass(frozen=True)
+class ProvisionParentAccountCommand:
+    parent_id: int
+    full_name: str
+    phone: str
+    telegram_username: str = ""
+
+
+@dataclass(frozen=True)
+class ProvisionParentAccountResult:
+    account_id: int
+
+
+@dataclass(frozen=True)
 class StaffSchoolScopeAssignment:
     staff_id: int
     raw_scope: str
@@ -87,6 +100,24 @@ def provision_student_account(
         status=command.status.strip().casefold() or "active",
     )
     return ProvisionStudentAccountResult(account_id=account_id)
+
+
+def provision_parent_account(
+    conn: Connection,
+    command: ProvisionParentAccountCommand,
+) -> ProvisionParentAccountResult:
+    from backend.modules.domains.identity.service import (
+        provision_parent_account as provision,
+    )
+
+    account_id = provision(
+        conn,
+        parent_id=command.parent_id,
+        full_name=command.full_name,
+        phone=command.phone,
+        telegram_username=command.telegram_username,
+    )
+    return ProvisionParentAccountResult(account_id=account_id)
 
 
 def create_hr_manager_account(
@@ -163,6 +194,8 @@ def reset_student_password(
 
 
 __all__ = [
+    "ProvisionParentAccountCommand",
+    "ProvisionParentAccountResult",
     "ProvisionStudentAccountCommand",
     "ProvisionStudentAccountResult",
     "StaffSchoolScopeAssignment",
@@ -185,6 +218,7 @@ __all__ = [
     "list_active_subjects",
     "list_head_of_department_accounts",
     "provision_student_account",
+    "provision_parent_account",
     "reset_head_of_department_password",
     "reset_student_password",
     "set_account_session",

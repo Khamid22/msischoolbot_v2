@@ -25,6 +25,7 @@ Audience: engineers locating the owner of a change.
 | holiday closures | `modules/domains/academics/calendar` | timetable closure UI |
 | learning resources | `modules/domains/academics/resources` | `features/academics/resources` |
 | payments | `modules/domains/finance` | `features/finance` |
+| admissions, contracts, and first invoices | `modules/domains/admissions` | `features/customer-support/admissions`, `workspaces/public_admission` |
 | support tickets | `modules/domains/support_cases/tickets` | `features/support` |
 | announcements/chat | `modules/domains/communications` | `features/communications` |
 | dashboards/read models | `modules/domains/reporting` | `features/reporting` |
@@ -51,7 +52,8 @@ Audience: engineers locating the owner of a change.
 | Academics / Resources | resource type/resource/comment tables |
 | Recruitment | `teacher_candidates`, normalized candidate document/evaluation/assignment/task/note/approval/decision tables; legacy candidate events are read-only history |
 | Teacher Academy | training, evaluation, assignment, and development tables |
-| Finance | `payments` |
+| Admissions | `admissions`, `admission_group_selections`, `admission_access_tokens`, `admission_contracts`, `invoices`, `invoice_lines`, `invoice_payments`, `payme_transactions` |
+| Finance | legacy `payments`; admission invoices are owned by Admissions and exposed through Finance compatibility reads |
 | Support Cases | complaint/support tables |
 | Communications | announcement and chat tables |
 | Reporting | no transactional ownership; read-only projections |
@@ -90,6 +92,8 @@ section.
 | Parents | `people/customer_support/parents` | `parent_relationships/support_contracts.py`, plus typed Student, Finance, and Support Cases contracts |
 | Teachers | `people/customer_support/teachers` | `teacher_records/support_contracts.py` |
 | Tickets | `people/customer_support/tickets` | `support_cases/tickets` |
+| Admissions | `people/customer_support/admissions` | `admissions/contracts.py` |
+| Payments | `people/customer_support/admissions` | `admissions/contracts.py`, plus Finance compatibility reads |
 
 The current Customer Support workspace adapter and
 `support_cases/customer_records_*` files remain compatibility boundaries.
@@ -125,6 +129,8 @@ not add another capability to one of these files before satisfying its removal c
 | `modules/domains/reporting/recruitment/repository.py` | HR Analytics | Split each report family before adding another analytics query. |
 | `modules/domains/support_cases/customer_records_service.py` | Support Cases | Split Student, Parent, and Payment commands before adding another support workflow. |
 | `modules/domains/support_cases/customer_records_repository.py` | Support Cases | Move student, parent, and payment writes behind their owning domain contracts before adding another records workflow. |
+| `modules/domains/admissions/contracts.py` | Admissions | Split admission commands and read projections after the initial Merchant sandbox is certified; no additional admission capability may be added here first. |
+| `modules/domains/admissions/repository.py` | Admissions | Split contract, invoice, token, and activation persistence into focused repository files before adding another billing provider. |
 
 No new backend domain implementation may exceed 800 lines and no new frontend feature component may exceed 600 lines without adding a named rationale here.
 

@@ -6,6 +6,8 @@ the conversion happens at this repository boundary so legacy ids never leak
 into foreign-key columns.
 """
 
+NEW_INVOICE_PAYMENT_ID_OFFSET = 2_000_000_000_000
+
 
 def _payment_select():
     return """
@@ -31,16 +33,60 @@ def _payment_select():
 def list_student_payment_rows(conn, student_row_id):
     return conn.execute(
         f"""
-        SELECT {_payment_select()}
-        FROM msi_v2.payments p
-        JOIN msi_v2.students st ON st.id = p.student_id
-        LEFT JOIN msi_v2.groups g ON g.id = p.group_id
-        LEFT JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
-        LEFT JOIN msi_v2.subjects sub ON sub.id = sp.subject_id
-        WHERE st.legacy_student_row_id = %s
-        ORDER BY COALESCE(p.due_date, DATE '9999-12-31') ASC, p.id ASC
+        WITH legacy_payments AS (
+            SELECT {_payment_select()}
+            FROM msi_v2.payments p
+            JOIN msi_v2.students st ON st.id = p.student_id
+            LEFT JOIN msi_v2.groups g ON g.id = p.group_id
+            LEFT JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+            LEFT JOIN msi_v2.subjects sub ON sub.id = sp.subject_id
+            WHERE st.legacy_student_row_id = %s
+        ),
+        admission_invoices AS (
+            SELECT
+                %s + invoice.id AS id,
+                student.legacy_student_row_id AS student_row_id,
+                COALESCE(
+                    string_agg(
+                        line.description,
+                        ', '
+                        ORDER BY line.id
+                    ),
+                    'School services'
+                ) AS subject,
+                to_char(invoice.billing_period, 'YYYY-MM') AS month_label,
+                (invoice.total_minor::numeric / 100)::float AS amount,
+                invoice.currency,
+                invoice.status,
+                invoice.due_date::text AS due_date,
+                COALESCE(invoice.paid_at::text, '') AS paid_at,
+                'Invoice ' || invoice.invoice_number AS notes,
+                invoice.version,
+                COALESCE(invoice.voided_at::text, '') AS voided_at,
+                invoice.void_reason,
+                invoice.created_by_staff_id AS created_by_admin_id,
+                invoice.created_at::text AS created_at,
+                invoice.updated_at::text AS updated_at
+            FROM msi_v2.invoices invoice
+            JOIN msi_v2.students student ON student.id = invoice.student_id
+            LEFT JOIN msi_v2.invoice_lines line ON line.invoice_id = invoice.id
+            WHERE student.legacy_student_row_id = %s
+            GROUP BY invoice.id, student.legacy_student_row_id
+        )
+        SELECT *
+        FROM (
+            SELECT * FROM legacy_payments
+            UNION ALL
+            SELECT * FROM admission_invoices
+        ) payment_record
+        ORDER BY COALESCE(NULLIF(payment_record.due_date, '')::date, DATE '9999-12-31'),
+                 payment_record.id
         """,
-        (int(student_row_id),),
+        (
+            int(student_row_id),
+            NEW_INVOICE_PAYMENT_ID_OFFSET,
+            int(student_row_id),
+        ),
     ).fetchall()
 
 
@@ -198,6 +244,7 @@ def delete_student_payment_row(conn, payment_id):
 
 
 __all__ = [
+    "NEW_INVOICE_PAYMENT_ID_OFFSET",
     "delete_student_payment_row",
     "get_student_payment_row",
     "get_internal_student_id",

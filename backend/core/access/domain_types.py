@@ -28,6 +28,7 @@ class PersonType(StrEnum):
 
 
 class Domain(StrEnum):
+    ADMISSIONS = "admissions"
     IDENTITY = "identity"
     ORGANIZATION = "organization"
     STUDENT_RECORDS = "student_records"
@@ -67,6 +68,7 @@ class Capability(StrEnum):
     MANAGE_RESOURCES = "manage_resources"
     MANAGE_COMPLAINTS = "manage_complaints"
     MANAGE_PAYMENTS = "manage_payments"
+    MANAGE_ADMISSIONS = "manage_admissions"
     MANAGE_ACADEMICS = "manage_academics"
     MANAGE_RECRUITMENT = "manage_recruitment"
     VIEW_GLOBAL_REPORTS = "view_global_reports"

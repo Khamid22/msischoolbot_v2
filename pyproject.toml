@@ -95,6 +95,7 @@ ignore = [
 "backend/modules/people/customer_support/workspace/teachers_api.py" = ["B008"]
 "backend/modules/people/customer_support/workspace/tickets_api.py" = ["B008"]
 "backend/modules/people/customer_support/workspace/dashboard_api.py" = ["B008"]
+"backend/modules/people/customer_support/workspace/api.py" = ["B008"]
 "backend/modules/people/parent/workspace/api.py" = ["B008"]
 
 [tool.mypy]
