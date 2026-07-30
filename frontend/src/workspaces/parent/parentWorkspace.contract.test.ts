@@ -71,4 +71,12 @@ describe("Parent workspace routes and screens", () => {
     assert.match(payments, /formatCountdown/);
     assert.match(payments, /reviewRequired/);
   });
+
+  it("shows the billing warning outside Payments and hides it on Payments", () => {
+    assert.match(
+      workspace,
+      /billingStatus\.data && activeView !== "payments"/,
+    );
+    assert.match(workspace, /<BillingCountdownBanner/);
+  });
 });

@@ -1,16 +1,14 @@
+import asyncio
 import errno
 import hashlib
+import logging
 import os
 import sys
-
-import asyncio
-import logging
 import threading
 
 from backend.core.runtime.config import get_web_settings
 from backend.modules.domains.identity.bootstrap import init_storage
 from backend.platform.telegram import polling_repository
-
 
 _ADDRESS_IN_USE_ERRNOS = {
     getattr(errno, "EADDRINUSE", 48),
@@ -192,6 +190,7 @@ def _is_address_in_use_error(exc):
 
 def run_web_server():
     import uvicorn
+
     from backend.core.runtime.config import get_web_settings
 
     listen_targets = _web_listen_targets()
@@ -318,8 +317,17 @@ if __name__ == "__main__":
         asyncio.run(run_bot())
     elif run_mode == "worker":
         from backend.application.worker import run_worker
+        from backend.application.worker_health import start_worker_health_server
 
-        run_worker()
+        health_settings = get_web_settings()
+        health_server = start_worker_health_server(
+            host=health_settings.web_host,
+            port=health_settings.web_port,
+        )
+        try:
+            run_worker()
+        finally:
+            health_server.close()
     else:
         logging.info(
             "Running bot + web in one process. "

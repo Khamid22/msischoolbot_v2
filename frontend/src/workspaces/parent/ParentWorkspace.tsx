@@ -194,7 +194,7 @@ export default function ParentWorkspace({
       selectedStudentId={selectedStudentId}
       onChildChange={changeChild}
     >
-      {billingStatus.data ? (
+      {billingStatus.data && activeView !== "payments" ? (
         <BillingCountdownBanner
           status={billingStatus.data}
           paymentsHref="/parent/payments"
