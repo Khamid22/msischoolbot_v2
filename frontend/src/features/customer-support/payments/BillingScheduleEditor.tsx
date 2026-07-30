@@ -43,6 +43,9 @@ export function BillingScheduleEditor({
   const hasCurrentInvoice = account.billingCycles.some((cycle) => (
     Boolean(cycle.invoiceId) && cycle.state === "invoiced"
   ));
+  const hasScheduledCycleWithoutInvoice = account.billingCycles.some((cycle) => (
+    !cycle.invoiceId && cycle.state === "scheduled"
+  ));
   const requiresApplyChoice = account.scheduleStatus !== "missing"
     && (hasCurrentInvoice || !account.canApplyCurrentCycle);
 
@@ -197,6 +200,13 @@ export function BillingScheduleEditor({
         </p>
       ) : null}
 
+      {hasScheduledCycleWithoutInvoice ? (
+        <p className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm font-bold text-foreground">
+          This schedule has no payable invoice. Confirm the schedule to issue it now
+          and give the parent a fresh 48-hour Payme window.
+        </p>
+      ) : null}
+
       <div className="mt-4 flex flex-wrap gap-2">
         {requiresApplyChoice ? (
           <button
@@ -216,7 +226,9 @@ export function BillingScheduleEditor({
             className={primaryButton}
           >
             <SaveIcon saving={saving} />
-            {account.scheduleStatus === "missing" ? "Start billing" : "Save schedule"}
+            {account.scheduleStatus === "missing" || hasScheduledCycleWithoutInvoice
+              ? "Issue invoice & start 48 hours"
+              : "Save schedule"}
           </button>
         )}
         <ScheduleActions account={account} saving={saving} />

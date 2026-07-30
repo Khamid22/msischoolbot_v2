@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 
 from backend.modules.domains.finance import billing_profile_repository
+from backend.modules.domains.finance.billing_cycles import plan_billing_cycles
 from backend.modules.domains.finance.commands import (
     BillingActor,
     configure_billing_profile,
@@ -316,27 +317,32 @@ def test_first_total_schedule_issues_one_live_invoice_and_enforcement_window():
         assert live["total_minor"] == 2_000_000_00
         assert live["due_at"] == live["deadline_at"]
         assert live["deadline_at"] - live["countdown_started_at"] == timedelta(hours=48)
-        assert abs(
-            (live["issued_at"] - live["countdown_started_at"]).total_seconds()
-        ) < 10
-        assert connection.execute(
-            """
+        assert abs((live["issued_at"] - live["countdown_started_at"]).total_seconds()) < 10
+        assert (
+            connection.execute(
+                """
             SELECT count(*) AS count
             FROM msi_v2.invoice_lines
             WHERE invoice_id = %s AND description = 'Monthly tuition'
             """,
-            (int(live["invoice_id"]),),
-        ).fetchone()["count"] == 1
-        assert connection.execute(
-            """
+                (int(live["invoice_id"]),),
+            ).fetchone()["count"]
+            == 1
+        )
+        assert (
+            connection.execute(
+                """
             SELECT count(*) AS count
             FROM msi_v2.student_billing_cycle_coverage
             WHERE cycle_id = %s
             """,
-            (int(live["cycle_id"]),),
-        ).fetchone()["count"] >= 1
-        assert connection.execute(
-            """
+                (int(live["cycle_id"]),),
+            ).fetchone()["count"]
+            >= 1
+        )
+        assert (
+            connection.execute(
+                """
             SELECT count(*) AS count
             FROM msi_v2.outbox_jobs
             WHERE topic = 'finance.process_billing_enforcement_stage'
@@ -344,17 +350,22 @@ def test_first_total_schedule_issues_one_live_invoice_and_enforcement_window():
               AND payload->>'stage' = 'initial'
               AND available_at <= now() + INTERVAL '10 seconds'
             """,
-            (str(live["schedule_id"]),),
-        ).fetchone()["count"] == 1
+                (str(live["schedule_id"]),),
+            ).fetchone()["count"]
+            == 1
+        )
         assert repeated.version == profile.version
-        assert connection.execute(
-            """
+        assert (
+            connection.execute(
+                """
             SELECT count(*) AS count
             FROM msi_v2.invoices
             WHERE student_id = %s AND status <> 'voided'
             """,
-            (int(enrollment["student_id"]),),
-        ).fetchone()["count"] == 1
+                (int(enrollment["student_id"]),),
+            ).fetchone()["count"]
+            == 1
+        )
 
         changed = configure_billing_profile(
             connection,
@@ -385,18 +396,24 @@ def test_first_total_schedule_issues_one_live_invoice_and_enforcement_window():
         assert replacement["revision"] == 2
         assert replacement["total_minor"] == 2_200_000_00
         assert replacement["due_at"] == replacement["deadline_at"]
-        assert connection.execute(
-            """
+        assert (
+            connection.execute(
+                """
             SELECT count(*) AS count
             FROM msi_v2.student_billing_cycles
             WHERE student_id = %s AND state = 'superseded'
             """,
-            (int(enrollment["student_id"]),),
-        ).fetchone()["count"] == 1
-        assert connection.execute(
-            "SELECT status FROM msi_v2.invoices WHERE id = %s",
-            (int(live["invoice_id"]),),
-        ).fetchone()["status"] == "voided"
+                (int(enrollment["student_id"]),),
+            ).fetchone()["count"]
+            == 1
+        )
+        assert (
+            connection.execute(
+                "SELECT status FROM msi_v2.invoices WHERE id = %s",
+                (int(live["invoice_id"]),),
+            ).fetchone()["status"]
+            == "voided"
+        )
 
         next_cycle = configure_billing_profile(
             connection,
@@ -411,22 +428,114 @@ def test_first_total_schedule_issues_one_live_invoice_and_enforcement_window():
             scope=BillingSchoolScope(all_schools=True),
         )
         assert next_cycle.total_amount_minor == 2_400_000_00
-        assert connection.execute(
-            """
+        assert (
+            connection.execute(
+                """
             SELECT total_minor
             FROM msi_v2.invoices
             WHERE id = %s AND status <> 'voided'
             """,
-            (int(replacement["invoice_id"]),),
-        ).fetchone()["total_minor"] == 2_200_000_00
-        assert connection.execute(
-            """
+                (int(replacement["invoice_id"]),),
+            ).fetchone()["total_minor"]
+            == 2_200_000_00
+        )
+        assert (
+            connection.execute(
+                """
             SELECT count(*) AS count
             FROM msi_v2.student_billing_cycles
             WHERE student_id = %s
             """,
+                (int(enrollment["student_id"]),),
+            ).fetchone()["count"]
+            == 2
+        )
+    finally:
+        connection.rollback()
+        connection.close()
+
+
+@pytest.mark.postgres
+def test_identical_schedule_save_repairs_a_planned_cycle_without_an_invoice():
+    connection = _connect_test_database()
+    try:
+        enrollment = _active_student_enrollment(connection)
+        now = datetime.now(UTC)
+        profile_id = billing_profile_repository.upsert_billing_profile(
+            connection,
+            student_id=int(enrollment["student_id"]),
+            school_id=int(enrollment["school_id"]),
+            billing_parent_id=None,
+            billing_day=1,
+            starts_on=now.date(),
+            status=BillingProfileStatus.ACTIVE,
+            pricing_mode=BillingPricingMode.TOTAL.value,
+            total_amount_minor=2_000_000_00,
+            expected_version=None,
+            staff_id=None,
+        )
+        planned_cycle_ids = plan_billing_cycles(connection, now=now)
+        assert planned_cycle_ids
+        assert (
+            connection.execute(
+                """
+            SELECT count(*) AS count
+            FROM msi_v2.invoices
+            WHERE student_id = %s AND status <> 'voided'
+            """,
+                (int(enrollment["student_id"]),),
+            ).fetchone()["count"]
+            == 0
+        )
+
+        command = ConfigureBillingProfileCommand(
+            student_id=int(enrollment["student_id"]),
+            billing_day=1,
+            pricing_mode=BillingPricingMode.TOTAL,
+            total_amount_minor=2_000_000_00,
+            apply_to=BillingScheduleApplyTo.CURRENT_CYCLE,
+            expected_version=1,
+        )
+        profile = configure_billing_profile(
+            connection,
+            command,
+            actor=BillingActor(staff_id=None, account_id=None),
+            scope=BillingSchoolScope(all_schools=True),
+        )
+        repeated = configure_billing_profile(
+            connection,
+            command,
+            actor=BillingActor(staff_id=None, account_id=None),
+            scope=BillingSchoolScope(all_schools=True),
+        )
+
+        live = connection.execute(
+            """
+            SELECT invoice.id, invoice.status,
+                   schedule.countdown_started_at, schedule.deadline_at
+            FROM msi_v2.invoices invoice
+            JOIN msi_v2.invoice_enforcement_schedules schedule
+              ON schedule.invoice_id = invoice.id
+            WHERE invoice.student_id = %s AND invoice.status <> 'voided'
+            """,
             (int(enrollment["student_id"]),),
-        ).fetchone()["count"] == 2
+        ).fetchone()
+        assert live is not None
+        assert live["status"] == "issued"
+        assert live["deadline_at"] - live["countdown_started_at"] == timedelta(hours=48)
+        assert profile.profile_id == profile_id
+        assert repeated.version == profile.version
+        assert (
+            connection.execute(
+                """
+            SELECT count(*) AS count
+            FROM msi_v2.invoices
+            WHERE student_id = %s AND status <> 'voided'
+            """,
+                (int(enrollment["student_id"]),),
+            ).fetchone()["count"]
+            == 1
+        )
     finally:
         connection.rollback()
         connection.close()

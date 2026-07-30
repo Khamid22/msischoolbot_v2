@@ -43,8 +43,8 @@ from backend.modules.domains.finance.schemas import (
     InvoiceDetail,
     IssueStudentInvoiceCommand,
     RecordManualInvoicePaymentCommand,
-    ReviewBillingCycleInvoiceCommand,
     ReverseInvoicePaymentCommand,
+    ReviewBillingCycleInvoiceCommand,
     VoidStudentInvoiceCommand,
 )
 from backend.modules.jobs.contracts import enqueue_on_connection
@@ -392,9 +392,7 @@ def configure_billing_profile(
             if not row:
                 raise BillingError("Every billing item must use an active student group.")
             subject_id = int(row["subject_id"])
-            subject_amounts[subject_id] = (
-                subject_amounts.get(subject_id, 0) + item.amount_minor
-            )
+            subject_amounts[subject_id] = subject_amounts.get(subject_id, 0) + item.amount_minor
     else:
         for price in command.subject_prices:
             if price.subject_id in subject_amounts:
@@ -448,6 +446,15 @@ def configure_billing_profile(
             and persisted_prices == subject_amounts
         )
         if is_same_configuration:
+            if (
+                command.status is BillingProfileStatus.ACTIVE
+                and command.apply_to is BillingScheduleApplyTo.CURRENT_CYCLE
+            ):
+                billing_cycles.ensure_current_cycle_invoice(
+                    conn,
+                    profile=current_profile,
+                    now=now,
+                )
             unchanged = get_billing_profile(
                 conn,
                 student_id=command.student_id,
@@ -458,23 +465,16 @@ def configure_billing_profile(
             return unchanged
     school_today = now.astimezone(SCHOOL_TIMEZONE).date()
     profile_starts_on = (
-        current_profile["starts_on"]
-        if current_profile
-        else (command.starts_on or school_today)
+        current_profile["starts_on"] if current_profile else (command.starts_on or school_today)
     )
     price_effective_on = command.starts_on or school_today
-    if (
-        current_profile
-        and command.apply_to is BillingScheduleApplyTo.NEXT_CYCLE
-    ):
+    if current_profile and command.apply_to is BillingScheduleApplyTo.NEXT_CYCLE:
         current_period = billing_cycles.next_billing_period(
             now=now,
             billing_day=command.billing_day,
             starts_on=profile_starts_on,
         )
-        price_effective_on = (current_period.replace(day=28) + timedelta(days=4)).replace(
-            day=1
-        )
+        price_effective_on = (current_period.replace(day=28) + timedelta(days=4)).replace(day=1)
     normalized_items = [
         (
             int(enrollment_by_subject[subject_id]["group_id"]),
@@ -545,10 +545,7 @@ def configure_billing_profile(
         conn,
         command.student_id,
     )
-    if (
-        command.status is BillingProfileStatus.ACTIVE
-        and persisted_profile is not None
-    ):
+    if command.status is BillingProfileStatus.ACTIVE and persisted_profile is not None:
         billing_cycles.apply_billing_profile_change(
             conn,
             profile=persisted_profile,

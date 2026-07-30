@@ -8,8 +8,10 @@ from pathlib import Path
 import pytest
 
 from backend.core.time import SCHOOL_TIMEZONE
+from backend.modules.domains.finance import billing_cycles
 from backend.modules.domains.finance.billing_cycles import (
     cycle_deadline,
+    ensure_current_cycle_invoice,
     next_billing_period,
 )
 from backend.modules.domains.finance.domain_types import (
@@ -66,6 +68,76 @@ def test_next_cycle_remains_current_month_before_deadline():
     assert period == date(2026, 8, 1)
 
 
+def test_unchanged_schedule_issues_a_missing_current_invoice(monkeypatch):
+    now = datetime(2026, 7, 30, 12, tzinfo=UTC)
+    monkeypatch.setattr(
+        billing_cycles.repository,
+        "get_profile_change_cycle_row",
+        lambda *args, **kwargs: {"id": 71},
+    )
+    monkeypatch.setattr(
+        billing_cycles.repository,
+        "get_cycle_row",
+        lambda *args, **kwargs: {
+            "id": 71,
+            "invoice_id": None,
+            "state": "scheduled",
+        },
+    )
+    monkeypatch.setattr(
+        billing_cycles.repository,
+        "list_manual_candidate_rows",
+        lambda *args, **kwargs: [],
+    )
+    issued: list[dict[str, object]] = []
+
+    def issue(*args, **kwargs):
+        issued.append(kwargs)
+        return 901
+
+    monkeypatch.setattr(billing_cycles, "issue_billing_cycle", issue)
+
+    invoice_id = ensure_current_cycle_invoice(
+        object(),  # type: ignore[arg-type]
+        profile={"id": 8, "billing_day": 1, "starts_on": date(2026, 7, 29)},
+        now=now,
+    )
+
+    assert invoice_id == 901
+    assert issued == [
+        {
+            "cycle_id": 71,
+            "now": now,
+            "force_immediate_window": True,
+        }
+    ]
+
+
+def test_unchanged_schedule_does_not_duplicate_an_existing_invoice(monkeypatch):
+    monkeypatch.setattr(
+        billing_cycles.repository,
+        "get_profile_change_cycle_row",
+        lambda *args, **kwargs: {"id": 71},
+    )
+    monkeypatch.setattr(
+        billing_cycles.repository,
+        "get_cycle_row",
+        lambda *args, **kwargs: {
+            "id": 71,
+            "invoice_id": 901,
+            "state": "invoiced",
+        },
+    )
+
+    invoice_id = ensure_current_cycle_invoice(
+        object(),  # type: ignore[arg-type]
+        profile={"id": 8, "billing_day": 1, "starts_on": date(2026, 7, 29)},
+        now=datetime(2026, 7, 30, 12, tzinfo=UTC),
+    )
+
+    assert invoice_id == 901
+
+
 def test_apply_review_requires_a_positive_allocation():
     with pytest.raises(ValueError, match="positive"):
         ReviewBillingCycleInvoiceCommand(
@@ -91,9 +163,9 @@ def test_excluded_review_cannot_allocate_money():
 
 
 def test_billing_cycle_migration_is_additive_and_never_auto_allocates_legacy_money():
-    source = Path(
-        "database/alembic/versions/0050_student_billing_cycles.py"
-    ).read_text(encoding="utf-8")
+    source = Path("database/alembic/versions/0050_student_billing_cycles.py").read_text(
+        encoding="utf-8"
+    )
     upgrade = source.split("def downgrade()", 1)[0]
 
     assert "student_billing_cycles" in upgrade
@@ -108,9 +180,9 @@ def test_billing_cycle_migration_is_additive_and_never_auto_allocates_legacy_mon
 
 
 def test_customer_support_api_exposes_review_and_reversal_without_delete_routes():
-    source = Path(
-        "backend/modules/people/customer_support/workspace/payments_api.py"
-    ).read_text(encoding="utf-8")
+    source = Path("backend/modules/people/customer_support/workspace/payments_api.py").read_text(
+        encoding="utf-8"
+    )
 
     assert '"/billing-cycles/readiness"' in source
     assert '"/billing-cycles/{cycle_id}/invoice-review"' in source
@@ -151,9 +223,9 @@ def test_per_subject_pricing_requires_subject_amounts():
 
 
 def test_simple_billing_migration_is_additive_and_revisioned():
-    source = Path(
-        "database/alembic/versions/0051_simple_live_billing.py"
-    ).read_text(encoding="utf-8")
+    source = Path("database/alembic/versions/0051_simple_live_billing.py").read_text(
+        encoding="utf-8"
+    )
     upgrade = source.split("def downgrade()", 1)[0]
 
     assert 'down_revision = "0050_billing_cycles"' in source
@@ -167,9 +239,7 @@ def test_simple_billing_migration_is_additive_and_revisioned():
 
 
 def test_schedule_change_issues_current_cycle_with_a_fresh_window():
-    source = Path(
-        "backend/modules/domains/finance/billing_cycles.py"
-    ).read_text(encoding="utf-8")
+    source = Path("backend/modules/domains/finance/billing_cycles.py").read_text(encoding="utf-8")
 
     assert "force_immediate_window=True" in source
     assert "normalized_now + timedelta(hours=PAYMENT_WINDOW_HOURS)" in source

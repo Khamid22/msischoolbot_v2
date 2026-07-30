@@ -145,6 +145,8 @@ describe("Customer Support admissions and payments", () => {
     assert.match(scheduleEditor, /Total monthly/);
     assert.match(scheduleEditor, /Per subject/);
     assert.match(scheduleEditor, /restart 48 hours/);
+    assert.match(scheduleEditor, /Issue invoice & start 48 hours/);
+    assert.match(scheduleEditor, /fresh 48-hour Payme window/);
   });
 
   it("defaults to billing accounts and exposes semantic desktop tables with mobile cards", () => {

@@ -170,10 +170,7 @@ def _create_cycle_for_profile(
     items, coverage, missing_subject_ids = _cycle_snapshot(
         conn,
         profile=profile,
-        effective_on=(
-            pricing_effective_on
-            or deadline.astimezone(SCHOOL_TIMEZONE).date()
-        ),
+        effective_on=(pricing_effective_on or deadline.astimezone(SCHOOL_TIMEZONE).date()),
     )
     if missing_subject_ids or not items:
         return 0, missing_subject_ids
@@ -338,6 +335,74 @@ def issue_billing_cycle(
     return invoice_id
 
 
+def ensure_current_cycle_invoice(
+    conn: Connection,
+    *,
+    profile: Any,
+    now: datetime,
+) -> int:
+    """Repair an active schedule whose current cycle has no payable invoice."""
+
+    normalized_now = now.astimezone(UTC)
+    planned_period = next_billing_period(
+        now=normalized_now,
+        billing_day=int(profile["billing_day"]),
+        starts_on=profile["starts_on"],
+    )
+    cycle = repository.get_profile_change_cycle_row(
+        conn,
+        profile_id=int(profile["id"]),
+        planned_billing_period=planned_period,
+        current_billing_period=_month_start(normalized_now.astimezone(SCHOOL_TIMEZONE).date()),
+        for_update=True,
+    )
+    if cycle is None:
+        cycle_id, missing_subject_ids = _create_cycle_for_profile(
+            conn,
+            profile=profile,
+            billing_period=planned_period,
+            deadline=cycle_deadline(planned_period, int(profile["billing_day"])),
+            pricing_effective_on=normalized_now.astimezone(SCHOOL_TIMEZONE).date(),
+        )
+        if missing_subject_ids:
+            raise BillingError(
+                "Enter an amount for every active subject before issuing the invoice.",
+                code="billing_subject_pricing_required",
+                status_code=409,
+            )
+        if not cycle_id:
+            raise BillingError(
+                "The student needs an active subject enrollment before billing can be configured.",
+                code="billing_enrollment_required",
+                status_code=409,
+            )
+        cycle = repository.get_cycle_row(conn, cycle_id, for_update=True)
+    else:
+        cycle = repository.get_cycle_row(conn, int(cycle["id"]), for_update=True)
+
+    if cycle["invoice_id"] is not None:
+        return int(cycle["invoice_id"])
+    if str(cycle["state"]) in {
+        BillingCycleState.CANCELLED.value,
+        BillingCycleState.SATISFIED.value,
+        BillingCycleState.REVIEW_REQUIRED.value,
+    }:
+        return 0
+    if repository.list_manual_candidate_rows(conn, int(cycle["id"])):
+        repository.update_cycle_state(
+            conn,
+            cycle_id=int(cycle["id"]),
+            state=BillingCycleState.REVIEW_REQUIRED.value,
+        )
+        return 0
+    return issue_billing_cycle(
+        conn,
+        cycle_id=int(cycle["id"]),
+        now=normalized_now,
+        force_immediate_window=True,
+    )
+
+
 def apply_billing_profile_change(
     conn: Connection,
     *,
@@ -359,9 +424,7 @@ def apply_billing_profile_change(
         conn,
         profile_id=int(profile["id"]),
         planned_billing_period=planned_period,
-        current_billing_period=_month_start(
-            normalized_now.astimezone(SCHOOL_TIMEZONE).date()
-        ),
+        current_billing_period=_month_start(normalized_now.astimezone(SCHOOL_TIMEZONE).date()),
         for_update=True,
     )
     if current and apply_to is BillingScheduleApplyTo.NEXT_CYCLE:
@@ -433,8 +496,7 @@ def apply_billing_profile_change(
         deadline=deadline,
         pricing_effective_on=(
             normalized_now.astimezone(SCHOOL_TIMEZONE).date()
-            if is_first_configuration
-            or apply_to is BillingScheduleApplyTo.CURRENT_CYCLE
+            if is_first_configuration or apply_to is BillingScheduleApplyTo.CURRENT_CYCLE
             else None
         ),
     )
@@ -637,6 +699,7 @@ __all__ = [
     "BILLING_DEADLINE_TIME",
     "apply_billing_profile_change",
     "cycle_deadline",
+    "ensure_current_cycle_invoice",
     "issue_billing_cycle",
     "next_billing_period",
     "plan_billing_cycles",
