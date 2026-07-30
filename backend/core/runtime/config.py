@@ -258,7 +258,8 @@ def _payme_settings(environment: str) -> PaymeSettings:
     payme_environment = getenv("PAYME_ENVIRONMENT", "test").strip().casefold() or "test"
     if payme_environment not in {"test", "production"}:
         raise RuntimeError("PAYME_ENVIRONMENT must be either 'test' or 'production'.")
-    if environment == "production" and payme_environment == "test":
+    allow_test_in_production = _bool_env("PAYME_ALLOW_TEST_IN_PRODUCTION")
+    if environment == "production" and payme_environment == "test" and not allow_test_in_production:
         merchant_id = ""
         login = ""
         key = ""
