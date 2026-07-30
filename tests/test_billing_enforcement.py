@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 from backend.application.security_middleware import _payment_only_path_allowed
-from backend.modules.domains.finance import enforcement
+from backend.modules.domains.finance import enforcement, notification_sender
 from backend.modules.domains.finance.domain_types import (
     BillingAccessMode,
     BillingHoldTarget,
@@ -58,6 +60,51 @@ def test_sibling_notification_does_not_reveal_invoice_details():
     assert "Other child" not in message
     assert "10 000 000" not in message
     assert "24 soat" in message
+
+
+def test_parent_payment_notification_opens_payments_as_telegram_web_app(monkeypatch):
+    captured_payload: dict[str, object] = {}
+
+    class TelegramResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+    def capture_request(telegram_request, *, timeout):
+        assert timeout == 5.0
+        captured_payload.update(json.loads(telegram_request.data))
+        return TelegramResponse()
+
+    monkeypatch.setattr(
+        notification_sender,
+        "get_app_settings",
+        lambda: SimpleNamespace(
+            telegram=SimpleNamespace(
+                bot_token="test-token",
+                mini_app_url="https://msi-school.example/",
+                api_timeout_seconds=5.0,
+            ),
+            payme=SimpleNamespace(callback_base_url=""),
+        ),
+    )
+    monkeypatch.setattr(notification_sender.request, "urlopen", capture_request)
+
+    notification_sender.send_billing_telegram_message(
+        telegram_user_id=123,
+        text="Payment reminder",
+        target_type=BillingHoldTarget.LINKED_PARENT,
+        language="uz",
+    )
+
+    button = captured_payload["reply_markup"]["inline_keyboard"][0][0]
+    assert button["web_app"] == {
+        "url": "https://msi-school.example/parent/payments"
+    }
+    assert "url" not in button
 
 
 def test_account_access_hides_sibling_invoice_details(monkeypatch):

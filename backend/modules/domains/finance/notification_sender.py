@@ -121,7 +121,12 @@ def send_billing_telegram_message(
     if base_url:
         payload["reply_markup"] = {
             "inline_keyboard": [
-                [{"text": button_label, "url": f"{base_url}{payment_path}"}]
+                [
+                    {
+                        "text": button_label,
+                        "web_app": {"url": f"{base_url}{payment_path}"},
+                    }
+                ]
             ]
         }
     telegram_request = request.Request(
