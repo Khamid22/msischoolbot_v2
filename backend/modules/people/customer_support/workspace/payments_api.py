@@ -14,6 +14,9 @@ from backend.core.access import ActorContext, get_actor_context
 from backend.core.api import ApiModel, ApiSuccess, api_error, api_success
 from backend.modules.people.customer_support.payments.contracts import (
     AddPaidStudentInvoiceCommand,
+    BillingAccountDetail,
+    BillingAccountPage,
+    BillingAccountType,
     BillingAutomationStatus,
     BillingError,
     BillingItemInput,
@@ -125,6 +128,64 @@ def get_billing_automation_status(
 
 
 @router.get(
+    "/billing-accounts",
+    response_model=ApiSuccess[BillingAccountPage],
+    operation_id="api_v1_customer_support_billing_accounts",
+)
+def list_billing_accounts(
+    actor: ActorDependency,
+    use_case: PaymentsUseCaseDependency,
+    q: Annotated[str, Query(max_length=200)] = "",
+    school_id: Annotated[int | None, Query(alias="schoolId", gt=0)] = None,
+    account_type: Annotated[str, Query(alias="accountType", max_length=20)] = "all",
+    schedule_status: Annotated[str, Query(alias="scheduleStatus", max_length=20)] = "all",
+    attention: Annotated[str, Query(max_length=40)] = "all",
+    access: Annotated[str, Query(max_length=20)] = "all",
+    cursor: Annotated[str | None, Query(max_length=500)] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+):
+    try:
+        return api_success(
+            use_case.list_billing_accounts(
+                actor,
+                query=q,
+                school_id=school_id,
+                account_type=account_type,
+                schedule_status=schedule_status,
+                attention=attention,
+                access=access,
+                cursor=cursor,
+                limit=limit,
+            )
+        )
+    except Exception as exc:
+        return _error(exc)
+
+
+@router.get(
+    "/billing-accounts/{account_type}/{account_id}",
+    response_model=ApiSuccess[BillingAccountDetail],
+    operation_id="api_v1_customer_support_billing_account_detail",
+)
+def get_billing_account(
+    account_type: BillingAccountType,
+    account_id: int,
+    actor: ActorDependency,
+    use_case: PaymentsUseCaseDependency,
+):
+    try:
+        return api_success(
+            use_case.get_billing_account(
+                actor,
+                account_type=account_type,
+                account_id=account_id,
+            )
+        )
+    except Exception as exc:
+        return _error(exc)
+
+
+@router.get(
     "/invoices",
     response_model=ApiSuccess[InvoicePage],
     operation_id="api_v1_customer_support_invoices",
@@ -136,6 +197,9 @@ def list_invoices(
     status: Annotated[str, Query(max_length=40)] = "all",
     origin: Annotated[str, Query(max_length=40)] = "all",
     enforcement: Annotated[str, Query(max_length=40)] = "all",
+    school_id: Annotated[int | None, Query(alias="schoolId", gt=0)] = None,
+    billing_period: Annotated[date | None, Query(alias="billingPeriod")] = None,
+    cursor: Annotated[str | None, Query(max_length=500)] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ):
     try:
@@ -146,6 +210,9 @@ def list_invoices(
                 status=status,
                 origin=origin,
                 enforcement=enforcement,
+                school_id=school_id,
+                billing_period=billing_period,
+                cursor=cursor,
                 limit=limit,
             )
         )

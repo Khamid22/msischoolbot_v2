@@ -9,6 +9,8 @@ from pydantic import Field, field_validator
 from backend.core.api import ApiModel
 from backend.modules.domains.finance.domain_types import (
     BillingAccessMode,
+    BillingAccountType,
+    BillingAttentionFlag,
     BillingAutomationWorkerState,
     BillingEnforcementState,
     BillingHoldTarget,
@@ -16,6 +18,7 @@ from backend.modules.domains.finance.domain_types import (
     BillingNotificationDeliveryStatus,
     BillingNotificationStage,
     BillingProfileStatus,
+    BillingScheduleStatus,
     InvoiceKind,
     InvoiceOrigin,
     InvoiceStatus,
@@ -100,6 +103,76 @@ class InvoiceDetail(InvoiceSummary):
 class InvoicePage(BillingModel):
     items: list[InvoiceSummary] = Field(default_factory=list)
     total: int = 0
+    next_cursor: str | None = None
+
+
+class CurrencyBalance(BillingModel):
+    currency: str
+    balance_minor: int
+
+
+class BillingAccountLatestInvoice(BillingModel):
+    invoice_id: int
+    invoice_number: str
+    billing_period: date
+    status: InvoiceStatus
+    due_date: date
+
+
+class BillingAccountSummary(BillingModel):
+    account_type: BillingAccountType
+    account_id: int
+    student_id: int | None = None
+    admission_id: int | None = None
+    student_name: str
+    student_code: str = ""
+    parent_name: str = ""
+    school_id: int
+    school_name: str
+    lifecycle_status: str
+    schedule_status: BillingScheduleStatus
+    billing_day: int | None = None
+    effective_date: date | None = None
+    currency: str
+    monthly_amount_minor: int = 0
+    billable_item_count: int = 0
+    latest_invoice: BillingAccountLatestInvoice | None = None
+    open_invoice_count: int = 0
+    overdue_invoice_count: int = 0
+    outstanding_balances: list[CurrencyBalance] = Field(default_factory=list)
+    enforcement_state: BillingEnforcementState | None = None
+    attention_flags: list[BillingAttentionFlag] = Field(default_factory=list)
+    schedule_version: int | None = None
+
+
+class BillingAccountScheduleItem(BillingModel):
+    group_id: int
+    group_name: str
+    subject_id: int
+    subject_name: str
+    description: str
+    amount_minor: int
+
+
+class BillingEnrollmentOption(BillingModel):
+    group_id: int
+    group_name: str
+    subject_id: int
+    subject_name: str
+
+
+class BillingAccountDetail(BillingAccountSummary):
+    schedule_items: list[BillingAccountScheduleItem] = Field(default_factory=list)
+    enrollment_options: list[BillingEnrollmentOption] = Field(default_factory=list)
+    invoices: list[InvoiceSummary] = Field(default_factory=list)
+    linked_telegram_recipients: int = 0
+    unlinked_telegram_recipients: int = 0
+
+
+class BillingAccountPage(BillingModel):
+    items: list[BillingAccountSummary] = Field(default_factory=list)
+    total: int = 0
+    next_cursor: str | None = None
 
 
 class IssueStudentInvoiceCommand(BillingModel):
@@ -250,15 +323,22 @@ class BillingAutomationStatus(BillingModel):
 
 __all__ = [
     "AddPaidStudentInvoiceCommand",
+    "BillingAccountDetail",
+    "BillingAccountLatestInvoice",
+    "BillingAccountPage",
+    "BillingAccountScheduleItem",
+    "BillingAccountSummary",
     "BillingItemInput",
     "BillingAccessInvoice",
     "BillingAccessStatus",
     "BillingAccessStudent",
     "BillingAutomationStatus",
+    "BillingEnrollmentOption",
     "BillingNotificationTimelineEntry",
     "BillingProfileItemResult",
     "BillingProfileResult",
     "ConfigureBillingProfileCommand",
+    "CurrencyBalance",
     "InvoiceDetail",
     "InvoiceLineResult",
     "InvoicePage",

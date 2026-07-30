@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from backend.core.access.context import ActorContext
 from backend.core.access.domain_types import Capability, Domain
 from backend.core.unit_of_work import UnitOfWorkFactory, commit_unit_of_work
 from backend.modules.domains.finance import contracts as finance_contracts
 from backend.modules.domains.finance.contracts import (
     AddPaidStudentInvoiceCommand,
+    BillingAccountDetail,
+    BillingAccountPage,
+    BillingAccountType,
     BillingActor,
     BillingAutomationStatus,
     BillingProfileResult,
@@ -59,6 +64,9 @@ class CustomerSupportPayments:
         status: str = "all",
         origin: str = "all",
         enforcement: str = "all",
+        school_id: int | None = None,
+        billing_period: date | None = None,
+        cursor: str | None = None,
         limit: int = 50,
     ) -> InvoicePage:
         scoped_actor = self._scoped_actor(actor)
@@ -70,7 +78,54 @@ class CustomerSupportPayments:
                 status=status,
                 origin=origin,
                 enforcement=enforcement,
+                school_id=school_id,
+                billing_period=billing_period,
+                cursor=cursor,
                 limit=limit,
+            )
+
+    def list_billing_accounts(
+        self,
+        actor: ActorContext,
+        *,
+        query: str = "",
+        school_id: int | None = None,
+        account_type: str = "all",
+        schedule_status: str = "all",
+        attention: str = "all",
+        access: str = "all",
+        cursor: str | None = None,
+        limit: int = 25,
+    ) -> BillingAccountPage:
+        scoped_actor = self._scoped_actor(actor)
+        with self._unit_of_work_factory.read() as unit_of_work:
+            return finance_contracts.list_billing_accounts(
+                unit_of_work.conn,
+                scope=_scope(scoped_actor),
+                query=query,
+                school_id=school_id,
+                account_type=account_type,
+                schedule_status=schedule_status,
+                attention=attention,
+                access=access,
+                cursor=cursor,
+                limit=limit,
+            )
+
+    def get_billing_account(
+        self,
+        actor: ActorContext,
+        *,
+        account_type: BillingAccountType,
+        account_id: int,
+    ) -> BillingAccountDetail:
+        scoped_actor = self._scoped_actor(actor)
+        with self._unit_of_work_factory.read() as unit_of_work:
+            return finance_contracts.get_billing_account(
+                unit_of_work.conn,
+                scope=_scope(scoped_actor),
+                account_type=account_type,
+                account_id=account_id,
             )
 
     def get_invoice(self, actor: ActorContext, invoice_id: int) -> InvoiceDetail:

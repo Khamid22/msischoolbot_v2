@@ -14,13 +14,16 @@ from backend.modules.domains.finance.commands import (
     record_manual_payment,
 )
 from backend.modules.domains.finance.domain_types import (
+    BillingAccountType,
     BillingProfileStatus,
     InvoiceKind,
     ManualPaymentMethod,
 )
 from backend.modules.domains.finance.queries import (
     BillingSchoolScope,
+    get_billing_account,
     get_billing_automation_status,
+    list_billing_accounts,
 )
 from backend.modules.domains.finance.schemas import (
     IssueStudentInvoiceCommand,
@@ -274,6 +277,150 @@ def test_empty_school_scope_automation_status_query_is_typed():
         assert result.open_invoices == 0
         assert result.worker_state.value == "not_started"
         assert result.last_successful_finance_worker_at is None
+    finally:
+        connection.rollback()
+        connection.close()
+
+
+@pytest.mark.postgres
+def test_billing_accounts_include_missing_and_configured_schedules_without_invoices():
+    connection = _connect_test_database()
+    try:
+        enrollment = _active_student_enrollment(connection)
+        suffix = uuid4().hex[:10]
+        student = connection.execute(
+            """
+            INSERT INTO msi_v2.students (student_code, full_name, school_id)
+            VALUES (%s, %s, %s)
+            RETURNING id
+            """,
+            (
+                f"BAC-{suffix}",
+                f"Billing Account {suffix}",
+                int(enrollment["school_id"]),
+            ),
+        ).fetchone()
+        connection.execute(
+            """
+            INSERT INTO msi_v2.group_students (group_id, student_id)
+            VALUES (%s, %s)
+            """,
+            (int(enrollment["group_id"]), int(student["id"])),
+        )
+
+        missing_page = list_billing_accounts(
+            connection,
+            scope=BillingSchoolScope(all_schools=True),
+            query=f"BAC-{suffix}",
+        )
+        assert missing_page.total == 1
+        assert missing_page.items[0].schedule_status.value == "missing"
+        assert missing_page.items[0].latest_invoice is None
+
+        profile_id = billing_profile_repository.upsert_billing_profile(
+            connection,
+            student_id=int(student["id"]),
+            school_id=int(enrollment["school_id"]),
+            billing_parent_id=None,
+            billing_day=12,
+            starts_on=date.today(),
+            status=BillingProfileStatus.ACTIVE,
+            expected_version=None,
+            staff_id=None,
+        )
+        billing_profile_repository.replace_billing_items(
+            connection,
+            profile_id=profile_id,
+            starts_on=date.today(),
+            items=[
+                (
+                    int(enrollment["group_id"]),
+                    int(enrollment["subject_id"]),
+                    "Configured without an invoice",
+                    275_000_00,
+                )
+            ],
+            staff_id=None,
+        )
+
+        configured = get_billing_account(
+            connection,
+            scope=BillingSchoolScope(all_schools=True),
+            account_type=BillingAccountType.STUDENT,
+            account_id=int(student["id"]),
+        )
+        assert configured.schedule_status.value == "active"
+        assert configured.billing_day == 12
+        assert configured.monthly_amount_minor == 275_000_00
+        assert configured.latest_invoice is None
+        assert configured.schedule_items[0].group_id == int(enrollment["group_id"])
+        assert configured.enrollment_options[0].subject_id == int(enrollment["subject_id"])
+    finally:
+        connection.rollback()
+        connection.close()
+
+
+@pytest.mark.postgres
+def test_pending_admission_is_not_duplicated_after_activation():
+    connection = _connect_test_database()
+    try:
+        enrollment = _active_student_enrollment(connection)
+        suffix = uuid4().hex[:10]
+        admission = connection.execute(
+            """
+            INSERT INTO msi_v2.admissions (
+                school_id, student_full_name, parent_full_name, parent_phone,
+                first_due_date, billing_day, status
+            )
+            VALUES (%s, %s, %s, %s, %s, 15, 'awaiting_payment')
+            RETURNING id
+            """,
+            (
+                int(enrollment["school_id"]),
+                f"Pending Admission {suffix}",
+                "Pending Parent",
+                "+998900000000",
+                date.today(),
+            ),
+        ).fetchone()
+        connection.execute(
+            """
+            INSERT INTO msi_v2.admission_group_selections (
+                admission_id, group_id, subject_id, monthly_amount_minor
+            )
+            VALUES (%s, %s, %s, %s)
+            """,
+            (
+                int(admission["id"]),
+                int(enrollment["group_id"]),
+                int(enrollment["subject_id"]),
+                300_000_00,
+            ),
+        )
+
+        pending = list_billing_accounts(
+            connection,
+            scope=BillingSchoolScope(all_schools=True),
+            query=f"Pending Admission {suffix}",
+        )
+        assert pending.total == 1
+        assert pending.items[0].account_type.value == "admission"
+        assert pending.items[0].monthly_amount_minor == 300_000_00
+
+        connection.execute(
+            """
+            UPDATE msi_v2.admissions
+            SET activated_student_id = %s, status = 'active'
+            WHERE id = %s
+            """,
+            (int(enrollment["student_id"]), int(admission["id"])),
+        )
+        activated = list_billing_accounts(
+            connection,
+            scope=BillingSchoolScope(all_schools=True),
+            query=f"Pending Admission {suffix}",
+        )
+        assert activated.total == 0
     finally:
         connection.rollback()
         connection.close()

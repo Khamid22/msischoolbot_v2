@@ -103,15 +103,18 @@ describe("Customer Support admissions and payments", () => {
   const detail = source("./admissions/AdmissionDetailPanel.tsx");
   const wizard = source("./admissions/AdmissionWizard.tsx");
   const payments = source("./payments/PaymentsPage.tsx");
+  const paymentLocation = source("./payments/paymentLocation.ts");
   const billingProfile = source("./students/BillingProfileDialog.tsx");
   const students = source("./students/StudentsPage.tsx");
   const publicAdmission = source("../../workspaces/public_admission/pages/Admission.tsx");
 
-  it("registers focused admission and invoice-ledger workspaces", () => {
+  it("registers focused admission and two-view payment workspaces", () => {
     assert.match(workspace, /<AdmissionsPage/);
     assert.match(workspace, /<PaymentsPage/);
     assert.match(admissions, /Admission queue/);
-    assert.match(payments, /Invoice ledger/);
+    assert.match(payments, /Billing Accounts/);
+    assert.match(payments, /Invoices\s*<\/PaymentViewButton>/);
+    assert.match(payments, /params\.set\("view", view\)/);
   });
 
   it("derives subjects from school-scoped groups and keeps amounts in minor units", () => {
@@ -136,6 +139,22 @@ describe("Customer Support admissions and payments", () => {
     assert.match(billingProfile, /billing-profile/);
     assert.match(billingProfile, /Monthly amount in UZS/);
     assert.match(payments, /invoice-payments\/\$\{paymentId\}\/reversal/);
+    assert.match(payments, /\/payments\/billing-accounts/);
+    assert.match(source("./payments/BillingAccountDetailPanel.tsx"), /Save schedule/);
+  });
+
+  it("defaults to billing accounts and exposes semantic desktop tables with mobile cards", () => {
+    const accountList = source("./payments/BillingAccountList.tsx");
+    const invoiceList = source("./payments/InvoiceList.tsx");
+    const filters = source("./payments/PaymentFilters.tsx");
+    assert.match(paymentLocation, /params\.get\("view"\) === "invoices"/);
+    assert.match(paymentLocation, /!params\.has\("view"\) && selectedInvoiceId/);
+    assert.match(accountList, /<table/);
+    assert.match(accountList, /xl:hidden/);
+    assert.match(invoiceList, /<table/);
+    assert.match(filters, /role="search"/);
+    assert.match(filters, />Filter</);
+    assert.match(filters, /role="dialog"/);
   });
 
   it("keeps Payme confirmation out of the browser callback", () => {
@@ -174,7 +193,7 @@ describe("Customer Support master-detail reliability", () => {
     assert.match(layout, /isDetailOpen \? "block" : "hidden lg:block"/);
     assert.match(layout, /lg:grid-cols/);
     assert.match(admissions, /Back to admissions/);
-    assert.match(payments, /Back to invoices/);
+    assert.match(payments, /Back to \{view === "accounts" \? "accounts" : "invoices"\}/);
   });
 
   it("exposes billing automation and privacy-safe notification results", () => {
@@ -186,5 +205,6 @@ describe("Customer Support master-detail reliability", () => {
     assert.match(automation, /status\.openInvoices/);
     assert.match(automation, /status\.pendingFinanceJobs/);
     assert.match(automation, /status\.lastSuccessfulFinanceWorkerAt/);
+    assert.match(automation, /<details/);
   });
 });

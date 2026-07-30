@@ -192,6 +192,85 @@ export type AdmissionInvoiceQueueItem = {
 export type AdmissionInvoiceQueue = {
   items: AdmissionInvoiceQueueItem[];
   total: number;
+  nextCursor?: string | null;
+};
+
+export type BillingAccountType = "student" | "admission";
+export type BillingScheduleStatus = "missing" | "active" | "paused" | "ended";
+export type BillingAttentionFlag =
+  | "payment_only"
+  | "overdue"
+  | "due_without_invoice"
+  | "missing_schedule"
+  | "enforcement_missing";
+
+export type CurrencyBalance = {
+  currency: string;
+  balanceMinor: number;
+};
+
+export type BillingAccountLatestInvoice = {
+  invoiceId: number;
+  invoiceNumber: string;
+  billingPeriod: string;
+  status: AdmissionInvoiceStatus;
+  dueDate: string;
+};
+
+export type BillingAccountSummary = {
+  accountType: BillingAccountType;
+  accountId: number;
+  studentId: number | null;
+  admissionId: number | null;
+  studentName: string;
+  studentCode: string;
+  parentName: string;
+  schoolId: number;
+  schoolName: string;
+  lifecycleStatus: string;
+  scheduleStatus: BillingScheduleStatus;
+  billingDay: number | null;
+  effectiveDate: string | null;
+  currency: string;
+  monthlyAmountMinor: number;
+  billableItemCount: number;
+  latestInvoice: BillingAccountLatestInvoice | null;
+  openInvoiceCount: number;
+  overdueInvoiceCount: number;
+  outstandingBalances: CurrencyBalance[];
+  enforcementState: AdmissionInvoiceQueueItem["enforcementState"];
+  attentionFlags: BillingAttentionFlag[];
+  scheduleVersion: number | null;
+};
+
+export type BillingAccountPage = {
+  items: BillingAccountSummary[];
+  total: number;
+  nextCursor: string | null;
+};
+
+export type BillingAccountScheduleItem = {
+  groupId: number;
+  groupName: string;
+  subjectId: number;
+  subjectName: string;
+  description: string;
+  amountMinor: number;
+};
+
+export type BillingEnrollmentOption = {
+  groupId: number;
+  groupName: string;
+  subjectId: number;
+  subjectName: string;
+};
+
+export type BillingAccountDetail = BillingAccountSummary & {
+  scheduleItems: BillingAccountScheduleItem[];
+  enrollmentOptions: BillingEnrollmentOption[];
+  invoices: AdmissionInvoiceQueueItem[];
+  linkedTelegramRecipients: number;
+  unlinkedTelegramRecipients: number;
 };
 
 export type InvoiceLine = {

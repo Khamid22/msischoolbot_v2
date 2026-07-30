@@ -2,6 +2,9 @@
 
 from backend.modules.domains.finance.contracts import (
     AddPaidStudentInvoiceCommand,
+    BillingAccountDetail,
+    BillingAccountPage,
+    BillingAccountType,
     BillingAutomationStatus,
     BillingError,
     BillingItemInput,
@@ -23,6 +26,9 @@ __all__ = [
     "AddPaidStudentInvoiceCommand",
     "BillingError",
     "BillingAutomationStatus",
+    "BillingAccountDetail",
+    "BillingAccountPage",
+    "BillingAccountType",
     "BillingItemInput",
     "BillingItemStatus",
     "BillingProfileResult",

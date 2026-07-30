@@ -11,13 +11,19 @@ export function InvoiceList({
   invoices,
   total,
   selectedInvoiceId,
+  hasNextPage = false,
+  loadingMore = false,
   onSelect,
+  onLoadMore = () => undefined,
 }: {
   loading: boolean;
   invoices: AdmissionInvoiceQueueItem[];
   total: number;
   selectedInvoiceId: number | null;
+  hasNextPage?: boolean;
+  loadingMore?: boolean;
   onSelect: (invoiceId: number) => void;
+  onLoadMore?: () => void;
 }) {
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -35,7 +41,8 @@ export function InvoiceList({
           ))}
         </div>
       ) : invoices.length ? (
-        <div className="divide-y divide-border">
+        <>
+        <div className="divide-y divide-border xl:hidden">
           {invoices.map((invoice) => (
             <button
               key={invoice.invoiceId}
@@ -87,6 +94,70 @@ export function InvoiceList({
             </button>
           ))}
         </div>
+        <div className="hidden overflow-x-auto xl:block">
+          <table className="w-full min-w-[76rem] border-collapse text-left text-xs">
+            <thead className="bg-muted/60 text-[0.625rem] font-black uppercase tracking-wide text-muted-foreground">
+              <tr>
+                {[
+                  "Invoice", "Student / Parent", "Billing period", "Total",
+                  "Paid", "Balance", "Due date", "Status", "Access",
+                ].map((heading) => (
+                  <th key={heading} scope="col" className="px-3 py-3">{heading}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {invoices.map((invoice) => (
+                <tr
+                  key={invoice.invoiceId}
+                  className={selectedInvoiceId === invoice.invoiceId
+                    ? "bg-primary/5"
+                    : "hover:bg-muted/40"}
+                >
+                  <td className="p-0">
+                    <button
+                      type="button"
+                      onClick={() => onSelect(invoice.invoiceId)}
+                      className="min-h-14 w-full px-3 py-3 text-left font-mono font-black focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
+                    >
+                      {invoice.invoiceNumber}
+                    </button>
+                  </td>
+                  <td className="px-3 py-3 font-black">
+                    {invoice.studentName}
+                    <span className="block font-semibold text-muted-foreground">
+                      {invoice.parentName || "No parent"}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3">{formatDate(invoice.billingPeriod)}</td>
+                  <td className="px-3 py-3 font-black">{money(invoice.totalMinor / 100, invoice.currency)}</td>
+                  <td className="px-3 py-3">{money(invoice.paidMinor / 100, invoice.currency)}</td>
+                  <td className="px-3 py-3 font-black">{money(invoice.balanceMinor / 100, invoice.currency)}</td>
+                  <td className="px-3 py-3">{formatDate(invoice.dueDate)}</td>
+                  <td className="px-3 py-3 font-black uppercase">{invoice.status.replace(/_/g, " ")}</td>
+                  <td className="px-3 py-3 font-black uppercase">
+                    {invoice.enforcementState === "held"
+                      ? "Payment-only"
+                      : invoice.enforcementState?.replace(/_/g, " ") || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {hasNextPage ? (
+          <div className="border-t border-border p-3">
+            <button
+              type="button"
+              onClick={onLoadMore}
+              disabled={loadingMore}
+              className="min-h-11 w-full rounded-lg border border-border px-3 text-sm font-black hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50"
+            >
+              {loadingMore ? "Loading…" : "Load more invoices"}
+            </button>
+          </div>
+        ) : null}
+        </>
       ) : (
         <div className="p-5">
           <EmptyState

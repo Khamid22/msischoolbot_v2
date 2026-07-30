@@ -27,7 +27,7 @@ export function AutomationStatusPanel({
   if (loading) {
     return (
       <div
-        className="h-28 animate-pulse rounded-xl border border-border bg-muted motion-reduce:animate-none"
+        className="h-14 animate-pulse rounded-xl border border-border bg-muted motion-reduce:animate-none"
         role="status"
         aria-label="Loading billing automation status"
       />
@@ -87,11 +87,8 @@ export function AutomationStatusPanel({
   ];
 
   return (
-    <section
-      className="rounded-xl border border-border bg-card p-4 shadow-sm"
-      aria-labelledby="billing-automation-title"
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <details className="group rounded-xl border border-border bg-card shadow-sm">
+      <summary className="flex min-h-14 cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30">
         <div>
           <h2
             id="billing-automation-title"
@@ -104,12 +101,19 @@ export function AutomationStatusPanel({
             Updated {formatDate(status.generatedAt, true)}
           </p>
         </div>
-        <span
-          className={`rounded-full px-2.5 py-1 text-[0.6875rem] font-black uppercase ${stateTone}`}
-        >
-          Worker {status.workerState.replace(/_/g, " ")}
-        </span>
-      </div>
+        <div className="flex items-center gap-2">
+          <span className="hidden text-xs font-semibold text-muted-foreground sm:inline">
+            {status.openInvoices} open · {status.activePaymentOnlyHolds} holds ·{" "}
+            {status.failedNotificationDeliveries} failed
+          </span>
+          <span
+            className={`rounded-full px-2.5 py-1 text-[0.6875rem] font-black uppercase ${stateTone}`}
+          >
+            Worker {status.workerState.replace(/_/g, " ")}
+          </span>
+        </div>
+      </summary>
+      <div className="border-t border-border px-4 pb-4">
       <dl className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {metrics.map(({ label, value, icon: Icon }) => (
           <div key={label} className="rounded-lg bg-muted/60 p-3">
@@ -127,6 +131,7 @@ export function AutomationStatusPanel({
           ? formatDate(status.lastSuccessfulFinanceWorkerAt, true)
           : "none recorded"}
       </p>
-    </section>
+      </div>
+    </details>
   );
 }

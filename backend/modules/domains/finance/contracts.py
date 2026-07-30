@@ -17,7 +17,9 @@ from backend.modules.domains.finance import (
     queries,
     repository,
 )
+from backend.modules.domains.finance.commands import BillingActor
 from backend.modules.domains.finance.domain_types import (
+    BillingAccountType,
     BillingItemStatus,
     BillingJobTopic,
     BillingProfileStatus,
@@ -29,6 +31,8 @@ from backend.modules.domains.finance.queries import BillingSchoolScope
 from backend.modules.domains.finance.schemas import (
     AddPaidStudentInvoiceCommand,
     BillingAccessStatus,
+    BillingAccountDetail,
+    BillingAccountPage,
     BillingAutomationStatus,
     BillingItemInput,
     BillingProfileResult,
@@ -248,9 +252,6 @@ def find_migrated_invoice_id(
     )
 
 
-BillingActor = commands.BillingActor
-
-
 def list_invoices(
     conn: Connection,
     *,
@@ -259,6 +260,9 @@ def list_invoices(
     status: str = "all",
     origin: str = "all",
     enforcement: str = "all",
+    school_id: int | None = None,
+    billing_period: date | None = None,
+    cursor: str | None = None,
     limit: int = 50,
 ) -> InvoicePage:
     return queries.list_invoices(
@@ -268,7 +272,52 @@ def list_invoices(
         status=status,
         origin=origin,
         enforcement=enforcement,
+        school_id=school_id,
+        billing_period=billing_period,
+        cursor=cursor,
         limit=limit,
+    )
+
+
+def list_billing_accounts(
+    conn: Connection,
+    *,
+    scope: BillingSchoolScope,
+    query: str = "",
+    school_id: int | None = None,
+    account_type: str = "all",
+    schedule_status: str = "all",
+    attention: str = "all",
+    access: str = "all",
+    cursor: str | None = None,
+    limit: int = 25,
+) -> BillingAccountPage:
+    return queries.list_billing_accounts(
+        conn,
+        scope=scope,
+        query=query,
+        school_id=school_id,
+        account_type=account_type,
+        schedule_status=schedule_status,
+        attention=attention,
+        access=access,
+        cursor=cursor,
+        limit=limit,
+    )
+
+
+def get_billing_account(
+    conn: Connection,
+    *,
+    scope: BillingSchoolScope,
+    account_type: BillingAccountType,
+    account_id: int,
+) -> BillingAccountDetail:
+    return queries.get_billing_account(
+        conn,
+        scope=scope,
+        account_type=account_type,
+        account_id=account_id,
     )
 
 
@@ -430,6 +479,9 @@ def student_invoice_checkout_data(
 __all__ = [
     "AddPaidStudentInvoiceCommand",
     "BillingActor",
+    "BillingAccountDetail",
+    "BillingAccountPage",
+    "BillingAccountType",
     "BillingAccessStatus",
     "BillingAutomationStatus",
     "BillingError",
@@ -456,12 +508,14 @@ __all__ = [
     "ensure_student_billing_profile",
     "find_migrated_invoice_id",
     "get_billing_profile",
+    "get_billing_account",
     "get_billing_automation_status",
     "get_account_billing_access",
     "get_invoice",
     "issue_student_invoice",
     "list_compatibility_payment_records",
     "list_invoices",
+    "list_billing_accounts",
     "list_payment_records",
     "list_student_account_payment_records",
     "major_to_minor",

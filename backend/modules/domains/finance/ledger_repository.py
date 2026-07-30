@@ -20,6 +20,9 @@ def list_scoped_invoice_rows(
     status: str,
     origin: str,
     enforcement: str = "all",
+    school_id: int | None = None,
+    billing_period: date | None = None,
+    offset: int = 0,
     limit: int = 50,
 ) -> list[Any]:
     search = f"%{query.strip()}%"
@@ -45,8 +48,10 @@ def list_scoped_invoice_rows(
         JOIN msi_v2.schools school
           ON school.id = COALESCE(student.school_id, admission.school_id)
         WHERE (%s OR school.id = ANY(%s::bigint[]))
+          AND (%s::bigint IS NULL OR school.id = %s)
           AND (%s = 'all' OR invoice.status = %s)
           AND (%s = 'all' OR invoice.origin = %s)
+          AND (%s::date IS NULL OR invoice.billing_period = %s)
           AND (
               %s = 'all'
               OR (%s = 'not_scheduled' AND enforcement.id IS NULL)
@@ -70,14 +75,19 @@ def list_scoped_invoice_rows(
             invoice.due_date,
             invoice.id DESC
         LIMIT %s
+        OFFSET %s
         """,
         (
             bool(all_schools),
             list(school_ids),
+            school_id,
+            school_id,
             status,
             status,
             origin,
             origin,
+            billing_period,
+            billing_period,
             enforcement,
             enforcement,
             enforcement,
@@ -86,7 +96,8 @@ def list_scoped_invoice_rows(
             search,
             search,
             search,
-            max(1, min(int(limit), 100)),
+            max(1, min(int(limit), 101)),
+            max(0, int(offset)),
         ),
     ).fetchall()
 

@@ -51,6 +51,26 @@ class BillingProfileStatus(StrEnum):
     ENDED = "ended"
 
 
+class BillingAccountType(StrEnum):
+    STUDENT = "student"
+    ADMISSION = "admission"
+
+
+class BillingScheduleStatus(StrEnum):
+    MISSING = "missing"
+    ACTIVE = "active"
+    PAUSED = "paused"
+    ENDED = "ended"
+
+
+class BillingAttentionFlag(StrEnum):
+    PAYMENT_ONLY = "payment_only"
+    OVERDUE = "overdue"
+    DUE_WITHOUT_INVOICE = "due_without_invoice"
+    MISSING_SCHEDULE = "missing_schedule"
+    ENFORCEMENT_MISSING = "enforcement_missing"
+
+
 class BillingItemStatus(StrEnum):
     ACTIVE = "active"
     CANCELLED = "cancelled"
@@ -108,6 +128,8 @@ class BillingHoldTarget(StrEnum):
 
 
 __all__ = [
+    "BillingAccountType",
+    "BillingAttentionFlag",
     "BillingJobTopic",
     "BillingAccessMode",
     "BillingEnforcementState",
@@ -117,6 +139,7 @@ __all__ = [
     "BillingAutomationWorkerState",
     "BillingItemStatus",
     "BillingProfileStatus",
+    "BillingScheduleStatus",
     "InvoiceKind",
     "InvoiceOrigin",
     "InvoiceStatus",

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -12,17 +15,21 @@ from backend.core.time import SCHOOL_TIMEZONE
 from backend.core.unit_of_work import Connection
 from backend.modules.domains.finance import (
     automation_repository,
+    billing_account_repository,
     billing_profile_repository,
     enforcement_repository,
 )
 from backend.modules.domains.finance import ledger_repository as repository
 from backend.modules.domains.finance.domain_types import (
+    BillingAccountType,
+    BillingAttentionFlag,
     BillingAutomationWorkerState,
     BillingEnforcementState,
     BillingItemStatus,
     BillingNotificationDeliveryStatus,
     BillingNotificationStage,
     BillingProfileStatus,
+    BillingScheduleStatus,
     InvoiceKind,
     InvoiceOrigin,
     InvoiceStatus,
@@ -31,10 +38,17 @@ from backend.modules.domains.finance.domain_types import (
 )
 from backend.modules.domains.finance.policies import BillingError
 from backend.modules.domains.finance.schemas import (
+    BillingAccountDetail,
+    BillingAccountLatestInvoice,
+    BillingAccountPage,
+    BillingAccountScheduleItem,
+    BillingAccountSummary,
     BillingAutomationStatus,
+    BillingEnrollmentOption,
     BillingNotificationTimelineEntry,
     BillingProfileItemResult,
     BillingProfileResult,
+    CurrencyBalance,
     InvoiceDetail,
     InvoiceLineResult,
     InvoicePage,
@@ -52,6 +66,227 @@ class BillingSchoolScope:
 
     def allows(self, school_id: int) -> bool:
         return self.all_schools or int(school_id) in self.school_ids
+
+
+def _decode_offset(cursor: str | None) -> int:
+    if not cursor:
+        return 0
+    try:
+        padding = "=" * (-len(cursor) % 4)
+        value = json.loads(base64.urlsafe_b64decode(cursor + padding))
+        offset = int(value["offset"])
+    except (
+        ValueError,
+        TypeError,
+        KeyError,
+        json.JSONDecodeError,
+        binascii.Error,
+    ) as exc:
+        raise BillingError("Pagination cursor is invalid.") from exc
+    if offset < 0:
+        raise BillingError("Pagination cursor is invalid.")
+    return offset
+
+
+def _encode_offset(offset: int) -> str:
+    payload = json.dumps({"offset": int(offset)}, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(payload).decode().rstrip("=")
+
+
+def _currency_balances(value: Any) -> list[CurrencyBalance]:
+    parsed = json.loads(value) if isinstance(value, str) else value
+    return [
+        CurrencyBalance(
+            currency=str(item["currency"]),
+            balance_minor=int(item["balance_minor"]),
+        )
+        for item in (parsed or [])
+    ]
+
+
+def _billing_account_summary(row: Mapping[str, Any]) -> BillingAccountSummary:
+    values = dict(row)
+    attention_flags: list[BillingAttentionFlag] = []
+    if values["is_payment_only"]:
+        attention_flags.append(BillingAttentionFlag.PAYMENT_ONLY)
+    if int(values["overdue_invoice_count"]):
+        attention_flags.append(BillingAttentionFlag.OVERDUE)
+    if values["is_due_without_invoice"]:
+        attention_flags.append(BillingAttentionFlag.DUE_WITHOUT_INVOICE)
+    if str(values["schedule_status"]) == BillingScheduleStatus.MISSING:
+        attention_flags.append(BillingAttentionFlag.MISSING_SCHEDULE)
+    if values["is_enforcement_missing"]:
+        attention_flags.append(BillingAttentionFlag.ENFORCEMENT_MISSING)
+    latest_invoice = None
+    if values.get("latest_invoice_id") is not None:
+        latest_invoice = BillingAccountLatestInvoice(
+            invoice_id=int(values["latest_invoice_id"]),
+            invoice_number=str(values["latest_invoice_number"]),
+            billing_period=values["latest_billing_period"],
+            status=InvoiceStatus(str(values["latest_invoice_status"])),
+            due_date=values["latest_invoice_due_date"],
+        )
+    account_type = BillingAccountType(str(values["account_type"]))
+    return BillingAccountSummary(
+        account_type=account_type,
+        account_id=int(values["account_id"]),
+        student_id=(int(values["student_id"]) if values.get("student_id") is not None else None),
+        admission_id=(
+            int(values["admission_id"]) if values.get("admission_id") is not None else None
+        ),
+        student_name=str(values["student_name"]),
+        student_code=str(values["student_code"]),
+        parent_name=str(values["parent_name"]),
+        school_id=int(values["school_id"]),
+        school_name=str(values["school_name"]),
+        lifecycle_status=str(values["lifecycle_status"]),
+        schedule_status=BillingScheduleStatus(str(values["schedule_status"])),
+        billing_day=(int(values["billing_day"]) if values.get("billing_day") is not None else None),
+        effective_date=values.get("effective_date"),
+        currency=str(values["currency"]),
+        monthly_amount_minor=int(values["monthly_amount_minor"]),
+        billable_item_count=int(values["billable_item_count"]),
+        latest_invoice=latest_invoice,
+        open_invoice_count=int(values["open_invoice_count"]),
+        overdue_invoice_count=int(values["overdue_invoice_count"]),
+        outstanding_balances=_currency_balances(values["outstanding_balances"]),
+        enforcement_state=(
+            BillingEnforcementState(str(values["enforcement_state"]))
+            if values.get("enforcement_state")
+            else None
+        ),
+        attention_flags=attention_flags,
+        schedule_version=(
+            int(values["schedule_version"]) if values.get("schedule_version") is not None else None
+        ),
+    )
+
+
+def list_billing_accounts(
+    conn: Connection,
+    *,
+    scope: BillingSchoolScope,
+    query: str = "",
+    school_id: int | None = None,
+    account_type: str = "all",
+    schedule_status: str = "all",
+    attention: str = "all",
+    access: str = "all",
+    cursor: str | None = None,
+    limit: int = 25,
+) -> BillingAccountPage:
+    allowed_account_types = {"all", *(item.value for item in BillingAccountType)}
+    allowed_schedule_statuses = {"all", *(item.value for item in BillingScheduleStatus)}
+    allowed_attention = {"all", *(item.value for item in BillingAttentionFlag)}
+    allowed_access = {"all", "normal", "countdown", "payment_only"}
+    if account_type not in allowed_account_types:
+        raise BillingError("Billing account type filter is invalid.")
+    if schedule_status not in allowed_schedule_statuses:
+        raise BillingError("Billing schedule filter is invalid.")
+    if attention not in allowed_attention:
+        raise BillingError("Billing attention filter is invalid.")
+    if access not in allowed_access:
+        raise BillingError("Billing access filter is invalid.")
+    if school_id is not None and not scope.allows(school_id):
+        raise PermissionError("The selected school is outside your assigned scope.")
+    offset = _decode_offset(cursor)
+    rows = billing_account_repository.list_billing_account_rows(
+        conn,
+        school_ids=scope.school_ids,
+        all_schools=scope.all_schools,
+        query=query,
+        school_id=school_id,
+        account_type=account_type,
+        account_id=None,
+        schedule_status=schedule_status,
+        attention=attention,
+        access=access,
+    )
+    page_rows = rows[offset : offset + limit]
+    next_offset = offset + len(page_rows)
+    return BillingAccountPage(
+        items=[_billing_account_summary(row) for row in page_rows],
+        total=len(rows),
+        next_cursor=_encode_offset(next_offset) if next_offset < len(rows) else None,
+    )
+
+
+def get_billing_account(
+    conn: Connection,
+    *,
+    scope: BillingSchoolScope,
+    account_type: BillingAccountType,
+    account_id: int,
+) -> BillingAccountDetail:
+    rows = billing_account_repository.list_billing_account_rows(
+        conn,
+        school_ids=scope.school_ids,
+        all_schools=scope.all_schools,
+        query="",
+        school_id=None,
+        account_type=account_type.value,
+        account_id=account_id,
+        schedule_status="all",
+        attention="all",
+        access="all",
+    )
+    row = next(
+        (item for item in rows if int(item["account_id"]) == int(account_id)),
+        None,
+    )
+    if row is None:
+        raise BillingError(
+            "Billing account was not found.",
+            code="billing_account_not_found",
+            status_code=404,
+        )
+    summary = _billing_account_summary(row)
+    if account_type is BillingAccountType.STUDENT:
+        schedule_rows = billing_account_repository.list_student_schedule_item_rows(conn, account_id)
+        enrollment_rows = billing_account_repository.list_student_enrollment_option_rows(
+            conn, account_id
+        )
+        recipients = enforcement_repository.list_household_target_rows(conn, student_id=account_id)
+        linked_recipients = sum(1 for recipient in recipients if recipient["telegram_user_id"])
+        unlinked_recipients = len(recipients) - linked_recipients
+    else:
+        schedule_rows = billing_account_repository.list_admission_schedule_item_rows(
+            conn, account_id
+        )
+        enrollment_rows = []
+        linked_recipients = 0
+        unlinked_recipients = 0
+    invoice_rows = billing_account_repository.list_account_invoice_rows(
+        conn,
+        account_type=account_type.value,
+        account_id=account_id,
+    )
+    return BillingAccountDetail(
+        **summary.model_dump(),
+        schedule_items=[
+            BillingAccountScheduleItem(
+                group_id=int(item["group_id"]),
+                group_name=str(item["group_name"]),
+                subject_id=int(item["subject_id"]),
+                subject_name=str(item["subject_name"]),
+                description=str(item["description"]),
+                amount_minor=int(item["amount_minor"]),
+            )
+            for item in schedule_rows
+        ],
+        enrollment_options=[
+            BillingEnrollmentOption(
+                group_id=int(item["group_id"]),
+                group_name=str(item["group_name"]),
+                subject_id=int(item["subject_id"]),
+                subject_name=str(item["subject_name"]),
+            )
+            for item in enrollment_rows
+        ],
+        invoices=[_invoice_summary(item) for item in invoice_rows],
+        linked_telegram_recipients=linked_recipients,
+        unlinked_telegram_recipients=unlinked_recipients,
+    )
 
 
 def _invoice_summary(row: Mapping[str, Any]) -> InvoiceSummary:
@@ -177,6 +412,9 @@ def list_invoices(
     status: str = "all",
     origin: str = "all",
     enforcement: str = "all",
+    school_id: int | None = None,
+    billing_period: date | None = None,
+    cursor: str | None = None,
     limit: int = 50,
 ) -> InvoicePage:
     allowed_statuses = {"all", *(item.value for item in InvoiceStatus)}
@@ -192,6 +430,9 @@ def list_invoices(
         raise BillingError("Invoice origin filter is invalid.")
     if enforcement not in allowed_enforcement_states:
         raise BillingError("Billing enforcement filter is invalid.")
+    if school_id is not None and not scope.allows(school_id):
+        raise PermissionError("The selected school is outside your assigned scope.")
+    offset = _decode_offset(cursor)
     rows = repository.list_scoped_invoice_rows(
         conn,
         school_ids=scope.school_ids,
@@ -200,11 +441,17 @@ def list_invoices(
         status=status,
         origin=origin,
         enforcement=enforcement,
-        limit=limit,
+        school_id=school_id,
+        billing_period=billing_period,
+        offset=offset,
+        limit=limit + 1,
     )
+    has_next = len(rows) > limit
+    page_rows = rows[:limit]
     return InvoicePage(
-        items=[_invoice_summary(row) for row in rows],
+        items=[_invoice_summary(row) for row in page_rows],
         total=int(rows[0]["total_count"]) if rows else 0,
+        next_cursor=_encode_offset(offset + limit) if has_next else None,
     )
 
 
@@ -398,11 +645,13 @@ def invoice_state_for_parent(status: InvoiceStatus, due_date: date) -> str:
 
 __all__ = [
     "BillingSchoolScope",
+    "get_billing_account",
     "get_billing_profile",
     "get_billing_automation_status",
     "get_invoice",
     "invoice_state_for_parent",
     "list_invoices",
+    "list_billing_accounts",
     "parent_can_access_invoice",
     "parent_invoice_checkout_data",
 ]
