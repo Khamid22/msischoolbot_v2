@@ -13,6 +13,7 @@ from backend.core.access.context import ActorContext, SchoolScope
 from backend.core.access.domain_types import Role
 from backend.core.unit_of_work import UnitOfWorkFactory
 from backend.modules.domains.identity.contracts import StaffSchoolScopeAssignment
+from backend.modules.domains.organization import contracts as organization_contracts
 from backend.modules.domains.organization.contracts import SchoolReference
 from backend.modules.domains.teacher_records.support_contracts import (
     TeacherSupportProfile,
@@ -146,17 +147,13 @@ def test_scope_resolver_uses_typed_identity_and_school_contracts(monkeypatch):
         "get_staff_school_scope_assignment",
         lambda conn, **kwargs: StaffSchoolScopeAssignment(
             staff_id=17,
-            raw_scope="north, 3",
+            raw_scope="school5, sehriyo",
         ),
     )
     monkeypatch.setattr(
         scope_module,
-        "list_school_references",
-        lambda conn: (
-            SchoolReference(school_id=1, code="north", name="North School"),
-            SchoolReference(school_id=2, code="south", name="South School"),
-            SchoolReference(school_id=3, code="central", name="Central School"),
-        ),
+        "list_public_school_references",
+        lambda conn: (SchoolReference(school_id=1, code="school5", name="School 5"),),
     )
 
     scoped_actor = CustomerSupportScopeResolver(UnitOfWorkFactory(lambda: connection)).resolve(
@@ -164,9 +161,50 @@ def test_scope_resolver_uses_typed_identity_and_school_contracts(monkeypatch):
     )
 
     assert not scoped_actor.school_scope.all_schools
-    assert scoped_actor.school_scope.allowed_school_ids == frozenset({1, 3})
+    assert scoped_actor.school_scope.allowed_school_ids == frozenset({1})
     assert connection.rollbacks == 1
     assert connection.closes == 1
+
+
+def test_scope_resolver_treats_all_as_all_public_schools_without_bypass(monkeypatch):
+    connection = _ScopeConnection()
+    monkeypatch.setattr(
+        scope_module,
+        "get_staff_school_scope_assignment",
+        lambda conn, **kwargs: StaffSchoolScopeAssignment(
+            staff_id=17,
+            raw_scope="all",
+        ),
+    )
+    monkeypatch.setattr(
+        scope_module,
+        "list_public_school_references",
+        lambda conn: (SchoolReference(school_id=1, code="school5", name="School 5"),),
+    )
+
+    scoped_actor = CustomerSupportScopeResolver(UnitOfWorkFactory(lambda: connection)).resolve(
+        _actor()
+    )
+
+    assert not scoped_actor.school_scope.all_schools
+    assert scoped_actor.school_scope.allowed_school_ids == frozenset({1})
+
+
+def test_organization_contract_lists_school_5_as_public_and_excludes_sehriyo(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        organization_contracts.repository,
+        "list_school_rows",
+        lambda conn: (
+            {"id": 5, "code": "school5", "name": "School 5"},
+            {"id": 7, "code": "sehriyo", "name": "Sehriyo"},
+        ),
+    )
+
+    schools = organization_contracts.list_public_school_references(object())
+
+    assert schools == (SchoolReference(school_id=5, code="school5", name="School 5"),)
 
 
 class _ApiQueries:

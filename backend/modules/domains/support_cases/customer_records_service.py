@@ -131,9 +131,13 @@ def load_scope(conn, actor: SupportActor) -> SchoolScope:
         raise ScopeError("Customer Support staff scope could not be resolved.")
     raw = str(staff["school_scope"] or "").strip() if staff else ""
     tokens = _scope_tokens(raw)
-    schools = [_public_row(row) for row in repository.list_school_rows(conn)]
-    all_schools = not tokens or bool(tokens & {"*", "all", "all schools"})
-    if all_schools:
+    schools = [
+        school
+        for school in (_public_row(row) for row in repository.list_school_rows(conn))
+        if organization_contract.is_public_school_code(school.get("school_key"))
+    ]
+    includes_all_assigned_schools = not tokens or bool(tokens & {"*", "all", "all schools"})
+    if includes_all_assigned_schools:
         allowed = schools
     else:
         allowed = [
@@ -144,7 +148,9 @@ def load_scope(conn, actor: SupportActor) -> SchoolScope:
             or str(school.get("id") or "") in tokens
         ]
     return SchoolScope(
-        all_schools=all_schools,
+        # Never pass the database-wide bypass into record queries. "All" means
+        # all public schools assigned to Customer Support.
+        all_schools=False,
         school_ids=tuple(int(school["id"]) for school in allowed),
         schools=tuple(allowed),
         raw=raw,
@@ -234,7 +240,11 @@ def _temporary_password(length: int = 12) -> str:
     alphabet = string.ascii_letters + string.digits
     while True:
         value = "".join(secrets.choice(alphabet) for _ in range(max(10, length)))
-        if any(char.islower() for char in value) and any(char.isupper() for char in value) and any(char.isdigit() for char in value):
+        if (
+            any(char.islower() for char in value)
+            and any(char.isupper() for char in value)
+            and any(char.isdigit() for char in value)
+        ):
             return value
 
 
@@ -429,7 +439,9 @@ def _activity(rows: list[Any]):
 
 def _student_detail(conn, scope: SchoolScope, student_id: int):
     student = _ensure_student_visible(conn, scope, student_id)
-    enrollments = [_public_row(row) for row in repository.list_student_enrollment_rows(conn, student_id)]
+    enrollments = [
+        _public_row(row) for row in repository.list_student_enrollment_rows(conn, student_id)
+    ]
     for enrollment in enrollments:
         present = int(enrollment.get("present_count") or 0)
         absent = int(enrollment.get("absent_count") or 0)
@@ -438,13 +450,14 @@ def _student_detail(conn, scope: SchoolScope, student_id: int):
         enrollment["attendanceRate"] = round(((present + justified) / total) * 100) if total else 0
     parents = [_public_row(row) for row in repository.list_student_parent_rows(conn, student_id)]
     parent_invites = [
-        _public_row(row)
-        for row in repository.list_student_parent_invite_rows(conn, student_id)
+        _public_row(row) for row in repository.list_student_parent_invite_rows(conn, student_id)
     ]
     payments = _payments_payload(_canonical_payment_rows(conn, student))
-    activity = _activity(repository.list_audit_rows(
-        conn, entity_types=["student", "student_account"], entity_id=student_id
-    ))
+    activity = _activity(
+        repository.list_audit_rows(
+            conn, entity_types=["student", "student_account"], entity_id=student_id
+        )
+    )
     return {
         "kind": "student",
         "profile": _public_row(student),
@@ -469,9 +482,11 @@ def _parent_detail(conn, scope: SchoolScope, parent_id: int):
         allowed_school_ids=list(scope.school_ids),
         all_schools=scope.all_schools,
     )
-    activity = _activity(repository.list_audit_rows(
-        conn, entity_types=["parent", "parent_account"], entity_id=parent_id
-    ))
+    activity = _activity(
+        repository.list_audit_rows(
+            conn, entity_types=["parent", "parent_account"], entity_id=parent_id
+        )
+    )
     return {
         "kind": "parent",
         "profile": _public_row(parent),
@@ -566,7 +581,10 @@ def update_student(actor: SupportActor, student_id: int, payload: dict[str, Any]
             school = repository.get_school_row(conn, school_id)
             if not school or str(school["status"] or "") != "active":
                 raise CustomerSupportError("Selected school is unavailable.")
-            blockers = [_public_row(row) for row in repository.list_active_enrollment_blockers(conn, student_id)]
+            blockers = [
+                _public_row(row)
+                for row in repository.list_active_enrollment_blockers(conn, student_id)
+            ]
             if blockers:
                 raise DependencyConflictError(
                     "The school cannot change while the student has active group enrollments.",
@@ -586,7 +604,9 @@ def update_student(actor: SupportActor, student_id: int, payload: dict[str, Any]
             school_id=school_id,
             phone=_optional_text(payload.get("phone", current["phone"])),
             photo_url=_optional_text(payload.get("photoUrl", current["photo_url"])),
-            profile_description=_optional_text(payload.get("profileDescription", current["profile_description"])),
+            profile_description=_optional_text(
+                payload.get("profileDescription", current["profile_description"])
+            ),
             status=status,
         )
         if not updated:
@@ -619,7 +639,10 @@ def set_student_lifecycle(
         expected = _ensure_version(current["version"], expected_version)
         target = "active" if active else "archived"
         if not active:
-            blockers = [_public_row(row) for row in repository.list_active_enrollment_blockers(conn, student_id)]
+            blockers = [
+                _public_row(row)
+                for row in repository.list_active_enrollment_blockers(conn, student_id)
+            ]
             if blockers:
                 raise DependencyConflictError(
                     "Academic Department must remove the student from active groups before archiving.",
@@ -710,7 +733,9 @@ def update_parent(actor: SupportActor, parent_id: int, payload: dict[str, Any]):
             expected_version=expected,
             display_name=display_name,
             phone=_optional_text(payload.get("phone", current["phone"])),
-            telegram_username=_optional_text(payload.get("telegramUsername", current["telegram_username"])).lstrip("@"),
+            telegram_username=_optional_text(
+                payload.get("telegramUsername", current["telegram_username"])
+            ).lstrip("@"),
             preferred_language=language,
             status=status,
         )
@@ -787,9 +812,7 @@ def link_parent_child(
             conn, parent_id=parent_id, student_id=student_id
         ):
             raise DuplicateLinkError("This student is already linked to this parent.")
-        if not repository.bump_parent_version(
-            conn, parent_id=parent_id, expected_version=expected
-        ):
+        if not repository.bump_parent_version(conn, parent_id=parent_id, expected_version=expected):
             raise VersionConflictError("This parent changed. Reload and try again.")
         _audit(
             conn,
@@ -820,11 +843,11 @@ def unlink_parent_child(
         parent = _ensure_parent_visible(conn, scope, parent_id)
         expected = _ensure_version(parent["version"], expected_version)
         student = _ensure_student_visible(conn, scope, student_id)
-        if not repository.remove_parent_student_link(conn, parent_id=parent_id, student_id=student_id):
-            raise NotFoundError("Parent-child link was not found.")
-        if not repository.bump_parent_version(
-            conn, parent_id=parent_id, expected_version=expected
+        if not repository.remove_parent_student_link(
+            conn, parent_id=parent_id, student_id=student_id
         ):
+            raise NotFoundError("Parent-child link was not found.")
+        if not repository.bump_parent_version(conn, parent_id=parent_id, expected_version=expected):
             raise VersionConflictError("This parent changed. Reload and try again.")
         _audit(
             conn,
@@ -840,9 +863,7 @@ def unlink_parent_child(
         return _parent_detail(conn, scope, parent_id)
 
 
-def create_parent_invite(
-    actor: SupportActor, student_id: int, *, expected_version: int
-):
+def create_parent_invite(actor: SupportActor, student_id: int, *, expected_version: int):
     with _connect() as conn:
         scope = load_scope(conn, actor)
         student = _ensure_student_visible(conn, scope, student_id)
@@ -964,8 +985,7 @@ def _payment_context(conn, actor: SupportActor, payment_id: int):
     )
     if migrated_invoice_id is not None:
         raise MigratedPaymentError(
-            "This payment is managed in the invoice ledger. "
-            "Use a reversal or invoice void instead."
+            "This payment is managed in the invoice ledger. Use a reversal or invoice void instead."
         )
     _ensure_student_visible(conn, scope, int(payment["student_id"]))
     return scope, payment
@@ -1016,7 +1036,9 @@ def update_payment(actor: SupportActor, payment_id: int, payload: dict[str, Any]
             scope=scope,
         )
         conn.commit()
-        return _payments_payload(repository.list_payment_rows(conn, student_id=int(current["student_id"])))
+        return _payments_payload(
+            repository.list_payment_rows(conn, student_id=int(current["student_id"]))
+        )
 
 
 def settle_payment(actor: SupportActor, payment_id: int, payload: dict[str, Any]):
@@ -1060,7 +1082,9 @@ def settle_payment(actor: SupportActor, payment_id: int, payload: dict[str, Any]
             scope=scope,
         )
         conn.commit()
-        return _payments_payload(repository.list_payment_rows(conn, student_id=int(current["student_id"])))
+        return _payments_payload(
+            repository.list_payment_rows(conn, student_id=int(current["student_id"]))
+        )
 
 
 def void_payment(actor: SupportActor, payment_id: int, payload: dict[str, Any]):
@@ -1105,7 +1129,9 @@ def void_payment(actor: SupportActor, payment_id: int, payload: dict[str, Any]):
             scope=scope,
         )
         conn.commit()
-        return _payments_payload(repository.list_payment_rows(conn, student_id=int(current["student_id"])))
+        return _payments_payload(
+            repository.list_payment_rows(conn, student_id=int(current["student_id"]))
+        )
 
 
 __all__ = [

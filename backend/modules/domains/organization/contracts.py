@@ -16,6 +16,7 @@ from backend.modules.domains.organization.operations import (
     create_school_from_payload,
 )
 from backend.modules.domains.organization.schools import (
+    is_public_school_code,
     normalize_school_code,
     student_code_prefix,
 )
@@ -41,6 +42,13 @@ def list_school_references(conn: Connection) -> tuple[SchoolReference, ...]:
             name=str(row["name"] or "").strip(),
         )
         for row in repository.list_school_rows(conn)
+    )
+
+
+def list_public_school_references(conn: Connection) -> tuple[SchoolReference, ...]:
+    """List schools classified as public by the Organization domain."""
+    return tuple(
+        school for school in list_school_references(conn) if is_public_school_code(school.code)
     )
 
 
@@ -82,7 +90,9 @@ __all__ = [
     "get_class_by_school_and_name",
     "get_school_by_key",
     "insert_class",
+    "is_public_school_code",
     "list_class_rows",
+    "list_public_school_references",
     "list_school_rows",
     "list_school_references",
     "list_subject_rows",

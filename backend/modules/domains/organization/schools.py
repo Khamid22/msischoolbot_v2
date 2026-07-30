@@ -6,6 +6,8 @@ DEFAULT_SCHOOL_CODE = "school5"
 DEFAULT_SCHOOL_NAME = "School 5"
 ADMIN_SCHOOL_FILTER_ALL = "all"
 
+PUBLIC_SCHOOL_CODES = frozenset({"school5"})
+
 SCHOOL_CODE_ALIASES = {
     "school_5": "school5",
     "school-5": "school5",
@@ -34,6 +36,11 @@ def normalize_school_code(value, default=DEFAULT_SCHOOL_CODE):
     return SCHOOL_CODE_ALIASES.get(normalized, normalized)
 
 
+def is_public_school_code(value) -> bool:
+    """Return whether a school code belongs to the public-school catalog."""
+    return normalize_school_code(value, default="") in PUBLIC_SCHOOL_CODES
+
+
 def school_display_name(school_code):
     return SCHOOL_DISPLAY_NAMES.get(normalize_school_code(school_code), DEFAULT_SCHOOL_NAME)
 
@@ -53,9 +60,11 @@ __all__ = [
     "DEFAULT_SCHOOL_CODE",
     "DEFAULT_SCHOOL_NAME",
     "ADMIN_SCHOOL_FILTER_ALL",
+    "PUBLIC_SCHOOL_CODES",
     "SCHOOL_CODE_ALIASES",
     "SCHOOL_DISPLAY_NAMES",
     "SCHOOL_STUDENT_PREFIX",
+    "is_public_school_code",
     "normalize_school_code",
     "school_display_name",
     "student_code_prefix",

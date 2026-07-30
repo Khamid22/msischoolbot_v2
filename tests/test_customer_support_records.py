@@ -78,36 +78,43 @@ def test_api_exposes_void_but_never_hard_delete_for_payments():
     assert ("DELETE", "/customer-support/payments/{payment_id}") not in routes
 
 
-def test_school_scope_uses_only_staff_allowed_schools(monkeypatch):
+def test_school_scope_uses_only_assigned_public_schools(monkeypatch):
     monkeypatch.setattr(
         repository,
         "get_staff_scope_row",
-        lambda conn, **kwargs: {"id": 17, "school_scope": "north, 3"},
+        lambda conn, **kwargs: {"id": 17, "school_scope": "school5, sehriyo"},
     )
     monkeypatch.setattr(
         repository,
         "list_school_rows",
         lambda conn: [
-            {"id": 1, "school_key": "north", "school_name": "North School", "status": "active"},
-            {"id": 2, "school_key": "south", "school_name": "South School", "status": "active"},
-            {"id": 3, "school_key": "central", "school_name": "Central School", "status": "active"},
+            {"id": 1, "school_key": "school5", "school_name": "School 5", "status": "active"},
+            {"id": 2, "school_key": "sehriyo", "school_name": "Sehriyo", "status": "active"},
         ],
     )
     scope = service.load_scope(object(), service.SupportActor(17, 41, "support"))
     assert not scope.all_schools
-    assert scope.school_ids == (1, 3)
-    assert [school["school_name"] for school in scope.schools] == ["North School", "Central School"]
+    assert scope.school_ids == (1,)
+    assert [school["school_name"] for school in scope.schools] == ["School 5"]
 
 
-def test_empty_scope_means_all_but_missing_staff_identity_is_denied(monkeypatch):
-    schools = [{"id": 1, "school_key": "north", "school_name": "North", "status": "active"}]
+def test_empty_scope_means_all_public_schools_without_database_wide_access(monkeypatch):
+    schools = [
+        {"id": 1, "school_key": "school5", "school_name": "School 5", "status": "active"},
+        {"id": 2, "school_key": "sehriyo", "school_name": "Sehriyo", "status": "active"},
+    ]
     monkeypatch.setattr(repository, "list_school_rows", lambda conn: schools)
     monkeypatch.setattr(
         repository,
         "get_staff_scope_row",
         lambda conn, **kwargs: {"id": 17, "school_scope": ""},
     )
-    assert service.load_scope(object(), service.SupportActor(17, 41, "support")).all_schools
+    scope = service.load_scope(object(), service.SupportActor(17, 41, "support"))
+    assert not scope.all_schools
+    assert scope.school_ids == (1,)
+    assert [school["school_name"] for school in scope.schools] == ["School 5"]
+    with pytest.raises(service.ScopeError, match="outside your Customer Support scope"):
+        service._ensure_school(scope, 2)
 
     monkeypatch.setattr(repository, "get_staff_scope_row", lambda conn, **kwargs: None)
     with pytest.raises(service.ScopeError, match="scope could not be resolved"):

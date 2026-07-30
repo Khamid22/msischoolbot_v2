@@ -10,7 +10,9 @@ from backend.core.unit_of_work import UnitOfWorkFactory
 from backend.modules.domains.identity.contracts import (
     get_staff_school_scope_assignment,
 )
-from backend.modules.domains.organization.contracts import list_school_references
+from backend.modules.domains.organization.contracts import (
+    list_public_school_references,
+)
 from backend.modules.people.customer_support.policies import (
     CustomerSupportAccessError,
     require_customer_support_actor,
@@ -40,7 +42,7 @@ class CustomerSupportScopeResolver:
                 staff_id=actor.staff_id,
                 account_id=actor.account_id,
             )
-            schools = list_school_references(unit_of_work.conn)
+            public_schools = list_public_school_references(unit_of_work.conn)
 
         if assignment is None:
             raise CustomerSupportAccessError(
@@ -48,11 +50,11 @@ class CustomerSupportScopeResolver:
             )
 
         tokens = _scope_tokens(assignment.raw_scope)
-        all_schools = not tokens or bool(tokens & ALL_SCHOOLS_SCOPE_TOKENS)
+        includes_all_assigned_schools = not tokens or bool(tokens & ALL_SCHOOLS_SCOPE_TOKENS)
         allowed_school_ids = frozenset(
             school.school_id
-            for school in schools
-            if all_schools
+            for school in public_schools
+            if includes_all_assigned_schools
             or str(school.school_id) in tokens
             or school.code.casefold() in tokens
             or school.name.casefold() in tokens
@@ -61,7 +63,9 @@ class CustomerSupportScopeResolver:
             actor,
             school_scope=SchoolScope(
                 allowed_school_ids=allowed_school_ids,
-                all_schools=all_schools,
+                # Customer Support must never receive the database-wide bypass.
+                # "All" in a staff assignment means all public schools only.
+                all_schools=False,
             ),
         )
 
