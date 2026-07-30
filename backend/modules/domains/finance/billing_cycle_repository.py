@@ -22,7 +22,29 @@ def list_active_profile_rows(conn: Connection) -> list[Any]:
     ).fetchall()
 
 
-def list_snapshot_item_rows(
+def list_active_enrollment_rows(
+    conn: Connection,
+    *,
+    student_id: int,
+) -> list[Any]:
+    return conn.execute(
+        """
+        SELECT enrollment.group_id, group_row.group_name,
+               subject.id AS subject_id, subject.subject_name
+        FROM msi_v2.group_students enrollment
+        JOIN msi_v2.groups group_row ON group_row.id = enrollment.group_id
+        JOIN msi_v2.subject_programs program ON program.id = group_row.program_id
+        JOIN msi_v2.subjects subject ON subject.id = program.subject_id
+        WHERE enrollment.student_id = %s
+          AND enrollment.enrollment_status = 'active'
+          AND group_row.status = 'active'
+        ORDER BY subject.subject_name, group_row.group_name, group_row.id
+        """,
+        (int(student_id),),
+    ).fetchall()
+
+
+def list_subject_price_rows(
     conn: Connection,
     *,
     profile_id: int,
@@ -30,21 +52,14 @@ def list_snapshot_item_rows(
 ) -> list[Any]:
     return conn.execute(
         """
-        SELECT item.*
-        FROM msi_v2.student_billing_items item
-        JOIN msi_v2.group_students enrollment
-          ON enrollment.student_id = (
-              SELECT student_id
-              FROM msi_v2.student_billing_profiles
-              WHERE id = item.profile_id
-          )
-         AND enrollment.group_id = item.group_id
-         AND enrollment.enrollment_status = 'active'
-        WHERE item.profile_id = %s
-          AND item.status = 'active'
-          AND item.active_from <= %s
-          AND (item.active_until IS NULL OR item.active_until >= %s)
-        ORDER BY item.id
+        SELECT price.*, subject.subject_name
+        FROM msi_v2.student_billing_subject_prices price
+        JOIN msi_v2.subjects subject ON subject.id = price.subject_id
+        WHERE price.profile_id = %s
+          AND price.status = 'active'
+          AND price.active_from <= %s
+          AND (price.active_until IS NULL OR price.active_until >= %s)
+        ORDER BY subject.subject_name, price.subject_id
         """,
         (int(profile_id), effective_on, effective_on),
     ).fetchall()
@@ -58,20 +73,35 @@ def insert_cycle(
     school_id: int,
     billing_period: date,
     due_at: datetime,
+    pricing_mode: str,
     item_rows: list[Any],
+    coverage_rows: list[Any],
 ) -> int:
     expected_minor = sum(int(item["amount_minor"]) for item in item_rows)
     if expected_minor <= 0:
         return 0
+    revision_row = conn.execute(
+        """
+        SELECT COALESCE(max(revision), 0) + 1 AS revision
+        FROM msi_v2.student_billing_cycles
+        WHERE profile_id = %s AND billing_period = %s
+        """,
+        (int(profile_id), billing_period),
+    ).fetchone()
+    revision = int(revision_row["revision"])
     row = conn.execute(
         """
         INSERT INTO msi_v2.student_billing_cycles (
             profile_id, student_id, school_id, billing_period, due_at,
-            currency, expected_minor, allocated_minor, state,
+            currency, expected_minor, allocated_minor, state, revision, pricing_mode,
             version, created_at, updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, 'UZS', %s, 0, 'scheduled', 1, now(), now())
-        ON CONFLICT (profile_id, billing_period) DO NOTHING
+        VALUES (
+            %s, %s, %s, %s, %s, 'UZS', %s, 0, 'scheduled', %s, %s,
+            1, now(), now()
+        )
+        ON CONFLICT (profile_id, billing_period) WHERE state <> 'superseded'
+        DO NOTHING
         RETURNING id
         """,
         (
@@ -81,6 +111,8 @@ def insert_cycle(
             billing_period,
             due_at,
             expected_minor,
+            revision,
+            pricing_mode,
         ),
     ).fetchone()
     if not row:
@@ -102,12 +134,29 @@ def insert_cycle(
             """,
             (
                 cycle_id,
-                int(item["id"]),
-                int(item["group_id"]),
-                int(item["subject_id"]),
+                (int(item["id"]) if item.get("id") is not None else None),
+                (int(item["group_id"]) if item.get("group_id") is not None else None),
+                (int(item["subject_id"]) if item.get("subject_id") is not None else None),
                 str(item["description"]),
                 int(item["amount_minor"]),
                 item_order,
+            ),
+        )
+    for coverage in coverage_rows:
+        conn.execute(
+            """
+            INSERT INTO msi_v2.student_billing_cycle_coverage (
+                cycle_id, group_id, subject_id, group_name, subject_name, created_at
+            )
+            VALUES (%s, %s, %s, %s, %s, now())
+            ON CONFLICT (cycle_id, group_id) DO NOTHING
+            """,
+            (
+                cycle_id,
+                int(coverage["group_id"]),
+                int(coverage["subject_id"]),
+                str(coverage["group_name"]),
+                str(coverage["subject_name"]),
             ),
         )
     return cycle_id
@@ -123,9 +172,59 @@ def get_cycle_by_profile_period_row(
         """
         SELECT *
         FROM msi_v2.student_billing_cycles
-        WHERE profile_id = %s AND billing_period = %s
+        WHERE profile_id = %s
+          AND billing_period = %s
+          AND state <> 'superseded'
         """,
         (int(profile_id), billing_period),
+    ).fetchone()
+
+
+def get_profile_change_cycle_row(
+    conn: Connection,
+    *,
+    profile_id: int,
+    planned_billing_period: date,
+    current_billing_period: date,
+    for_update: bool = False,
+) -> Any:
+    """Lock the cycle that an explicit current/next schedule edit must consider."""
+
+    lock = " FOR UPDATE OF cycle" if for_update else ""
+    return conn.execute(
+        f"""
+        SELECT cycle.*
+        FROM msi_v2.student_billing_cycles cycle
+        LEFT JOIN msi_v2.invoices invoice
+          ON invoice.billing_cycle_id = cycle.id
+         AND invoice.status <> 'voided'
+        WHERE cycle.profile_id = %s
+          AND cycle.state <> 'superseded'
+          AND (
+              cycle.billing_period = %s
+              OR cycle.billing_period = %s
+              OR cycle.state = 'review_required'
+              OR invoice.status IN ('issued', 'partially_paid', 'overdue')
+          )
+        ORDER BY
+            CASE
+                WHEN cycle.state = 'review_required'
+                  OR invoice.status IN ('issued', 'partially_paid', 'overdue')
+                THEN 0
+                WHEN cycle.billing_period = %s THEN 1
+                ELSE 2
+            END,
+            cycle.billing_period DESC,
+            cycle.id DESC
+        LIMIT 1
+        {lock}
+        """,
+        (
+            int(profile_id),
+            planned_billing_period,
+            current_billing_period,
+            current_billing_period,
+        ),
     ).fetchone()
 
 
@@ -146,18 +245,48 @@ def get_cycle_row(
                invoice.id AS invoice_id,
                invoice.invoice_number,
                invoice.total_minor AS invoice_total_minor,
-               invoice.paid_minor AS invoice_paid_minor
+               invoice.paid_minor AS invoice_paid_minor,
+               invoice.status AS invoice_status,
+               enforcement.state AS enforcement_state,
+               EXISTS (
+                   SELECT 1
+                   FROM msi_v2.payme_transactions transaction
+                   WHERE transaction.invoice_id = invoice.id AND transaction.state = 1
+               ) AS has_pending_payme,
+               EXISTS (
+                   SELECT 1
+                   FROM msi_v2.billing_cycle_invoice_reviews review
+                   WHERE review.cycle_id = cycle.id AND review.status = 'active'
+               ) AS has_active_review
         FROM msi_v2.student_billing_cycles cycle
         JOIN msi_v2.students student ON student.id = cycle.student_id
         JOIN msi_v2.schools school ON school.id = cycle.school_id
         LEFT JOIN msi_v2.invoices invoice
           ON invoice.billing_cycle_id = cycle.id
          AND invoice.status <> 'voided'
+        LEFT JOIN msi_v2.invoice_enforcement_schedules enforcement
+          ON enforcement.invoice_id = invoice.id
         WHERE cycle.id = %s
         {lock}
         """,
         (int(cycle_id),),
     ).fetchone()
+
+
+def update_cycle_deadline(
+    conn: Connection,
+    *,
+    cycle_id: int,
+    deadline_at: datetime,
+) -> None:
+    conn.execute(
+        """
+        UPDATE msi_v2.student_billing_cycles
+        SET due_at = %s, version = version + 1, updated_at = now()
+        WHERE id = %s AND due_at <> %s
+        """,
+        (deadline_at, int(cycle_id), deadline_at),
+    )
 
 
 def list_cycle_item_rows(conn: Connection, cycle_id: int) -> list[Any]:
@@ -183,6 +312,42 @@ def list_cycle_review_rows(conn: Connection, cycle_id: int) -> list[Any]:
         """,
         (int(cycle_id),),
     ).fetchall()
+
+
+def supersede_cycle(
+    conn: Connection,
+    *,
+    cycle_id: int,
+    replaced_by_cycle_id: int | None = None,
+) -> None:
+    conn.execute(
+        """
+        UPDATE msi_v2.student_billing_cycles
+        SET state = 'superseded',
+            superseded_at = COALESCE(superseded_at, now()),
+            superseded_by_cycle_id = COALESCE(%s, superseded_by_cycle_id),
+            version = version + 1,
+            updated_at = now()
+        WHERE id = %s AND state <> 'superseded'
+        """,
+        (int(replaced_by_cycle_id) if replaced_by_cycle_id else None, int(cycle_id)),
+    )
+
+
+def link_superseded_cycle(
+    conn: Connection,
+    *,
+    cycle_id: int,
+    replaced_by_cycle_id: int,
+) -> None:
+    conn.execute(
+        """
+        UPDATE msi_v2.student_billing_cycles
+        SET superseded_by_cycle_id = %s, updated_at = now()
+        WHERE id = %s AND state = 'superseded'
+        """,
+        (int(replaced_by_cycle_id), int(cycle_id)),
+    )
 
 
 def list_manual_candidate_rows(conn: Connection, cycle_id: int) -> list[Any]:
@@ -301,6 +466,7 @@ def list_scoped_cycle_rows(
           ON invoice.billing_cycle_id = cycle.id
          AND invoice.status <> 'voided'
         WHERE (%s OR cycle.school_id = ANY(%s::bigint[]))
+          AND cycle.state <> 'superseded'
           AND (%s::bigint IS NULL OR cycle.student_id = %s)
         ORDER BY cycle.due_at, cycle.id
         LIMIT %s
@@ -344,6 +510,7 @@ def list_parent_cycle_rows(
           ON enforcement.invoice_id = invoice.id
         WHERE link.parent_id = %s
           AND link.status = 'active'
+          AND cycle.state <> 'superseded'
           AND (
               %s::bigint IS NULL
               OR student.legacy_student_row_id = %s
@@ -588,19 +755,24 @@ __all__ = [
     "get_cycle_by_profile_period_row",
     "get_cycle_row",
     "get_available_manual_invoice_row",
+    "get_profile_change_cycle_row",
     "get_review_row",
     "insert_cycle",
     "insert_cycle_invoice",
     "insert_review",
+    "link_superseded_cycle",
     "list_active_profile_rows",
+    "list_active_enrollment_rows",
     "list_cycle_item_rows",
     "list_cycle_review_rows",
     "list_manual_candidate_rows",
     "list_parent_cycle_rows",
     "list_scoped_cycle_rows",
-    "list_snapshot_item_rows",
+    "list_subject_price_rows",
     "recompute_cycle_allocation",
     "reverse_review",
     "sync_cycle_state_for_invoice",
+    "supersede_cycle",
+    "update_cycle_deadline",
     "update_cycle_state",
 ]

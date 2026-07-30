@@ -3,17 +3,26 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
+from typing import Any
 
 from psycopg.errors import CheckViolation, UniqueViolation
 
 from backend.core.clock import SystemClock
 from backend.core.time import SCHOOL_TIMEZONE
 from backend.core.unit_of_work import Connection
-from backend.modules.domains.finance import billing_cycles, billing_profile_repository, enforcement
+from backend.modules.domains.finance import (
+    billing_cycle_repository,
+    billing_cycles,
+    billing_profile_repository,
+    enforcement,
+)
 from backend.modules.domains.finance import ledger_repository as repository
 from backend.modules.domains.finance.domain_types import (
     BillingJobTopic,
+    BillingPricingMode,
     BillingProfileStatus,
+    BillingScheduleApplyTo,
     PaymentStatus,
 )
 from backend.modules.domains.finance.policies import (
@@ -348,6 +357,7 @@ def configure_billing_profile(
     actor: BillingActor,
     scope: BillingSchoolScope,
 ) -> BillingProfileResult:
+    now = SystemClock().now()
     student = repository.get_scoped_student_row(
         conn,
         student_id=command.student_id,
@@ -357,36 +367,133 @@ def configure_billing_profile(
     )
     if not student:
         raise BillingError("Student was not found.", code="student_not_found", status_code=404)
-    normalized_items: list[tuple[int, int, str, int]] = []
-    seen_groups: set[int] = set()
-    for item in command.items:
-        if item.group_id in seen_groups:
-            raise BillingError("A billing group can appear only once.")
-        seen_groups.add(item.group_id)
-        row = repository.find_active_group_enrollment_row(
-            conn,
-            student_id=command.student_id,
-            group_id=item.group_id,
+    enrollment_rows = billing_cycle_repository.list_active_enrollment_rows(
+        conn,
+        student_id=command.student_id,
+    )
+    if not enrollment_rows:
+        raise BillingError(
+            "The student needs an active subject enrollment before billing can be configured.",
+            code="billing_enrollment_required",
+            status_code=409,
         )
-        if not row:
-            raise BillingError("Every billing item must use an active student group.")
-        description = item.description.strip() or str(row["subject_name"])
-        normalized_items.append(
-            (
-                int(row["group_id"]),
-                int(row["subject_id"]),
-                description,
-                item.amount_minor,
+    enrollment_by_group = {int(row["group_id"]): row for row in enrollment_rows}
+    enrollment_by_subject: dict[int, Any] = {}
+    for row in enrollment_rows:
+        enrollment_by_subject.setdefault(int(row["subject_id"]), row)
+    subject_amounts: dict[int, int] = {}
+    if command.items:
+        seen_groups: set[int] = set()
+        for item in command.items:
+            if item.group_id in seen_groups:
+                raise BillingError("A billing group can appear only once.")
+            seen_groups.add(item.group_id)
+            row = enrollment_by_group.get(item.group_id)
+            if not row:
+                raise BillingError("Every billing item must use an active student group.")
+            subject_id = int(row["subject_id"])
+            subject_amounts[subject_id] = (
+                subject_amounts.get(subject_id, 0) + item.amount_minor
             )
+    else:
+        for price in command.subject_prices:
+            if price.subject_id in subject_amounts:
+                raise BillingError("A subject price can appear only once.")
+            subject_amounts[price.subject_id] = price.amount_minor
+    active_subject_ids = set(enrollment_by_subject)
+    if command.pricing_mode is BillingPricingMode.PER_SUBJECT:
+        missing_subject_ids = active_subject_ids - subject_amounts.keys()
+        extra_subject_ids = subject_amounts.keys() - active_subject_ids
+        if missing_subject_ids or extra_subject_ids:
+            raise BillingError(
+                "Enter one amount for every active subject.",
+                code="billing_subject_pricing_required",
+                status_code=409,
+            )
+    else:
+        subject_amounts = {}
+    current_profile = billing_profile_repository.get_billing_profile_row(
+        conn,
+        command.student_id,
+        for_update=True,
+    )
+    is_first_configuration = current_profile is None
+    if current_profile and (
+        command.expected_version is None
+        or int(current_profile["version"]) != command.expected_version
+    ):
+        raise BillingError(
+            "The billing profile changed. Reload and try again.",
+            code="billing_profile_version_conflict",
+            status_code=409,
         )
+    if current_profile:
+        persisted_prices = {
+            int(row["subject_id"]): int(row["amount_minor"])
+            for row in billing_profile_repository.list_subject_price_rows(
+                conn,
+                int(current_profile["id"]),
+            )
+        }
+        is_same_configuration = (
+            int(current_profile["billing_day"]) == command.billing_day
+            and str(current_profile["status"]) == command.status.value
+            and str(current_profile["pricing_mode"]) == command.pricing_mode.value
+            and (
+                int(current_profile["total_amount_minor"])
+                if current_profile["total_amount_minor"] is not None
+                else None
+            )
+            == command.total_amount_minor
+            and persisted_prices == subject_amounts
+        )
+        if is_same_configuration:
+            unchanged = get_billing_profile(
+                conn,
+                student_id=command.student_id,
+                scope=scope,
+            )
+            if unchanged is None:
+                raise BillingError("Billing profile could not be loaded.")
+            return unchanged
+    school_today = now.astimezone(SCHOOL_TIMEZONE).date()
+    profile_starts_on = (
+        current_profile["starts_on"]
+        if current_profile
+        else (command.starts_on or school_today)
+    )
+    price_effective_on = command.starts_on or school_today
+    if (
+        current_profile
+        and command.apply_to is BillingScheduleApplyTo.NEXT_CYCLE
+    ):
+        current_period = billing_cycles.next_billing_period(
+            now=now,
+            billing_day=command.billing_day,
+            starts_on=profile_starts_on,
+        )
+        price_effective_on = (current_period.replace(day=28) + timedelta(days=4)).replace(
+            day=1
+        )
+    normalized_items = [
+        (
+            int(enrollment_by_subject[subject_id]["group_id"]),
+            subject_id,
+            str(enrollment_by_subject[subject_id]["subject_name"]),
+            amount_minor,
+        )
+        for subject_id, amount_minor in sorted(subject_amounts.items())
+    ]
     profile_id = billing_profile_repository.upsert_billing_profile(
         conn,
         student_id=command.student_id,
         school_id=int(student["school_id"]),
         billing_parent_id=repository.find_billing_parent_id(conn, command.student_id),
         billing_day=command.billing_day,
-        starts_on=command.starts_on,
+        starts_on=profile_starts_on,
         status=command.status,
+        pricing_mode=command.pricing_mode.value,
+        total_amount_minor=command.total_amount_minor,
         expected_version=command.expected_version,
         staff_id=actor.staff_id,
     )
@@ -400,8 +507,15 @@ def configure_billing_profile(
         billing_profile_repository.replace_billing_items(
             conn,
             profile_id=profile_id,
-            starts_on=command.starts_on,
+            starts_on=price_effective_on,
             items=normalized_items,
+            staff_id=actor.staff_id,
+        )
+        billing_profile_repository.replace_subject_prices(
+            conn,
+            profile_id=profile_id,
+            starts_on=price_effective_on,
+            prices=sorted(subject_amounts.items()),
             staff_id=actor.staff_id,
         )
     except (CheckViolation, UniqueViolation) as exc:
@@ -419,15 +533,37 @@ def configure_billing_profile(
             "student_id": command.student_id,
             "billing_day": command.billing_day,
             "status": command.status.value,
-            "group_ids": sorted(seen_groups),
+            "pricing_mode": command.pricing_mode.value,
+            "total_amount_minor": command.total_amount_minor,
+            "subject_ids": sorted(subject_amounts),
+            "apply_to": command.apply_to.value,
         },
         staff_id=actor.staff_id,
         account_id=actor.account_id,
     )
+    persisted_profile = billing_profile_repository.get_billing_profile_row(
+        conn,
+        command.student_id,
+    )
+    if (
+        command.status is BillingProfileStatus.ACTIVE
+        and persisted_profile is not None
+    ):
+        billing_cycles.apply_billing_profile_change(
+            conn,
+            profile=persisted_profile,
+            apply_to=command.apply_to,
+            actor=actor,
+            is_first_configuration=is_first_configuration,
+            now=now,
+        )
     profile = get_billing_profile(conn, student_id=command.student_id, scope=scope)
     if profile is None:
         raise BillingError("Billing profile could not be loaded.")
-    if profile.status is BillingProfileStatus.ACTIVE:
+    if (
+        profile.status is BillingProfileStatus.ACTIVE
+        and command.apply_to is BillingScheduleApplyTo.NEXT_CYCLE
+    ):
         _enqueue_invoice_generation_check(
             conn,
             profile_id=profile.profile_id,

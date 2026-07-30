@@ -44,6 +44,21 @@ def list_billing_item_rows(conn: Connection, profile_id: int) -> list[Any]:
     ).fetchall()
 
 
+def list_subject_price_rows(conn: Connection, profile_id: int) -> list[Any]:
+    return conn.execute(
+        """
+        SELECT price.*, subject.subject_name
+        FROM msi_v2.student_billing_subject_prices price
+        JOIN msi_v2.subjects subject ON subject.id = price.subject_id
+        WHERE price.profile_id = %s
+          AND price.status = 'active'
+          AND price.active_until IS NULL
+        ORDER BY subject.subject_name, price.subject_id
+        """,
+        (int(profile_id),),
+    ).fetchall()
+
+
 def upsert_billing_profile(
     conn: Connection,
     *,
@@ -53,6 +68,8 @@ def upsert_billing_profile(
     billing_day: int,
     starts_on: date,
     status: BillingProfileStatus,
+    pricing_mode: str = "per_subject",
+    total_amount_minor: int | None = None,
     expected_version: int | None,
     staff_id: int | None,
 ) -> int:
@@ -64,7 +81,8 @@ def upsert_billing_profile(
             """
             UPDATE msi_v2.student_billing_profiles
             SET school_id = %s, billing_parent_id = %s, billing_day = %s,
-                starts_on = %s, status = %s, updated_by_staff_id = %s,
+                starts_on = %s, status = %s, pricing_mode = %s,
+                total_amount_minor = %s, updated_by_staff_id = %s,
                 version = version + 1, updated_at = now()
             WHERE id = %s AND version = %s
             RETURNING id
@@ -75,6 +93,8 @@ def upsert_billing_profile(
                 int(billing_day),
                 starts_on,
                 status.value,
+                pricing_mode,
+                int(total_amount_minor) if total_amount_minor is not None else None,
                 int(staff_id) if staff_id else None,
                 int(current["id"]),
                 int(expected_version),
@@ -87,10 +107,14 @@ def upsert_billing_profile(
         """
         INSERT INTO msi_v2.student_billing_profiles (
             student_id, school_id, billing_parent_id, billing_day, currency,
-            starts_on, status, version, created_by_staff_id, updated_by_staff_id,
+            starts_on, status, pricing_mode, total_amount_minor, version,
+            created_by_staff_id, updated_by_staff_id,
             created_at, updated_at
         )
-        VALUES (%s, %s, %s, %s, 'UZS', %s, %s, 1, %s, %s, now(), now())
+        VALUES (
+            %s, %s, %s, %s, 'UZS', %s, %s, %s, %s,
+            1, %s, %s, now(), now()
+        )
         RETURNING id
         """,
         (
@@ -100,11 +124,76 @@ def upsert_billing_profile(
             int(billing_day),
             starts_on,
             status.value,
+            pricing_mode,
+            int(total_amount_minor) if total_amount_minor is not None else None,
             int(staff_id) if staff_id else None,
             int(staff_id) if staff_id else None,
         ),
     ).fetchone()
     return int(row["id"]) if row else 0
+
+
+def replace_subject_prices(
+    conn: Connection,
+    *,
+    profile_id: int,
+    starts_on: date,
+    prices: list[tuple[int, int]],
+    staff_id: int | None,
+) -> None:
+    conn.execute(
+        """
+        UPDATE msi_v2.student_billing_subject_prices
+        SET status = 'cancelled',
+            cancelled_at = now(),
+            cancelled_by_staff_id = %s,
+            cancellation_reason = 'superseded_by_billing_profile',
+            version = version + 1,
+            updated_at = now()
+        WHERE profile_id = %s
+          AND status = 'active'
+          AND active_from >= %s
+        """,
+        (int(staff_id) if staff_id else None, int(profile_id), starts_on),
+    )
+    conn.execute(
+        """
+        UPDATE msi_v2.student_billing_subject_prices
+        SET active_until = %s - 1,
+            version = version + 1,
+            updated_at = now()
+        WHERE profile_id = %s
+          AND status = 'active'
+          AND active_from < %s
+          AND (active_until IS NULL OR active_until >= %s)
+        """,
+        (starts_on, int(profile_id), starts_on, starts_on),
+    )
+    for subject_id, amount_minor in prices:
+        conn.execute(
+            """
+            INSERT INTO msi_v2.student_billing_subject_prices (
+                profile_id, subject_id, amount_minor, active_from, active_until,
+                status, cancelled_at, cancelled_by_staff_id, cancellation_reason,
+                version, created_at, updated_at
+            )
+            VALUES (
+                %s, %s, %s, %s, NULL,
+                'active', NULL, NULL, '', 1, now(), now()
+            )
+            ON CONFLICT (profile_id, subject_id, active_from)
+            DO UPDATE SET
+                amount_minor = excluded.amount_minor,
+                active_until = NULL,
+                status = 'active',
+                cancelled_at = NULL,
+                cancelled_by_staff_id = NULL,
+                cancellation_reason = '',
+                version = msi_v2.student_billing_subject_prices.version + 1,
+                updated_at = now()
+            """,
+            (int(profile_id), int(subject_id), int(amount_minor), starts_on),
+        )
 
 
 def replace_billing_items(
@@ -238,6 +327,27 @@ def list_active_profile_item_rows(
     ).fetchall()
 
 
+def list_active_subject_price_rows(
+    conn: Connection,
+    *,
+    profile_id: int,
+    run_date: date,
+) -> list[Any]:
+    return conn.execute(
+        """
+        SELECT price.*, subject.subject_name
+        FROM msi_v2.student_billing_subject_prices price
+        JOIN msi_v2.subjects subject ON subject.id = price.subject_id
+        WHERE price.profile_id = %s
+          AND price.status = 'active'
+          AND price.active_from <= %s
+          AND (price.active_until IS NULL OR price.active_until >= %s)
+        ORDER BY subject.subject_name, price.subject_id
+        """,
+        (int(profile_id), run_date, run_date),
+    ).fetchall()
+
+
 def insert_generated_monthly_invoice(
     conn: Connection,
     *,
@@ -302,8 +412,11 @@ __all__ = [
     "get_billing_profile_row",
     "insert_generated_monthly_invoice",
     "list_active_profile_item_rows",
+    "list_active_subject_price_rows",
     "list_billing_item_rows",
+    "list_subject_price_rows",
     "list_due_billing_profile_rows",
     "replace_billing_items",
+    "replace_subject_prices",
     "upsert_billing_profile",
 ]

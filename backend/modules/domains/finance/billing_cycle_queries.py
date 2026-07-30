@@ -13,6 +13,7 @@ from backend.modules.domains.finance.domain_types import (
     BillingCycleReviewDecision,
     BillingCycleReviewStatus,
     BillingCycleState,
+    BillingPricingMode,
     InvoiceOrigin,
     InvoiceStatus,
 )
@@ -62,6 +63,8 @@ def _review(row: Any) -> BillingCycleReviewResult:
         reversed_at=row["reversed_at"],
         reversal_reason=str(row["reversal_reason"]),
         version=int(row["version"]),
+        revision=int(row.get("revision") or 1),
+        pricing_mode=BillingPricingMode(str(row.get("pricing_mode") or "per_subject")),
     )
 
 

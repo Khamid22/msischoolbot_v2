@@ -40,9 +40,19 @@ def list_billing_account_rows(
                 profile.billing_day,
                 profile.starts_on AS effective_date,
                 COALESCE(profile.currency, 'UZS') AS currency,
-                COALESCE(items.monthly_amount_minor, 0)::bigint AS monthly_amount_minor,
-                COALESCE(items.item_count, 0)::integer AS billable_item_count,
+                CASE
+                    WHEN profile.pricing_mode = 'total'
+                    THEN COALESCE(profile.total_amount_minor, 0)
+                    ELSE COALESCE(
+                        prices.monthly_amount_minor,
+                        legacy_items.monthly_amount_minor,
+                        0
+                    )
+                END::bigint AS monthly_amount_minor,
+                COALESCE(enrollments.subject_count, 0)::integer AS billable_item_count,
                 profile.version AS schedule_version,
+                COALESCE(profile.pricing_mode, 'per_subject') AS pricing_mode,
+                profile.total_amount_minor,
                 latest.id AS latest_invoice_id,
                 latest.invoice_number AS latest_invoice_number,
                 latest.billing_period AS latest_billing_period,
@@ -83,20 +93,75 @@ def list_billing_account_rows(
                     COALESCE(invoice_totals.open_count, 0) > 0
                     AND enforcement.id IS NULL
                 ) AS is_enforcement_missing
+                ,
+                (
+                    profile.status = 'active'
+                    AND profile.pricing_mode = 'per_subject'
+                    AND EXISTS (
+                        SELECT 1
+                        FROM msi_v2.group_students missing_enrollment
+                        JOIN msi_v2.groups missing_group
+                          ON missing_group.id = missing_enrollment.group_id
+                        JOIN msi_v2.subject_programs missing_program
+                          ON missing_program.id = missing_group.program_id
+                        WHERE missing_enrollment.student_id = student.id
+                          AND missing_enrollment.enrollment_status = 'active'
+                          AND missing_group.status = 'active'
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM msi_v2.student_billing_subject_prices price
+                              WHERE price.profile_id = profile.id
+                                AND price.subject_id = missing_program.subject_id
+                                AND price.status = 'active'
+                                AND price.active_from <= CURRENT_DATE
+                                AND (
+                                    price.active_until IS NULL
+                                    OR price.active_until >= CURRENT_DATE
+                                )
+                          )
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM msi_v2.student_billing_items legacy_item
+                              WHERE legacy_item.profile_id = profile.id
+                                AND legacy_item.subject_id = missing_program.subject_id
+                                AND legacy_item.status = 'active'
+                                AND legacy_item.active_from <= CURRENT_DATE
+                                AND (
+                                    legacy_item.active_until IS NULL
+                                    OR legacy_item.active_until >= CURRENT_DATE
+                                )
+                          )
+                    )
+                ) AS is_pricing_required
             FROM msi_v2.students student
             JOIN msi_v2.schools school ON school.id = student.school_id
             LEFT JOIN msi_v2.student_billing_profiles profile
               ON profile.student_id = student.id
             LEFT JOIN LATERAL (
-                SELECT
-                    COALESCE(sum(item.amount_minor), 0)::bigint AS monthly_amount_minor,
-                    count(*)::integer AS item_count
+                SELECT sum(price.amount_minor)::bigint AS monthly_amount_minor
+                FROM msi_v2.student_billing_subject_prices price
+                WHERE price.profile_id = profile.id
+                  AND price.status = 'active'
+                  AND price.active_from <= CURRENT_DATE
+                  AND (price.active_until IS NULL OR price.active_until >= CURRENT_DATE)
+            ) prices ON true
+            LEFT JOIN LATERAL (
+                SELECT sum(item.amount_minor)::bigint AS monthly_amount_minor
                 FROM msi_v2.student_billing_items item
                 WHERE item.profile_id = profile.id
                   AND item.status = 'active'
                   AND item.active_from <= CURRENT_DATE
                   AND (item.active_until IS NULL OR item.active_until >= CURRENT_DATE)
-            ) items ON true
+            ) legacy_items ON true
+            LEFT JOIN LATERAL (
+                SELECT count(DISTINCT program.subject_id)::integer AS subject_count
+                FROM msi_v2.group_students enrollment
+                JOIN msi_v2.groups group_row ON group_row.id = enrollment.group_id
+                JOIN msi_v2.subject_programs program ON program.id = group_row.program_id
+                WHERE enrollment.student_id = student.id
+                  AND enrollment.enrollment_status = 'active'
+                  AND group_row.status = 'active'
+            ) enrollments ON true
             LEFT JOIN LATERAL (
                 SELECT invoice.id, invoice.invoice_number, invoice.billing_period,
                        invoice.status, invoice.due_date
@@ -215,6 +280,8 @@ def list_billing_account_rows(
                 COALESCE(items.monthly_amount_minor, 0)::bigint AS monthly_amount_minor,
                 COALESCE(items.item_count, 0)::integer AS billable_item_count,
                 admission.version AS schedule_version,
+                'per_subject'::text AS pricing_mode,
+                NULL::bigint AS total_amount_minor,
                 latest.id AS latest_invoice_id,
                 latest.invoice_number AS latest_invoice_number,
                 latest.billing_period AS latest_billing_period,
@@ -227,6 +294,8 @@ def list_billing_account_rows(
                 false AS is_payment_only,
                 false AS is_due_without_invoice,
                 false AS is_enforcement_missing
+                ,
+                false AS is_pricing_required
             FROM msi_v2.admissions admission
             JOIN msi_v2.schools school ON school.id = admission.school_id
             LEFT JOIN LATERAL (
@@ -313,10 +382,11 @@ def list_billing_account_rows(
                CASE
                    WHEN account.is_payment_only THEN 0
                    WHEN account.overdue_invoice_count > 0 THEN 1
-                   WHEN account.is_due_without_invoice THEN 2
-                   WHEN account.schedule_status = 'missing' THEN 3
-                   WHEN account.is_enforcement_missing THEN 4
-                   ELSE 5
+                   WHEN account.is_pricing_required THEN 2
+                   WHEN account.is_due_without_invoice THEN 3
+                   WHEN account.schedule_status = 'missing' THEN 4
+                   WHEN account.is_enforcement_missing THEN 5
+                   ELSE 6
                END AS attention_rank
         FROM accounts account
         WHERE (%s OR account.school_id = ANY(%s::bigint[]))
@@ -331,6 +401,7 @@ def list_billing_account_rows(
               OR (%s = 'due_without_invoice' AND account.is_due_without_invoice)
               OR (%s = 'missing_schedule' AND account.schedule_status = 'missing')
               OR (%s = 'enforcement_missing' AND account.is_enforcement_missing)
+              OR (%s = 'pricing_required' AND account.is_pricing_required)
           )
           AND (
               %s = 'all'
@@ -366,6 +437,7 @@ def list_billing_account_rows(
             attention,
             attention,
             attention,
+            attention,
             access,
             access,
             access,
@@ -393,6 +465,23 @@ def list_student_schedule_item_rows(conn: Connection, student_id: int) -> list[A
           AND item.active_from <= CURRENT_DATE
           AND (item.active_until IS NULL OR item.active_until >= CURRENT_DATE)
         ORDER BY subject.subject_name, group_row.group_name, item.id
+        """,
+        (int(student_id),),
+    ).fetchall()
+
+
+def list_student_subject_price_rows(conn: Connection, student_id: int) -> list[Any]:
+    return conn.execute(
+        """
+        SELECT price.*, subject.subject_name
+        FROM msi_v2.student_billing_profiles profile
+        JOIN msi_v2.student_billing_subject_prices price
+          ON price.profile_id = profile.id
+        JOIN msi_v2.subjects subject ON subject.id = price.subject_id
+        WHERE profile.student_id = %s
+          AND price.status = 'active'
+          AND price.active_until IS NULL
+        ORDER BY subject.subject_name, subject.id
         """,
         (int(student_id),),
     ).fetchall()

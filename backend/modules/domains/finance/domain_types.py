@@ -51,6 +51,16 @@ class BillingProfileStatus(StrEnum):
     ENDED = "ended"
 
 
+class BillingPricingMode(StrEnum):
+    TOTAL = "total"
+    PER_SUBJECT = "per_subject"
+
+
+class BillingScheduleApplyTo(StrEnum):
+    CURRENT_CYCLE = "current_cycle"
+    NEXT_CYCLE = "next_cycle"
+
+
 class BillingAccountType(StrEnum):
     STUDENT = "student"
     ADMISSION = "admission"
@@ -69,6 +79,7 @@ class BillingAttentionFlag(StrEnum):
     DUE_WITHOUT_INVOICE = "due_without_invoice"
     MISSING_SCHEDULE = "missing_schedule"
     ENFORCEMENT_MISSING = "enforcement_missing"
+    PRICING_REQUIRED = "pricing_required"
 
 
 class BillingItemStatus(StrEnum):
@@ -134,6 +145,7 @@ class BillingCycleState(StrEnum):
     INVOICED = "invoiced"
     SATISFIED = "satisfied"
     CANCELLED = "cancelled"
+    SUPERSEDED = "superseded"
 
 
 class BillingCycleReviewDecision(StrEnum):
@@ -160,7 +172,9 @@ __all__ = [
     "BillingNotificationDeliveryStatus",
     "BillingAutomationWorkerState",
     "BillingItemStatus",
+    "BillingPricingMode",
     "BillingProfileStatus",
+    "BillingScheduleApplyTo",
     "BillingScheduleStatus",
     "InvoiceKind",
     "InvoiceOrigin",

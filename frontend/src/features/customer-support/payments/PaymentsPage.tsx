@@ -13,19 +13,15 @@ import type {
   BillingAccountDetail,
   BillingAccountPage,
   BillingAccountSummary,
-  BillingAutomationStatus,
   BillingCycle,
   BillingCycleInvoiceCandidate,
-  BillingCycleReadiness,
   BillingCycleReview,
   BillingProfile,
   SupportContext,
   UnifiedInvoiceDetail,
 } from "@/features/customer-support/model";
-import { AutomationStatusPanel } from "@/features/customer-support/payments/AutomationStatusPanel";
 import { BillingAccountDetailPanel } from "@/features/customer-support/payments/BillingAccountDetailPanel";
 import { BillingAccountList } from "@/features/customer-support/payments/BillingAccountList";
-import { CycleReadinessPanel } from "@/features/customer-support/payments/CycleReadinessPanel";
 import { InvoiceDetailPanel } from "@/features/customer-support/payments/InvoiceDetailPanel";
 import { InvoiceList } from "@/features/customer-support/payments/InvoiceList";
 import {
@@ -132,23 +128,6 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
     ),
     enabled: view === "invoices" && selectedInvoiceId !== null,
   });
-  const automationQuery = useQuery({
-    queryKey: ["customer-support", "payments", "automation-status"],
-    queryFn: ({ signal }) => getSupport<BillingAutomationStatus>(
-      "/payments/automation-status",
-      signal,
-    ),
-    refetchInterval: 60_000,
-  });
-  const readinessQuery = useQuery({
-    queryKey: ["customer-support", "payments", "billing-cycle-readiness"],
-    queryFn: ({ signal }) => getSupport<BillingCycleReadiness>(
-      "/payments/billing-cycles/readiness",
-      signal,
-    ),
-    refetchInterval: 60_000,
-  });
-
   const invoiceMutation = useMutation({
     mutationFn: (operation: () => Promise<UnifiedInvoiceDetail>) => operation(),
     onSuccess: (invoice) => {
@@ -181,7 +160,6 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
     mutationFn: (operation: () => Promise<BillingCycle>) => operation(),
     onSuccess: () => {
       void invalidatePayments(queryClient);
-      void readinessQuery.refetch();
       void accountDetail.refetch();
     },
   });
@@ -303,13 +281,6 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
     setSelectedInvoiceId(invoiceId);
   }
 
-  function openBillingAccount(studentId: number) {
-    setView("accounts");
-    setSelectedInvoiceId(null);
-    setSelectedAccountType("student");
-    setSelectedAccountId(studentId);
-  }
-
   function saveSchedule(
     event: FormEvent<HTMLFormElement>,
     account: BillingAccountDetail,
@@ -317,23 +288,36 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
     event.preventDefault();
     if (!account.studentId) return;
     const data = new FormData(event.currentTarget);
-    const items = account.enrollmentOptions
-      .filter((option) => data.get(`enabled-${option.groupId}`) === "on")
-      .map((option) => ({
-        groupId: option.groupId,
-        amount: Number(data.get(`amount-${option.groupId}`)),
-        description: String(
-          data.get(`description-${option.groupId}`) || option.subjectName,
-        ).trim(),
-      }));
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const pricingMode = String(data.get("pricingMode") || "per_subject");
+    const status = submitter?.name === "status"
+      ? submitter.value
+      : account.scheduleStatus === "missing"
+        ? "active"
+        : account.scheduleStatus;
+    const applyTo = status === "active"
+      ? String(submitter?.dataset.applyTo || "current_cycle")
+      : "next_cycle";
+    const subjectIds = Array.from(new Set(
+      account.enrollmentOptions.map((option) => option.subjectId),
+    ));
     scheduleMutation.mutate({
       studentId: account.studentId,
       body: {
         billingDay: Number(data.get("billingDay")),
-        startsOn: String(data.get("startsOn") || ""),
-        status: String(data.get("status") || "active"),
+        status,
+        pricingMode,
+        totalAmount: pricingMode === "total"
+          ? Number(data.get("totalAmount"))
+          : null,
+        subjectAmounts: pricingMode === "per_subject"
+          ? subjectIds.map((subjectId) => ({
+            subjectId,
+            amount: Number(data.get(`subjectAmount-${subjectId}`)),
+          }))
+          : [],
+        applyTo,
         expectedVersion: account.scheduleVersion,
-        items,
       },
     });
   }
@@ -451,6 +435,34 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
             Billing operations
           </span>
         )}
+        actions={(
+          <div className="w-full md:w-[min(52vw,46rem)]">
+            <PaymentFilters
+              embedded
+              view={view}
+              searchInput={searchInput}
+              schools={context.data?.schools || []}
+              accountFilters={accountFilters}
+              invoiceFilters={invoiceFilters}
+              onSearchInputChange={setSearchInput}
+              onSearch={() => {
+                setSearch(searchInput.trim());
+                setSelectedAccountType(null);
+                setSelectedAccountId(null);
+                setSelectedInvoiceId(null);
+              }}
+              onAccountFiltersChange={(filters) => {
+                setAccountFilters(filters);
+                setSelectedAccountType(null);
+                setSelectedAccountId(null);
+              }}
+              onInvoiceFiltersChange={(filters) => {
+                setInvoiceFilters(filters);
+                setSelectedInvoiceId(null);
+              }}
+            />
+          </div>
+        )}
       />
       <div className="inline-flex rounded-lg border border-border bg-card p-1 shadow-sm" role="tablist" aria-label="Payment view">
         <PaymentViewButton active={view === "accounts"} onClick={() => switchView("accounts")}>
@@ -460,42 +472,6 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
           Invoices
         </PaymentViewButton>
       </div>
-      <PaymentFilters
-        view={view}
-        searchInput={searchInput}
-        schools={context.data?.schools || []}
-        accountFilters={accountFilters}
-        invoiceFilters={invoiceFilters}
-        onSearchInputChange={setSearchInput}
-        onSearch={() => {
-          setSearch(searchInput.trim());
-          setSelectedAccountType(null);
-          setSelectedAccountId(null);
-          setSelectedInvoiceId(null);
-        }}
-        onAccountFiltersChange={(filters) => {
-          setAccountFilters(filters);
-          setSelectedAccountType(null);
-          setSelectedAccountId(null);
-        }}
-        onInvoiceFiltersChange={(filters) => {
-          setInvoiceFilters(filters);
-          setSelectedInvoiceId(null);
-        }}
-      />
-      <AutomationStatusPanel
-        status={automationQuery.data}
-        loading={automationQuery.isLoading}
-        error={automationQuery.error}
-        onRetry={() => void automationQuery.refetch()}
-      />
-      <CycleReadinessPanel
-        readiness={readinessQuery.data}
-        loading={readinessQuery.isLoading}
-        error={readinessQuery.error}
-        onRetry={() => void readinessQuery.refetch()}
-        onOpenAccount={openBillingAccount}
-      />
       <MasterDetailLayout
         collectionState={collectionState}
         isDetailOpen={isDetailOpen}
@@ -552,7 +528,8 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
                 loading={accountDetail.isLoading}
                 error={accountDetail.error}
                 saving={scheduleMutation.isPending || cycleMutation.isPending}
-                mutationError={scheduleMutation.error || cycleMutation.error}
+                scheduleError={scheduleMutation.error}
+                cycleError={cycleMutation.error}
                 onClose={closeDetail}
                 onRetry={() => void accountDetail.refetch()}
                 onSaveSchedule={saveSchedule}

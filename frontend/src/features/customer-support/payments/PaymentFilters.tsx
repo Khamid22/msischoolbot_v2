@@ -23,6 +23,7 @@ export type InvoiceFilters = {
 };
 
 type Props = {
+  embedded?: boolean;
   view: PaymentView;
   searchInput: string;
   schools: SupportSchool[];
@@ -41,6 +42,7 @@ const PANEL_CLASS = [
 ].join(" ");
 
 export function PaymentFilters({
+  embedded = false,
   view,
   searchInput,
   schools,
@@ -97,7 +99,9 @@ export function PaymentFilters({
       role="search"
       aria-label={`Search and filter billing ${view}`}
       onSubmit={submit}
-      className="relative flex items-center gap-2 rounded-lg border border-border bg-card p-2 shadow-sm"
+      className={`relative flex w-full items-center gap-2 ${
+        embedded ? "" : "rounded-lg border border-border bg-card p-2 shadow-sm"
+      }`}
     >
       <label className="relative min-w-0 flex-1">
         <span className="sr-only">Search billing {view}</span>

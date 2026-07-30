@@ -12,8 +12,16 @@ from backend.modules.domains.finance.billing_cycles import (
     cycle_deadline,
     next_billing_period,
 )
-from backend.modules.domains.finance.domain_types import BillingCycleReviewDecision
-from backend.modules.domains.finance.schemas import ReviewBillingCycleInvoiceCommand
+from backend.modules.domains.finance.domain_types import (
+    BillingCycleReviewDecision,
+    BillingPricingMode,
+    BillingScheduleApplyTo,
+)
+from backend.modules.domains.finance.schemas import (
+    BillingSubjectPriceInput,
+    ConfigureBillingProfileCommand,
+    ReviewBillingCycleInvoiceCommand,
+)
 
 
 @pytest.mark.parametrize(
@@ -108,3 +116,61 @@ def test_customer_support_api_exposes_review_and_reversal_without_delete_routes(
     assert '"/billing-cycles/{cycle_id}/invoice-review"' in source
     assert '"/billing-cycle-reviews/{review_id}/reversal"' in source
     assert "@router.delete" not in source
+
+
+def test_total_pricing_requires_one_positive_total_and_no_subject_prices():
+    command = ConfigureBillingProfileCommand(
+        student_id=1,
+        billing_day=10,
+        pricing_mode=BillingPricingMode.TOTAL,
+        total_amount_minor=200_000_000,
+        apply_to=BillingScheduleApplyTo.CURRENT_CYCLE,
+    )
+
+    assert command.total_amount_minor == 200_000_000
+    assert command.subject_prices == []
+
+
+def test_per_subject_pricing_requires_subject_amounts():
+    with pytest.raises(ValueError, match="every subject"):
+        ConfigureBillingProfileCommand(
+            student_id=1,
+            billing_day=10,
+            pricing_mode=BillingPricingMode.PER_SUBJECT,
+        )
+
+    command = ConfigureBillingProfileCommand(
+        student_id=1,
+        billing_day=10,
+        pricing_mode=BillingPricingMode.PER_SUBJECT,
+        subject_prices=[
+            BillingSubjectPriceInput(subject_id=7, amount_minor=100_000_000),
+        ],
+    )
+    assert command.subject_prices[0].subject_id == 7
+
+
+def test_simple_billing_migration_is_additive_and_revisioned():
+    source = Path(
+        "database/alembic/versions/0051_simple_live_billing.py"
+    ).read_text(encoding="utf-8")
+    upgrade = source.split("def downgrade()", 1)[0]
+
+    assert 'down_revision = "0050_billing_cycles"' in source
+    assert "student_billing_subject_prices" in upgrade
+    assert "student_billing_cycle_coverage" in upgrade
+    assert "pricing_mode" in upgrade
+    assert "superseded_by_cycle_id" in upgrade
+    assert "DELETE FROM" not in upgrade.upper()
+    assert "TRUNCATE " not in upgrade.upper()
+    assert "DROP TABLE " not in upgrade.upper()
+
+
+def test_schedule_change_issues_current_cycle_with_a_fresh_window():
+    source = Path(
+        "backend/modules/domains/finance/billing_cycles.py"
+    ).read_text(encoding="utf-8")
+
+    assert "force_immediate_window=True" in source
+    assert "normalized_now + timedelta(hours=PAYMENT_WINDOW_HOURS)" in source
+    assert "billing_current_cycle_locked" in source

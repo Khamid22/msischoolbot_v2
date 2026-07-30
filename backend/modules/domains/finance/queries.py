@@ -30,6 +30,7 @@ from backend.modules.domains.finance.domain_types import (
     BillingItemStatus,
     BillingNotificationDeliveryStatus,
     BillingNotificationStage,
+    BillingPricingMode,
     BillingProfileStatus,
     BillingScheduleStatus,
     InvoiceKind,
@@ -50,6 +51,7 @@ from backend.modules.domains.finance.schemas import (
     BillingNotificationTimelineEntry,
     BillingProfileItemResult,
     BillingProfileResult,
+    BillingSubjectPriceResult,
     CurrencyBalance,
     InvoiceDetail,
     InvoiceLineResult,
@@ -119,6 +121,8 @@ def _billing_account_summary(row: Mapping[str, Any]) -> BillingAccountSummary:
         attention_flags.append(BillingAttentionFlag.MISSING_SCHEDULE)
     if values["is_enforcement_missing"]:
         attention_flags.append(BillingAttentionFlag.ENFORCEMENT_MISSING)
+    if values.get("is_pricing_required"):
+        attention_flags.append(BillingAttentionFlag.PRICING_REQUIRED)
     latest_invoice = None
     if values.get("latest_invoice_id") is not None:
         latest_invoice = BillingAccountLatestInvoice(
@@ -160,6 +164,12 @@ def _billing_account_summary(row: Mapping[str, Any]) -> BillingAccountSummary:
         attention_flags=attention_flags,
         schedule_version=(
             int(values["schedule_version"]) if values.get("schedule_version") is not None else None
+        ),
+        pricing_mode=BillingPricingMode(str(values.get("pricing_mode") or "per_subject")),
+        total_amount_minor=(
+            int(values["total_amount_minor"])
+            if values.get("total_amount_minor") is not None
+            else None
         ),
     )
 
@@ -248,6 +258,9 @@ def get_billing_account(
         enrollment_rows = billing_account_repository.list_student_enrollment_option_rows(
             conn, account_id
         )
+        subject_price_rows = billing_account_repository.list_student_subject_price_rows(
+            conn, account_id
+        )
         recipients = enforcement_repository.list_household_target_rows(conn, student_id=account_id)
         linked_recipients = sum(1 for recipient in recipients if recipient["telegram_user_id"])
         unlinked_recipients = len(recipients) - linked_recipients
@@ -256,6 +269,7 @@ def get_billing_account(
             conn, account_id
         )
         enrollment_rows = []
+        subject_price_rows = []
         linked_recipients = 0
         unlinked_recipients = 0
     invoice_rows = billing_account_repository.list_account_invoice_rows(
@@ -263,6 +277,70 @@ def get_billing_account(
         account_type=account_type.value,
         account_id=account_id,
     )
+    cycle_rows = (
+        billing_cycle_repository.list_scoped_cycle_rows(
+            conn,
+            school_ids=scope.school_ids,
+            all_schools=scope.all_schools,
+            student_id=account_id,
+            limit=24,
+        )
+        if account_type is BillingAccountType.STUDENT
+        else []
+    )
+    current_cycle_row = None
+    if cycle_rows:
+        from backend.modules.domains.finance.billing_cycles import next_billing_period
+
+        generated_at = SystemClock().now()
+        school_date = generated_at.astimezone(SCHOOL_TIMEZONE).date()
+        planned_period = next_billing_period(
+            now=generated_at,
+            billing_day=summary.billing_day or 1,
+            starts_on=summary.effective_date or school_date,
+        )
+        current_cycle_row = (
+            billing_cycle_repository.get_profile_change_cycle_row(
+                conn,
+                profile_id=int(cycle_rows[-1]["profile_id"]),
+                planned_billing_period=planned_period,
+                current_billing_period=school_date.replace(day=1),
+            )
+            or cycle_rows[-1]
+        )
+    can_apply_current_cycle = True
+    current_cycle_edit_block_reason = ""
+    if current_cycle_row is not None:
+        locked_cycle = billing_cycle_repository.get_cycle_row(
+            conn,
+            int(current_cycle_row["id"]),
+        )
+        if str(locked_cycle["state"]) == "review_required":
+            can_apply_current_cycle = False
+            current_cycle_edit_block_reason = "Review the existing paid invoice first."
+        elif locked_cycle["invoice_id"] is not None:
+            if int(locked_cycle["invoice_paid_minor"]) > 0:
+                can_apply_current_cycle = False
+                current_cycle_edit_block_reason = "The current invoice already has a payment."
+            elif bool(locked_cycle["has_pending_payme"]):
+                can_apply_current_cycle = False
+                current_cycle_edit_block_reason = "A Payme transaction is pending."
+            elif str(locked_cycle["enforcement_state"] or "") == "held":
+                can_apply_current_cycle = False
+                current_cycle_edit_block_reason = "Payment-only mode is already active."
+            elif bool(locked_cycle["has_active_review"]):
+                can_apply_current_cycle = False
+                current_cycle_edit_block_reason = "The current cycle is under manual review."
+    priced_subject_ids = {int(item["subject_id"]) for item in subject_price_rows}
+    seen_missing_subjects: set[int] = set()
+    pricing_required_rows = []
+    if summary.pricing_mode is BillingPricingMode.PER_SUBJECT:
+        for item in enrollment_rows:
+            subject_id = int(item["subject_id"])
+            if subject_id in priced_subject_ids or subject_id in seen_missing_subjects:
+                continue
+            seen_missing_subjects.add(subject_id)
+            pricing_required_rows.append(item)
     return BillingAccountDetail(
         **summary.model_dump(),
         schedule_items=[
@@ -288,20 +366,30 @@ def get_billing_account(
         invoices=[_invoice_summary(item) for item in invoice_rows],
         linked_telegram_recipients=linked_recipients,
         unlinked_telegram_recipients=unlinked_recipients,
-        billing_cycles=(
-            [
-                cycle_summary(conn, item)
-                for item in billing_cycle_repository.list_scoped_cycle_rows(
-                    conn,
-                    school_ids=scope.school_ids,
-                    all_schools=scope.all_schools,
-                    student_id=account_id,
-                    limit=24,
-                )
-            ]
-            if account_type is BillingAccountType.STUDENT
-            else []
-        ),
+        billing_cycles=[cycle_summary(conn, item) for item in cycle_rows],
+        subject_prices=[
+            BillingSubjectPriceResult(
+                subject_price_id=int(item["id"]),
+                subject_id=int(item["subject_id"]),
+                subject_name=str(item["subject_name"]),
+                amount_minor=int(item["amount_minor"]),
+                active_from=item["active_from"],
+                active_until=item["active_until"],
+                status=BillingItemStatus(str(item["status"])),
+            )
+            for item in subject_price_rows
+        ],
+        pricing_required_subjects=[
+            BillingEnrollmentOption(
+                group_id=int(item["group_id"]),
+                group_name=str(item["group_name"]),
+                subject_id=int(item["subject_id"]),
+                subject_name=str(item["subject_name"]),
+            )
+            for item in pricing_required_rows
+        ],
+        can_apply_current_cycle=can_apply_current_cycle,
+        current_cycle_edit_block_reason=current_cycle_edit_block_reason,
     )
 
 
@@ -622,8 +710,29 @@ def get_billing_profile(
         starts_on=row["starts_on"],
         ends_on=row["ends_on"],
         status=BillingProfileStatus(str(row["status"])),
+        pricing_mode=BillingPricingMode(str(row["pricing_mode"])),
+        total_amount_minor=(
+            int(row["total_amount_minor"])
+            if row["total_amount_minor"] is not None
+            else None
+        ),
         version=int(row["version"]),
         items=items,
+        subject_prices=[
+            BillingSubjectPriceResult(
+                subject_price_id=int(item["id"]),
+                subject_id=int(item["subject_id"]),
+                subject_name=str(item["subject_name"]),
+                amount_minor=int(item["amount_minor"]),
+                active_from=item["active_from"],
+                active_until=item["active_until"],
+                status=BillingItemStatus(str(item["status"])),
+            )
+            for item in billing_profile_repository.list_subject_price_rows(
+                conn,
+                int(row["id"]),
+            )
+        ],
     )
 
 

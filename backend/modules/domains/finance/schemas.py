@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from backend.core.api import ApiModel
 from backend.modules.domains.finance.domain_types import (
@@ -20,7 +20,9 @@ from backend.modules.domains.finance.domain_types import (
     BillingItemStatus,
     BillingNotificationDeliveryStatus,
     BillingNotificationStage,
+    BillingPricingMode,
     BillingProfileStatus,
+    BillingScheduleApplyTo,
     BillingScheduleStatus,
     InvoiceKind,
     InvoiceOrigin,
@@ -148,6 +150,8 @@ class BillingAccountSummary(BillingModel):
     enforcement_state: BillingEnforcementState | None = None
     attention_flags: list[BillingAttentionFlag] = Field(default_factory=list)
     schedule_version: int | None = None
+    pricing_mode: BillingPricingMode = BillingPricingMode.PER_SUBJECT
+    total_amount_minor: int | None = None
 
 
 class BillingAccountScheduleItem(BillingModel):
@@ -166,6 +170,16 @@ class BillingEnrollmentOption(BillingModel):
     subject_name: str
 
 
+class BillingSubjectPriceResult(BillingModel):
+    subject_price_id: int
+    subject_id: int
+    subject_name: str
+    amount_minor: int
+    active_from: date
+    active_until: date | None = None
+    status: BillingItemStatus = BillingItemStatus.ACTIVE
+
+
 class BillingAccountDetail(BillingAccountSummary):
     schedule_items: list[BillingAccountScheduleItem] = Field(default_factory=list)
     enrollment_options: list[BillingEnrollmentOption] = Field(default_factory=list)
@@ -173,6 +187,10 @@ class BillingAccountDetail(BillingAccountSummary):
     linked_telegram_recipients: int = 0
     unlinked_telegram_recipients: int = 0
     billing_cycles: list["BillingCycleSummary"] = Field(default_factory=list)
+    subject_prices: list[BillingSubjectPriceResult] = Field(default_factory=list)
+    pricing_required_subjects: list[BillingEnrollmentOption] = Field(default_factory=list)
+    can_apply_current_cycle: bool = True
+    current_cycle_edit_block_reason: str = ""
 
 
 class BillingAccountPage(BillingModel):
@@ -241,13 +259,36 @@ class BillingItemInput(BillingModel):
     description: str = Field(default="", max_length=200)
 
 
+class BillingSubjectPriceInput(BillingModel):
+    subject_id: int = Field(gt=0)
+    amount_minor: int = Field(gt=0)
+
+
 class ConfigureBillingProfileCommand(BillingModel):
     student_id: int = Field(gt=0)
     billing_day: int = Field(ge=1, le=28)
-    starts_on: date
+    starts_on: date | None = None
     status: BillingProfileStatus = BillingProfileStatus.ACTIVE
-    items: list[BillingItemInput] = Field(min_length=1, max_length=20)
+    pricing_mode: BillingPricingMode = BillingPricingMode.PER_SUBJECT
+    total_amount_minor: int | None = Field(default=None, gt=0)
+    subject_prices: list[BillingSubjectPriceInput] = Field(default_factory=list, max_length=50)
+    apply_to: BillingScheduleApplyTo = BillingScheduleApplyTo.CURRENT_CYCLE
+    items: list[BillingItemInput] = Field(default_factory=list, max_length=50)
     expected_version: int | None = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def validate_pricing(self):
+        if self.pricing_mode is BillingPricingMode.TOTAL:
+            if self.total_amount_minor is None:
+                raise ValueError("Total pricing requires a monthly amount.")
+            if self.subject_prices or self.items:
+                raise ValueError("Total pricing cannot include subject amounts.")
+            return self
+        if self.total_amount_minor is not None:
+            raise ValueError("Per-subject pricing cannot include a total amount.")
+        if not self.subject_prices and not self.items:
+            raise ValueError("Per-subject pricing requires an amount for every subject.")
+        return self
 
 
 class BillingProfileItemResult(BillingModel):
@@ -275,8 +316,11 @@ class BillingProfileResult(BillingModel):
     starts_on: date
     ends_on: date | None = None
     status: BillingProfileStatus
+    pricing_mode: BillingPricingMode = BillingPricingMode.PER_SUBJECT
+    total_amount_minor: int | None = None
     version: int
     items: list[BillingProfileItemResult] = Field(default_factory=list)
+    subject_prices: list[BillingSubjectPriceResult] = Field(default_factory=list)
 
 
 class BillingCycleItemResult(BillingModel):
@@ -334,6 +378,8 @@ class BillingCycleSummary(BillingModel):
     invoice_id: int | None = None
     invoice_number: str = ""
     version: int
+    revision: int = 1
+    pricing_mode: BillingPricingMode = BillingPricingMode.PER_SUBJECT
     is_preview: bool = False
     items: list[BillingCycleItemResult] = Field(default_factory=list)
     reviews: list[BillingCycleReviewResult] = Field(default_factory=list)
@@ -446,6 +492,8 @@ __all__ = [
     "BillingCycleReviewResult",
     "BillingCycleSummary",
     "BillingEnrollmentOption",
+    "BillingSubjectPriceInput",
+    "BillingSubjectPriceResult",
     "BillingNotificationTimelineEntry",
     "BillingProfileItemResult",
     "BillingProfileResult",

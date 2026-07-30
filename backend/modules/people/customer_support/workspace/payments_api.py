@@ -23,7 +23,10 @@ from backend.modules.people.customer_support.payments.contracts import (
     BillingCycleSummary,
     BillingError,
     BillingItemInput,
+    BillingPricingMode,
     BillingProfileResult,
+    BillingScheduleApplyTo,
+    BillingSubjectPriceInput,
     ConfigureBillingProfileCommand,
     InvoiceDetail,
     InvoiceKind,
@@ -115,11 +118,23 @@ class BillingItemRequest(ApiModel):
     description: str = Field(default="", max_length=200)
 
 
+class BillingSubjectPriceRequest(ApiModel):
+    subject_id: int = Field(gt=0)
+    amount: float = Field(gt=0)
+
+
 class ConfigureBillingProfileRequest(ApiModel):
     billing_day: int = Field(ge=1, le=28)
-    starts_on: date
+    starts_on: date | None = None
     status: str = Field(default="active", pattern="^(active|paused|ended)$")
-    items: list[BillingItemRequest] = Field(min_length=1, max_length=20)
+    pricing_mode: BillingPricingMode = BillingPricingMode.PER_SUBJECT
+    total_amount: float | None = Field(default=None, gt=0)
+    subject_amounts: list[BillingSubjectPriceRequest] = Field(
+        default_factory=list,
+        max_length=50,
+    )
+    apply_to: BillingScheduleApplyTo = BillingScheduleApplyTo.CURRENT_CYCLE
+    items: list[BillingItemRequest] = Field(default_factory=list, max_length=50)
     expected_version: int | None = Field(default=None, gt=0)
 
 
@@ -514,6 +529,20 @@ def configure_billing_profile(
                     billing_day=payload.billing_day,
                     starts_on=payload.starts_on,
                     status=payload.status,
+                    pricing_mode=payload.pricing_mode,
+                    total_amount_minor=(
+                        major_to_minor(payload.total_amount)
+                        if payload.total_amount is not None
+                        else None
+                    ),
+                    subject_prices=[
+                        BillingSubjectPriceInput(
+                            subject_id=item.subject_id,
+                            amount_minor=major_to_minor(item.amount),
+                        )
+                        for item in payload.subject_amounts
+                    ],
+                    apply_to=payload.apply_to,
                     items=[
                         BillingItemInput(
                             group_id=item.group_id,

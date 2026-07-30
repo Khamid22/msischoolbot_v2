@@ -198,12 +198,14 @@ export type AdmissionInvoiceQueue = {
 
 export type BillingAccountType = "student" | "admission";
 export type BillingScheduleStatus = "missing" | "active" | "paused" | "ended";
+export type BillingPricingMode = "total" | "per_subject";
 export type BillingAttentionFlag =
   | "payment_only"
   | "overdue"
   | "due_without_invoice"
   | "missing_schedule"
-  | "enforcement_missing";
+  | "enforcement_missing"
+  | "pricing_required";
 
 export type CurrencyBalance = {
   currency: string;
@@ -242,6 +244,8 @@ export type BillingAccountSummary = {
   enforcementState: AdmissionInvoiceQueueItem["enforcementState"];
   attentionFlags: BillingAttentionFlag[];
   scheduleVersion: number | null;
+  pricingMode: BillingPricingMode;
+  totalAmountMinor: number | null;
 };
 
 export type BillingAccountPage = {
@@ -266,6 +270,16 @@ export type BillingEnrollmentOption = {
   subjectName: string;
 };
 
+export type BillingSubjectPrice = {
+  subjectPriceId: number;
+  subjectId: number;
+  subjectName: string;
+  amountMinor: number;
+  activeFrom: string;
+  activeUntil: string | null;
+  status: "active" | "cancelled";
+};
+
 export type BillingAccountDetail = BillingAccountSummary & {
   scheduleItems: BillingAccountScheduleItem[];
   enrollmentOptions: BillingEnrollmentOption[];
@@ -273,6 +287,10 @@ export type BillingAccountDetail = BillingAccountSummary & {
   linkedTelegramRecipients: number;
   unlinkedTelegramRecipients: number;
   billingCycles: BillingCycle[];
+  subjectPrices: BillingSubjectPrice[];
+  pricingRequiredSubjects: BillingEnrollmentOption[];
+  canApplyCurrentCycle: boolean;
+  currentCycleEditBlockReason: string;
 };
 
 export type BillingCycleState =
@@ -280,7 +298,8 @@ export type BillingCycleState =
   | "review_required"
   | "invoiced"
   | "satisfied"
-  | "cancelled";
+  | "cancelled"
+  | "superseded";
 
 export type BillingCycleItem = {
   cycleItemId: number;
@@ -303,6 +322,8 @@ export type BillingCycleReview = {
   reversedAt: string | null;
   reversalReason: string;
   version: number;
+  revision: number;
+  pricingMode: BillingPricingMode;
 };
 
 export type BillingCycleInvoiceCandidate = {

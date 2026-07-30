@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from calendar import monthrange
 from datetime import UTC, date, datetime, time, timedelta
-from typing import Protocol
+from typing import Any, Protocol
 
 from backend.core.clock import SystemClock
 from backend.core.time import SCHOOL_TIMEZONE
@@ -17,6 +17,9 @@ from backend.modules.domains.finance.domain_types import (
     BillingCycleReviewStatus,
     BillingCycleState,
     BillingJobTopic,
+    BillingPricingMode,
+    BillingScheduleApplyTo,
+    InvoiceStatus,
 )
 from backend.modules.domains.finance.policies import PAYMENT_WINDOW_HOURS, BillingError
 from backend.modules.domains.finance.schemas import (
@@ -103,6 +106,91 @@ def _enqueue_cycle_issuance(
     )
 
 
+def _cycle_snapshot(
+    conn: Connection,
+    *,
+    profile: Any,
+    effective_on: date,
+) -> tuple[list[dict[str, Any]], list[Any], list[int]]:
+    student_id = int(profile["student_id"])
+    coverage = repository.list_active_enrollment_rows(conn, student_id=student_id)
+    if not coverage:
+        return [], [], []
+    pricing_mode = BillingPricingMode(str(profile["pricing_mode"]))
+    if pricing_mode is BillingPricingMode.TOTAL:
+        return (
+            [
+                {
+                    "id": None,
+                    "group_id": None,
+                    "subject_id": None,
+                    "description": "Monthly tuition",
+                    "amount_minor": int(profile["total_amount_minor"]),
+                }
+            ],
+            coverage,
+            [],
+        )
+    prices = {
+        int(row["subject_id"]): row
+        for row in repository.list_subject_price_rows(
+            conn,
+            profile_id=int(profile["id"]),
+            effective_on=effective_on,
+        )
+    }
+    covered_subject_ids = {int(row["subject_id"]) for row in coverage}
+    missing_subject_ids = sorted(covered_subject_ids - prices.keys())
+    if missing_subject_ids:
+        return [], coverage, missing_subject_ids
+    items: list[dict[str, Any]] = [
+        {
+            "id": None,
+            "group_id": None,
+            "subject_id": subject_id,
+            "description": str(prices[subject_id]["subject_name"]),
+            "amount_minor": int(prices[subject_id]["amount_minor"]),
+        }
+        for subject_id in sorted(
+            covered_subject_ids,
+            key=lambda value: str(prices[value]["subject_name"]).casefold(),
+        )
+    ]
+    return items, coverage, []
+
+
+def _create_cycle_for_profile(
+    conn: Connection,
+    *,
+    profile: Any,
+    billing_period: date,
+    deadline: datetime,
+    pricing_effective_on: date | None = None,
+) -> tuple[int, list[int]]:
+    items, coverage, missing_subject_ids = _cycle_snapshot(
+        conn,
+        profile=profile,
+        effective_on=(
+            pricing_effective_on
+            or deadline.astimezone(SCHOOL_TIMEZONE).date()
+        ),
+    )
+    if missing_subject_ids or not items:
+        return 0, missing_subject_ids
+    cycle_id = repository.insert_cycle(
+        conn,
+        profile_id=int(profile["id"]),
+        student_id=int(profile["student_id"]),
+        school_id=int(profile["school_id"]),
+        billing_period=billing_period,
+        due_at=deadline,
+        pricing_mode=str(profile["pricing_mode"]),
+        item_rows=items,
+        coverage_rows=coverage,
+    )
+    return cycle_id, []
+
+
 def plan_billing_cycles(conn: Connection, *, now: datetime) -> list[int]:
     planned_cycle_ids: list[int] = []
     normalized_now = now.astimezone(UTC)
@@ -115,20 +203,19 @@ def plan_billing_cycles(conn: Connection, *, now: datetime) -> list[int]:
         if profile["ends_on"] is not None and period > _month_start(profile["ends_on"]):
             continue
         deadline = cycle_deadline(period, int(profile["billing_day"]))
-        items = repository.list_snapshot_item_rows(
+        existing = repository.get_cycle_by_profile_period_row(
             conn,
             profile_id=int(profile["id"]),
-            effective_on=deadline.astimezone(SCHOOL_TIMEZONE).date(),
-        )
-        cycle_id = repository.insert_cycle(
-            conn,
-            profile_id=int(profile["id"]),
-            student_id=int(profile["student_id"]),
-            school_id=int(profile["school_id"]),
             billing_period=period,
-            due_at=deadline,
-            item_rows=items,
         )
+        cycle_id = int(existing["id"]) if existing else 0
+        if not cycle_id:
+            cycle_id, _missing_subject_ids = _create_cycle_for_profile(
+                conn,
+                profile=profile,
+                billing_period=period,
+                deadline=deadline,
+            )
         if not cycle_id:
             continue
         cycle = repository.get_cycle_row(conn, cycle_id)
@@ -161,6 +248,7 @@ def issue_billing_cycle(
     *,
     cycle_id: int,
     now: datetime,
+    force_immediate_window: bool = False,
 ) -> int:
     cycle = repository.get_cycle_row(conn, cycle_id, for_update=True)
     if not cycle:
@@ -197,7 +285,7 @@ def issue_billing_cycle(
     planned_issue_at = cycle["due_at"] - timedelta(hours=PAYMENT_WINDOW_HOURS)
     deadline_at = (
         normalized_now + timedelta(hours=PAYMENT_WINDOW_HOURS)
-        if normalized_now > planned_issue_at
+        if force_immediate_window or normalized_now > planned_issue_at
         else cycle["due_at"]
     )
     parent_id = ledger_repository.find_billing_parent_id(
@@ -215,6 +303,11 @@ def issue_billing_cycle(
     )
     if not invoice_id:
         return 0
+    repository.update_cycle_deadline(
+        conn,
+        cycle_id=cycle_id,
+        deadline_at=deadline_at,
+    )
     repository.update_cycle_state(
         conn,
         cycle_id=cycle_id,
@@ -243,6 +336,148 @@ def issue_billing_cycle(
         account_id=None,
     )
     return invoice_id
+
+
+def apply_billing_profile_change(
+    conn: Connection,
+    *,
+    profile: Any,
+    apply_to: BillingScheduleApplyTo,
+    actor: BillingAuditActor,
+    is_first_configuration: bool,
+    now: datetime,
+) -> int:
+    """Refresh an unissued cycle or audit-replace an eligible open invoice."""
+
+    normalized_now = now.astimezone(UTC)
+    planned_period = next_billing_period(
+        now=normalized_now,
+        billing_day=int(profile["billing_day"]),
+        starts_on=profile["starts_on"],
+    )
+    current = repository.get_profile_change_cycle_row(
+        conn,
+        profile_id=int(profile["id"]),
+        planned_billing_period=planned_period,
+        current_billing_period=_month_start(
+            normalized_now.astimezone(SCHOOL_TIMEZONE).date()
+        ),
+        for_update=True,
+    )
+    if current and apply_to is BillingScheduleApplyTo.NEXT_CYCLE:
+        return 0
+    period = current["billing_period"] if current else planned_period
+    if current:
+        current = repository.get_cycle_row(conn, int(current["id"]), for_update=True)
+        if str(current["state"]) == BillingCycleState.REVIEW_REQUIRED.value:
+            raise BillingError(
+                "Review the existing paid invoice before changing the current cycle.",
+                code="billing_cycle_review_required",
+                status_code=409,
+            )
+        if current["invoice_id"] is not None:
+            invoice_status = InvoiceStatus(str(current["invoice_status"]))
+            block_reason = ""
+            if int(current["invoice_paid_minor"]) > 0 or invoice_status is InvoiceStatus.PAID:
+                block_reason = "The current invoice already has a completed payment."
+            elif bool(current["has_pending_payme"]):
+                block_reason = "The current invoice has a pending Payme transaction."
+            elif str(current["enforcement_state"] or "") == "held":
+                block_reason = "The current invoice already placed accounts in payment-only mode."
+            elif bool(current["has_active_review"]):
+                block_reason = "The current billing cycle is under manual review."
+            if block_reason:
+                raise BillingError(
+                    f"{block_reason} Apply the schedule from the next cycle.",
+                    code="billing_current_cycle_locked",
+                    status_code=409,
+                )
+            invoice_id = int(current["invoice_id"])
+            if not ledger_repository.void_invoice(
+                conn,
+                invoice_id=invoice_id,
+                expected_version=int(
+                    ledger_repository.get_invoice_row(
+                        conn,
+                        invoice_id=invoice_id,
+                        for_update=True,
+                    )["version"]
+                ),
+                reason="Replaced by an audited billing schedule edit.",
+            ):
+                raise BillingError(
+                    "The current invoice changed. Reload and try again.",
+                    code="invoice_version_conflict",
+                    status_code=409,
+                )
+            enforcement.reconcile_invoice_enforcement(
+                conn,
+                invoice_id=invoice_id,
+                now=normalized_now,
+            )
+            ledger_repository.insert_audit_event(
+                conn,
+                event_type="finance.invoice_replaced_by_schedule",
+                entity_type="invoice",
+                entity_id=invoice_id,
+                detail={"billing_cycle_id": int(current["id"])},
+                staff_id=actor.staff_id,
+                account_id=actor.account_id,
+            )
+        repository.supersede_cycle(conn, cycle_id=int(current["id"]))
+    deadline = cycle_deadline(period, int(profile["billing_day"]))
+    cycle_id, missing_subject_ids = _create_cycle_for_profile(
+        conn,
+        profile=profile,
+        billing_period=period,
+        deadline=deadline,
+        pricing_effective_on=(
+            normalized_now.astimezone(SCHOOL_TIMEZONE).date()
+            if is_first_configuration
+            or apply_to is BillingScheduleApplyTo.CURRENT_CYCLE
+            else None
+        ),
+    )
+    if missing_subject_ids:
+        raise BillingError(
+            "Enter an amount for every active subject before issuing the invoice.",
+            code="billing_subject_pricing_required",
+            status_code=409,
+        )
+    if not cycle_id:
+        raise BillingError(
+            "The student needs an active subject enrollment before billing can be configured.",
+            code="billing_enrollment_required",
+            status_code=409,
+        )
+    if current:
+        repository.link_superseded_cycle(
+            conn,
+            cycle_id=int(current["id"]),
+            replaced_by_cycle_id=cycle_id,
+        )
+    if repository.list_manual_candidate_rows(conn, cycle_id):
+        repository.update_cycle_state(
+            conn,
+            cycle_id=cycle_id,
+            state=BillingCycleState.REVIEW_REQUIRED.value,
+        )
+        return 0
+    if is_first_configuration or apply_to is BillingScheduleApplyTo.CURRENT_CYCLE:
+        return issue_billing_cycle(
+            conn,
+            cycle_id=cycle_id,
+            now=normalized_now,
+            force_immediate_window=True,
+        )
+    _enqueue_cycle_issuance(
+        conn,
+        cycle_id=cycle_id,
+        cycle_version=1,
+        issue_at=deadline - timedelta(hours=PAYMENT_WINDOW_HOURS),
+        now=normalized_now,
+    )
+    return 0
 
 
 def review_manual_invoice(
@@ -400,6 +635,7 @@ def reverse_manual_invoice_review(
 
 __all__ = [
     "BILLING_DEADLINE_TIME",
+    "apply_billing_profile_change",
     "cycle_deadline",
     "issue_billing_cycle",
     "next_billing_period",

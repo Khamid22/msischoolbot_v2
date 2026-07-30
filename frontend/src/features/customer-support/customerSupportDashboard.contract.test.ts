@@ -133,6 +133,7 @@ describe("Customer Support admissions and payments", () => {
   });
 
   it("uses the unified ledger for current students and recurring billing", () => {
+    const scheduleEditor = source("./payments/BillingScheduleEditor.tsx");
     assert.match(students, /paid-invoices/);
     assert.match(students, /expectedStudentVersion/);
     assert.doesNotMatch(students, /Mark unpaid/);
@@ -140,7 +141,10 @@ describe("Customer Support admissions and payments", () => {
     assert.match(billingProfile, /Monthly amount in UZS/);
     assert.match(payments, /invoice-payments\/\$\{paymentId\}\/reversal/);
     assert.match(payments, /\/payments\/billing-accounts/);
-    assert.match(source("./payments/BillingAccountDetailPanel.tsx"), /Save schedule/);
+    assert.match(scheduleEditor, /Save schedule/);
+    assert.match(scheduleEditor, /Total monthly/);
+    assert.match(scheduleEditor, /Per subject/);
+    assert.match(scheduleEditor, /restart 48 hours/);
   });
 
   it("defaults to billing accounts and exposes semantic desktop tables with mobile cards", () => {
@@ -171,7 +175,6 @@ describe("Customer Support master-detail reliability", () => {
   const supportLayout = source("./shared/SupportPageLayout.tsx");
   const admissions = source("./admissions/AdmissionsPage.tsx");
   const payments = source("./payments/PaymentsPage.tsx");
-  const automation = source("./payments/AutomationStatusPanel.tsx");
   const invoiceDetail = source("./payments/InvoiceDetailPanel.tsx");
   const teachers = source("./teachers/TeachersPage.tsx");
   const tickets = source("./tickets/TicketsPage.tsx");
@@ -196,19 +199,15 @@ describe("Customer Support master-detail reliability", () => {
     assert.match(payments, /Back to \{view === "accounts" \? "accounts" : "invoices"\}/);
   });
 
-  it("exposes billing automation and privacy-safe notification results", () => {
-    assert.match(payments, /\/payments\/automation-status/);
-    assert.match(payments, /\/payments\/billing-cycles\/readiness/);
+  it("keeps operations out of the visible header and preserves invoice delivery results", () => {
+    assert.doesNotMatch(payments, /\/payments\/automation-status/);
+    assert.doesNotMatch(payments, /\/payments\/billing-cycles\/readiness/);
+    assert.match(payments, /actions=\{\(/);
+    assert.match(payments, /<PaymentFilters/);
     assert.match(payments, /reviewCycleInvoice/);
     assert.match(source("./payments/BillingAccountDetailPanel.tsx"), /Apply payment/);
     assert.match(source("./payments/BillingAccountDetailPanel.tsx"), /Exclude from cycle/);
-    assert.match(automation, /Billing automation/);
     assert.match(invoiceDetail, /Notification timeline/);
     assert.match(invoiceDetail, /without exposing Telegram identifiers/);
-    assert.match(automation, /Worker \{status\.workerState/);
-    assert.match(automation, /status\.openInvoices/);
-    assert.match(automation, /status\.pendingFinanceJobs/);
-    assert.match(automation, /status\.lastSuccessfulFinanceWorkerAt/);
-    assert.match(automation, /<details/);
   });
 });

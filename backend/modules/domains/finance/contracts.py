@@ -28,7 +28,9 @@ from backend.modules.domains.finance.domain_types import (
     BillingCycleState,
     BillingItemStatus,
     BillingJobTopic,
+    BillingPricingMode,
     BillingProfileStatus,
+    BillingScheduleApplyTo,
     InvoiceKind,
     ManualPaymentMethod,
 )
@@ -44,6 +46,7 @@ from backend.modules.domains.finance.schemas import (
     BillingCycleSummary,
     BillingItemInput,
     BillingProfileResult,
+    BillingSubjectPriceInput,
     ConfigureBillingProfileCommand,
     InvoiceDetail,
     InvoicePage,
@@ -157,6 +160,8 @@ def ensure_student_billing_profile(
         billing_day=command.billing_day,
         starts_on=command.starts_on,
         status=BillingProfileStatus.ACTIVE,
+        pricing_mode="per_subject",
+        total_amount_minor=None,
         expected_version=expected_version,
         staff_id=command.staff_id,
     )
@@ -175,6 +180,18 @@ def ensure_student_billing_profile(
             )
             for item in command.items
         ],
+        staff_id=command.staff_id,
+    )
+    subject_amounts: dict[int, int] = {}
+    for item in command.items:
+        subject_amounts[item.subject_id] = (
+            subject_amounts.get(item.subject_id, 0) + item.amount_minor
+        )
+    billing_profile_repository.replace_subject_prices(
+        conn,
+        profile_id=profile_id,
+        starts_on=command.starts_on,
+        prices=sorted(subject_amounts.items()),
         staff_id=command.staff_id,
     )
     profile_version = int(current["version"]) + 1 if current else 1
@@ -591,10 +608,13 @@ __all__ = [
     "BillingCycleSummary",
     "BillingError",
     "BillingProfileItemCommand",
+    "BillingPricingMode",
     "BillingProfileResult",
+    "BillingScheduleApplyTo",
     "BillingSchoolScope",
     "BillingItemInput",
     "BillingItemStatus",
+    "BillingSubjectPriceInput",
     "CompatibilityPaymentRecord",
     "ConfigureBillingProfileCommand",
     "EnsureStudentBillingProfileCommand",
