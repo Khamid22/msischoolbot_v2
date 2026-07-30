@@ -82,6 +82,7 @@
 /api/v1/customer-support/parents/{parent_id}/children/{student_id} | DELETE
 /api/v1/customer-support/parents/{parent_id}/deactivate | POST
 /api/v1/customer-support/parents/{parent_id}/reactivate | POST
+/api/v1/customer-support/payments/automation-status | GET
 /api/v1/customer-support/payments/invoice-payments/{payment_id}/reversal | POST
 /api/v1/customer-support/payments/invoices | GET
 /api/v1/customer-support/payments/invoices/{invoice_id} | GET

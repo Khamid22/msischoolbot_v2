@@ -21,12 +21,16 @@ def claim_jobs(
     worker_id: str,
     settings: WorkerSettings,
 ) -> list[JobRecord]:
-    repository.release_expired_leases(uow.conn)
+    repository.release_expired_leases(
+        uow.conn,
+        allowed_topics=settings.allowed_topics,
+    )
     return repository.claim_due_jobs(
         uow.conn,
         worker_id=worker_id,
         limit=settings.batch_size,
         lease_seconds=settings.lease_seconds,
+        allowed_topics=settings.allowed_topics,
     )
 
 

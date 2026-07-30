@@ -20,6 +20,10 @@ import {
   TicketQueueFilters,
   type TicketQueueFilterValues,
 } from "@/features/customer-support/tickets/TicketQueueFilters";
+import {
+  MasterDetailLayout,
+  resolveMasterDetailCollectionState,
+} from "@/features/customer-support/shared/MasterDetailLayout";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
@@ -100,6 +104,11 @@ export function TicketsPage({
     getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
   });
   const tickets = queue.data?.pages.flatMap((page) => page.items) || [];
+  const collectionState = resolveMasterDetailCollectionState({
+    isLoading: queue.isLoading,
+    isError: queue.isError,
+    itemCount: tickets.length,
+  });
 
   useEffect(() => {
     const normalizedSearch = searchInput.trim();
@@ -110,6 +119,14 @@ export function TicketsPage({
     }, 300);
     return () => window.clearTimeout(timeout);
   }, [search, searchInput]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setSelectedId(readTicketFilters().selectedId);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -144,6 +161,25 @@ export function TicketsPage({
     setSelectedId(null);
   }
 
+  function selectTicket(ticketId: number) {
+    const params = new URLSearchParams(window.location.search);
+    params.set("ticketId", String(ticketId));
+    window.history.pushState(
+      { ...window.history.state, supportTicketDetail: true },
+      "",
+      `${window.location.pathname}?${params}`,
+    );
+    setSelectedId(ticketId);
+  }
+
+  function closeTicket() {
+    if (window.history.state?.supportTicketDetail) {
+      window.history.back();
+      return;
+    }
+    setSelectedId(null);
+  }
+
   return (
     <div className="flex min-w-0 flex-col gap-4 overflow-x-hidden">
       <PageHeader title={title} subtitle={description} />
@@ -158,9 +194,58 @@ export function TicketsPage({
         onFiltersChange={updateFilters}
       />
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(20rem,0.72fr)_minmax(0,1.55fr)]">
+      <MasterDetailLayout
+        collectionState={collectionState}
+        isDetailOpen={selectedId !== null}
+        fallback={collectionState === "loading" ? (
+          <section className="min-h-[28rem] overflow-hidden rounded-lg border border-border bg-card shadow-card">
+            <header className="flex min-h-14 items-center justify-between border-b border-border px-4 py-3">
+              <div>
+                <h2 className="text-sm font-black">Parent tickets</h2>
+                <p className="text-xs font-semibold text-muted-foreground">Loading…</p>
+              </div>
+              <Loader2 className="h-4 w-4 animate-spin text-primary motion-reduce:animate-none" />
+            </header>
+            <TicketQueueSkeleton />
+          </section>
+        ) : (
+          <EmptyState
+            title={collectionState === "error"
+              ? "Could not load tickets"
+              : "No matching tickets"}
+            detail={collectionState === "error"
+              ? (queue.error instanceof Error ? queue.error.message : "Try again.")
+              : "New parent requests in your assigned schools will appear here."}
+            icon={<TicketCheck className="h-5 w-5" />}
+            action={(
+              <button
+                type="button"
+                className="min-h-11 rounded-lg border border-border px-4 text-sm font-black"
+                onClick={() => {
+                  if (collectionState === "error") {
+                    void queue.refetch();
+                    return;
+                  }
+                  setSearchInput("");
+                  setSearch("");
+                  updateFilters({
+                    status: "",
+                    schoolId: "",
+                    category: "",
+                    priority: "",
+                    slaState: "",
+                    assignment: "",
+                  });
+                }}
+              >
+                {collectionState === "error" ? "Try again" : "Reset filters"}
+              </button>
+            )}
+          />
+        )}
+        collection={(
         <section
-          className={`${selectedId ? "hidden lg:flex" : "flex"} min-h-[28rem] min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-card lg:max-h-[calc(100dvh-14rem)]`}
+          className="flex min-h-[28rem] min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-card lg:max-h-[calc(100dvh-14rem)]"
           aria-label="Support ticket queue"
         >
           <header className="flex min-h-14 items-center justify-between border-b border-border px-4 py-3">
@@ -199,7 +284,7 @@ export function TicketsPage({
                 <button
                   key={ticket.ticketId}
                   type="button"
-                  onClick={() => setSelectedId(ticket.ticketId)}
+                  onClick={() => selectTicket(ticket.ticketId)}
                   aria-pressed={selectedId === ticket.ticketId}
                   className={`flex min-h-24 w-full items-start gap-3 border-b border-border px-4 py-3 text-left transition-colors hover:bg-muted/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 motion-reduce:transition-none ${
                     selectedId === ticket.ticketId ? "bg-primary/8" : "bg-card"
@@ -250,15 +335,17 @@ export function TicketsPage({
             </footer>
           ) : null}
         </section>
-
-        <section className={`${selectedId ? "block" : "hidden lg:block"} min-w-0`}>
+        )}
+        detail={(
+        <section className="min-w-0">
           <TicketDetailPanel
             ticketId={selectedId}
             csrfToken={csrfToken}
-            onBack={() => setSelectedId(null)}
+            onBack={closeTicket}
           />
         </section>
-      </div>
+        )}
+      />
     </div>
   );
 }

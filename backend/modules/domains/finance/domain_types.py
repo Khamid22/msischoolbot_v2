@@ -51,6 +51,11 @@ class BillingProfileStatus(StrEnum):
     ENDED = "ended"
 
 
+class BillingItemStatus(StrEnum):
+    ACTIVE = "active"
+    CANCELLED = "cancelled"
+
+
 class BillingJobTopic(StrEnum):
     GENERATE_INVOICES = "finance.generate_invoices"
     RECONCILE_LEGACY_PAYMENTS = "finance.reconcile_legacy_payments"
@@ -81,6 +86,21 @@ class BillingNotificationStage(StrEnum):
     RESTORED = "restored"
 
 
+class BillingNotificationDeliveryStatus(StrEnum):
+    SCHEDULED = "scheduled"
+    PENDING = "pending"
+    SENT = "sent"
+    SKIPPED = "skipped"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class BillingAutomationWorkerState(StrEnum):
+    HEALTHY = "healthy"
+    STALLED = "stalled"
+    NOT_STARTED = "not_started"
+
+
 class BillingHoldTarget(StrEnum):
     DEBTOR_STUDENT = "debtor_student"
     LINKED_PARENT = "linked_parent"
@@ -93,6 +113,9 @@ __all__ = [
     "BillingEnforcementState",
     "BillingHoldTarget",
     "BillingNotificationStage",
+    "BillingNotificationDeliveryStatus",
+    "BillingAutomationWorkerState",
+    "BillingItemStatus",
     "BillingProfileStatus",
     "InvoiceKind",
     "InvoiceOrigin",

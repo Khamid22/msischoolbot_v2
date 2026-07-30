@@ -82,6 +82,8 @@ describe("Customer Support ticket queue", () => {
     assert.match(page, /params\.set\("q", search\)/);
     assert.match(page, /params\.set\("slaState", slaState\)/);
     assert.match(page, /params\.set\("assignedToMe", "true"\)/);
+    assert.match(page, /window\.history\.pushState/);
+    assert.match(page, /window\.addEventListener\("popstate"/);
   });
 
   it("limits an open ticket to flag, escalate, and resolve actions", () => {
@@ -142,5 +144,47 @@ describe("Customer Support admissions and payments", () => {
     assert.match(publicAdmission, /action=\{data\.checkoutUrl\}/);
     assert.doesNotMatch(publicAdmission, /confirmPayment|performTransaction/);
     assert.match(publicAdmission, /mutation\.isError/);
+  });
+});
+
+describe("Customer Support master-detail reliability", () => {
+  const layout = source("./shared/MasterDetailLayout.tsx");
+  const supportLayout = source("./shared/SupportPageLayout.tsx");
+  const admissions = source("./admissions/AdmissionsPage.tsx");
+  const payments = source("./payments/PaymentsPage.tsx");
+  const automation = source("./payments/AutomationStatusPanel.tsx");
+  const invoiceDetail = source("./payments/InvoiceDetailPanel.tsx");
+  const teachers = source("./teachers/TeachersPage.tsx");
+  const tickets = source("./tickets/TicketsPage.tsx");
+
+  it("uses one collection-state decision across all six master-detail pages", () => {
+    assert.match(layout, /itemCount > 0/);
+    assert.match(layout, /if \(isLoading\)/);
+    assert.match(layout, /if \(isError\)/);
+    assert.match(layout, /collectionState !== "ready"/);
+    assert.match(supportLayout, /MasterDetailLayout/);
+    assert.match(admissions, /MasterDetailLayout/);
+    assert.match(payments, /MasterDetailLayout/);
+    assert.match(teachers, /MasterDetailLayout/);
+    assert.match(tickets, /MasterDetailLayout/);
+  });
+
+  it("shows only the collection or detail on mobile and splits at lg", () => {
+    assert.match(layout, /isDetailOpen \? "hidden lg:block" : "block"/);
+    assert.match(layout, /isDetailOpen \? "block" : "hidden lg:block"/);
+    assert.match(layout, /lg:grid-cols/);
+    assert.match(admissions, /Back to admissions/);
+    assert.match(payments, /Back to invoices/);
+  });
+
+  it("exposes billing automation and privacy-safe notification results", () => {
+    assert.match(payments, /\/payments\/automation-status/);
+    assert.match(automation, /Billing automation/);
+    assert.match(invoiceDetail, /Notification timeline/);
+    assert.match(invoiceDetail, /without exposing Telegram identifiers/);
+    assert.match(automation, /Worker \{status\.workerState/);
+    assert.match(automation, /status\.openInvoices/);
+    assert.match(automation, /status\.pendingFinanceJobs/);
+    assert.match(automation, /status\.lastSuccessfulFinanceWorkerAt/);
   });
 });

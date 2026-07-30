@@ -14,6 +14,7 @@ from backend.core.access import ActorContext, get_actor_context
 from backend.core.api import ApiModel, ApiSuccess, api_error, api_success
 from backend.modules.people.customer_support.payments.contracts import (
     AddPaidStudentInvoiceCommand,
+    BillingAutomationStatus,
     BillingError,
     BillingItemInput,
     BillingProfileResult,
@@ -106,6 +107,21 @@ def _error(exc: Exception):
     if isinstance(exc, ValueError):
         return api_error(str(exc), code="invalid_payment_request", status_code=400)
     raise exc
+
+
+@router.get(
+    "/automation-status",
+    response_model=ApiSuccess[BillingAutomationStatus],
+    operation_id="api_v1_customer_support_billing_automation_status",
+)
+def get_billing_automation_status(
+    actor: ActorDependency,
+    use_case: PaymentsUseCaseDependency,
+):
+    try:
+        return api_success(use_case.get_automation_status(actor))
+    except Exception as exc:
+        return _error(exc)
 
 
 @router.get(

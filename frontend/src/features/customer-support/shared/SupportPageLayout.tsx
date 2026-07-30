@@ -1,6 +1,10 @@
 import { ArrowLeft, GraduationCap, ShieldCheck, UsersRound } from "lucide-react";
 import type { ReactNode } from "react";
 import type { SupportRecordKind } from "@/features/customer-support/model";
+import {
+  MasterDetailLayout,
+  resolveMasterDetailCollectionState,
+} from "@/features/customer-support/shared/MasterDetailLayout";
 import { RecordList } from "@/features/customer-support/shared/RecordList";
 import { RecordsSearchBar } from "@/features/customer-support/shared/RecordsSearchBar";
 import { SupportErrorAlert } from "@/features/customer-support/shared/SupportErrorAlert";
@@ -26,6 +30,32 @@ export function SupportPageLayout<K extends SupportRecordKind>({
 }) {
   const noun = controller.kind === "student" ? "student" : "parent";
   const EmptyIcon = controller.kind === "student" ? GraduationCap : UsersRound;
+  const hasDetailError = Boolean(
+    controller.selectedId
+    && !controller.loadingDetail
+    && !controller.detail
+    && controller.errorState,
+  );
+  const collectionState = resolveMasterDetailCollectionState({
+    isLoading: controller.loadingRecords,
+    isError: Boolean(controller.errorState && !hasDetailError),
+    itemCount: controller.records.length,
+  });
+  const recordList = (
+    <RecordList
+      kind={controller.kind}
+      items={controller.records}
+      selectedId={controller.selectedId}
+      loading={controller.loadingRecords}
+      loadingMore={controller.loadingMore}
+      hasMore={Boolean(controller.nextCursor)}
+      allRecordsLoaded={controller.allRecordsLoaded}
+      fixedSchoolLabel={controller.fixedSchoolLabel}
+      scrollRef={controller.listScrollRef}
+      onSelect={controller.selectRecord}
+      onLoadMore={() => void controller.loadMore()}
+    />
+  );
 
   return (
     <div className="flex min-w-0 flex-col gap-4 overflow-x-hidden">
@@ -55,28 +85,49 @@ export function SupportPageLayout<K extends SupportRecordKind>({
         action={searchAction}
       />
 
-      <SupportErrorAlert
-        state={controller.errorState}
-        onReload={controller.reloadDetail}
-        onDismiss={() => controller.setErrorState(null)}
-      />
-
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(20rem,0.72fr)_minmax(0,1.55fr)]">
-        <RecordList
-          kind={controller.kind}
-          items={controller.records}
-          selectedId={controller.selectedId}
-          loading={controller.loadingRecords}
-          loadingMore={controller.loadingMore}
-          hasMore={Boolean(controller.nextCursor)}
-          allRecordsLoaded={controller.allRecordsLoaded}
-          fixedSchoolLabel={controller.fixedSchoolLabel}
-          scrollRef={controller.listScrollRef}
-          onSelect={controller.selectRecord}
-          onLoadMore={() => void controller.loadMore()}
+      {!hasDetailError && collectionState !== "error" ? (
+        <SupportErrorAlert
+          state={controller.errorState}
+          onReload={controller.reloadRecords}
+          onDismiss={() => controller.setErrorState(null)}
         />
+      ) : null}
 
-        <section className={`${controller.selectedId ? "block" : "hidden lg:block"} min-w-0`} aria-label={`Selected ${noun}`}>
+      <MasterDetailLayout
+        collectionState={collectionState}
+        isDetailOpen={Boolean(controller.selectedId)}
+        desktopColumnsClassName="lg:grid-cols-[minmax(20rem,0.72fr)_minmax(0,1.55fr)]"
+        collection={recordList}
+        fallback={collectionState === "loading" ? recordList : (
+          <EmptyState
+            title={collectionState === "error"
+              ? `${title} could not be loaded`
+              : `No matching ${noun}s`}
+            detail={collectionState === "error"
+              ? controller.errorState?.error.message
+              : "Try another name, contact, school, or status."}
+            icon={<EmptyIcon className="h-5 w-5" />}
+            action={(
+              <button
+                type="button"
+                className={secondaryButton}
+                onClick={() => {
+                  if (collectionState === "error") {
+                    controller.reloadRecords();
+                    return;
+                  }
+                  controller.setQuery("");
+                  controller.setStatus("all");
+                  controller.setSchoolId("");
+                }}
+              >
+                {collectionState === "error" ? "Try again" : "Reset filters"}
+              </button>
+            )}
+          />
+        )}
+        detail={(
+          <section className="min-w-0" aria-label={`Selected ${noun}`}>
           {controller.selectedId ? (
             <button type="button" onClick={controller.closeDetail} className={`${secondaryButton} mb-3 lg:hidden`}>
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -87,6 +138,12 @@ export function SupportPageLayout<K extends SupportRecordKind>({
             <DetailSkeleton />
           ) : controller.detail ? (
             detail
+          ) : hasDetailError ? (
+            <SupportErrorAlert
+              state={controller.errorState}
+              onReload={controller.reloadDetail}
+              onDismiss={() => controller.setErrorState(null)}
+            />
           ) : !controller.selectedId ? (
             <EmptyState
               title={`Select a ${noun}`}
@@ -94,8 +151,9 @@ export function SupportPageLayout<K extends SupportRecordKind>({
               icon={<EmptyIcon className="h-5 w-5" />}
             />
           ) : null}
-        </section>
-      </div>
+          </section>
+        )}
+      />
     </div>
   );
 }

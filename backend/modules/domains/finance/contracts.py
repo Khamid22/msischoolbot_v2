@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 
 from backend.core.clock import SystemClock
+from backend.core.time import SCHOOL_TIMEZONE
 from backend.core.unit_of_work import Connection
 from backend.modules.domains.finance import (
     billing_profile_repository,
@@ -17,6 +18,8 @@ from backend.modules.domains.finance import (
     repository,
 )
 from backend.modules.domains.finance.domain_types import (
+    BillingItemStatus,
+    BillingJobTopic,
     BillingProfileStatus,
     InvoiceKind,
     ManualPaymentMethod,
@@ -26,6 +29,7 @@ from backend.modules.domains.finance.queries import BillingSchoolScope
 from backend.modules.domains.finance.schemas import (
     AddPaidStudentInvoiceCommand,
     BillingAccessStatus,
+    BillingAutomationStatus,
     BillingItemInput,
     BillingProfileResult,
     ConfigureBillingProfileCommand,
@@ -37,6 +41,8 @@ from backend.modules.domains.finance.schemas import (
     VoidStudentInvoiceCommand,
 )
 from backend.modules.domains.finance.service import payment_row_to_record
+from backend.modules.jobs.contracts import enqueue_on_connection
+from backend.modules.jobs.schemas import EnqueueJobCommand
 
 
 @dataclass(frozen=True)
@@ -103,11 +109,7 @@ def _payment_record_from_row(row) -> PaymentRecord:
     is_outstanding = str(item["state"]) in {"debt", "due", "upcoming"}
     return PaymentRecord(
         payment_id=payment_id,
-        invoice_id=(
-            payment_id - repository.NEW_INVOICE_PAYMENT_ID_OFFSET
-            if is_invoice
-            else None
-        ),
+        invoice_id=(payment_id - repository.NEW_INVOICE_PAYMENT_ID_OFFSET if is_invoice else None),
         student_row_id=int(item["student_row_id"]),
         subject=str(item["subject"]),
         month=str(item["month"]),
@@ -159,6 +161,21 @@ def ensure_student_billing_profile(
             )
             for item in command.items
         ],
+        staff_id=command.staff_id,
+    )
+    profile_version = int(current["version"]) + 1 if current else 1
+    enqueue_on_connection(
+        conn,
+        EnqueueJobCommand(
+            topic=BillingJobTopic.GENERATE_INVOICES.value,
+            payload={
+                "run_date": SystemClock().now().astimezone(SCHOOL_TIMEZONE).date().isoformat()
+            },
+            idempotency_key=(
+                f"finance-generate-invoices:billing-profile:{profile_id}:v{profile_version}"
+            ),
+            max_attempts=10,
+        ),
     )
     return profile_id
 
@@ -344,6 +361,19 @@ def get_billing_profile(
     return queries.get_billing_profile(conn, student_id=student_id, scope=scope)
 
 
+def get_billing_automation_status(
+    conn: Connection,
+    *,
+    scope: BillingSchoolScope,
+    now: datetime | None = None,
+) -> BillingAutomationStatus:
+    return queries.get_billing_automation_status(
+        conn,
+        scope=scope,
+        now=now,
+    )
+
+
 def configure_billing_profile(
     conn: Connection,
     command: ConfigureBillingProfileCommand,
@@ -401,11 +431,13 @@ __all__ = [
     "AddPaidStudentInvoiceCommand",
     "BillingActor",
     "BillingAccessStatus",
+    "BillingAutomationStatus",
     "BillingError",
     "BillingProfileItemCommand",
     "BillingProfileResult",
     "BillingSchoolScope",
     "BillingItemInput",
+    "BillingItemStatus",
     "CompatibilityPaymentRecord",
     "ConfigureBillingProfileCommand",
     "EnsureStudentBillingProfileCommand",
@@ -424,6 +456,7 @@ __all__ = [
     "ensure_student_billing_profile",
     "find_migrated_invoice_id",
     "get_billing_profile",
+    "get_billing_automation_status",
     "get_account_billing_access",
     "get_invoice",
     "issue_student_invoice",

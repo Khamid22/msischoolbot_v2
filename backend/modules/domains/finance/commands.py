@@ -4,12 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from psycopg.errors import CheckViolation, UniqueViolation
+
 from backend.core.clock import SystemClock
+from backend.core.time import SCHOOL_TIMEZONE
 from backend.core.unit_of_work import Connection
-from backend.modules.domains.finance import billing_profile_repository
-from backend.modules.domains.finance import enforcement
+from backend.modules.domains.finance import billing_profile_repository, enforcement
 from backend.modules.domains.finance import ledger_repository as repository
-from backend.modules.domains.finance.domain_types import PaymentStatus
+from backend.modules.domains.finance.domain_types import (
+    BillingJobTopic,
+    BillingProfileStatus,
+    PaymentStatus,
+)
 from backend.modules.domains.finance.policies import (
     BillingError,
     ensure_invoice_accepts_payment,
@@ -31,12 +37,34 @@ from backend.modules.domains.finance.schemas import (
     ReverseInvoicePaymentCommand,
     VoidStudentInvoiceCommand,
 )
+from backend.modules.jobs.contracts import enqueue_on_connection
+from backend.modules.jobs.schemas import EnqueueJobCommand
 
 
 @dataclass(frozen=True)
 class BillingActor:
     staff_id: int | None
     account_id: int | None
+
+
+def _enqueue_invoice_generation_check(
+    conn: Connection,
+    *,
+    profile_id: int,
+    profile_version: int,
+) -> None:
+    run_date = SystemClock().now().astimezone(SCHOOL_TIMEZONE).date()
+    enqueue_on_connection(
+        conn,
+        EnqueueJobCommand(
+            topic=BillingJobTopic.GENERATE_INVOICES.value,
+            payload={"run_date": run_date.isoformat()},
+            idempotency_key=(
+                f"finance-generate-invoices:billing-profile:{profile_id}:v{profile_version}"
+            ),
+            max_attempts=10,
+        ),
+    )
 
 
 def _student_for_write(
@@ -346,12 +374,20 @@ def configure_billing_profile(
             code="billing_profile_version_conflict",
             status_code=409,
         )
-    billing_profile_repository.replace_billing_items(
-        conn,
-        profile_id=profile_id,
-        starts_on=command.starts_on,
-        items=normalized_items,
-    )
+    try:
+        billing_profile_repository.replace_billing_items(
+            conn,
+            profile_id=profile_id,
+            starts_on=command.starts_on,
+            items=normalized_items,
+            staff_id=actor.staff_id,
+        )
+    except (CheckViolation, UniqueViolation) as exc:
+        raise BillingError(
+            "The billing schedule conflicts with an existing version. Reload and try again.",
+            code="billing_profile_conflict",
+            status_code=409,
+        ) from exc
     repository.insert_audit_event(
         conn,
         event_type="finance.billing_profile_configured",
@@ -369,6 +405,12 @@ def configure_billing_profile(
     profile = get_billing_profile(conn, student_id=command.student_id, scope=scope)
     if profile is None:
         raise BillingError("Billing profile could not be loaded.")
+    if profile.status is BillingProfileStatus.ACTIVE:
+        _enqueue_invoice_generation_check(
+            conn,
+            profile_id=profile.profile_id,
+            profile_version=profile.version,
+        )
     return profile
 
 

@@ -10,7 +10,6 @@ from typing import Any
 from backend.core.unit_of_work import Connection
 from backend.modules.domains.finance.domain_types import (
     BillingEnforcementState,
-    BillingHoldTarget,
     BillingNotificationStage,
 )
 
@@ -132,11 +131,7 @@ def get_schedule_by_invoice_row(
         """,
         (int(invoice_id),),
     ).fetchone()
-    return (
-        get_schedule_row(conn, int(row["id"]), for_update=for_update)
-        if row
-        else None
-    )
+    return get_schedule_row(conn, int(row["id"]), for_update=for_update) if row else None
 
 
 def set_schedule_state(
@@ -536,6 +531,24 @@ def update_notification_delivery(
     )
 
 
+def list_notification_delivery_summary_rows(
+    conn: Connection,
+    *,
+    schedule_id: int,
+) -> list[Any]:
+    return conn.execute(
+        """
+        SELECT stage, status, count(*)::bigint AS delivery_count,
+               min(created_at) AS first_created_at
+        FROM msi_v2.billing_notification_deliveries
+        WHERE schedule_id = %s
+        GROUP BY stage, status
+        ORDER BY min(id)
+        """,
+        (int(schedule_id),),
+    ).fetchall()
+
+
 def list_active_schedule_rows(conn: Connection, *, limit: int = 500) -> list[Any]:
     return conn.execute(
         """
@@ -563,6 +576,7 @@ __all__ = [
     "list_active_schedule_rows",
     "list_bootstrap_invoice_rows",
     "list_household_target_rows",
+    "list_notification_delivery_summary_rows",
     "release_removed_household_holds",
     "release_schedule_holds",
     "set_schedule_state",

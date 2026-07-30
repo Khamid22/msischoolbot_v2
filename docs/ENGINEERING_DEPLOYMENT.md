@@ -22,16 +22,20 @@ polling inside a web replica.
 
 ## Database Deployment
 
-`scripts/railway_start.sh` runs:
+`scripts/railway_start.sh` starts the selected process:
 
 ```bash
-python -m alembic upgrade head
 python main.py "$RUN_MODE"
 ```
 
-Repository migration head is `0044_student_identifier_sequence`. A failed migration stops startup. Test the
-entire chain on a disposable representative clone before release, especially intentionally
-irreversible revisions.
+Database migration is a separate reviewed release step. The repository head is
+`0049_billing_reliability`. Before applying it to production, run `python -m alembic current`
+against production and require `0048_billing_enforcement` (or `0049_billing_reliability` when
+already applied). Stop if production is behind `0048`: earlier recruitment-catalog revisions
+contain row deletions and require a separate data review and explicit approval.
+
+Test the entire chain on a disposable representative clone before release, especially
+intentionally irreversible revisions. A migration failure must stop the release.
 
 Never substitute manual production DDL for a migration.
 
@@ -57,7 +61,38 @@ Required deployed settings include:
 
 Optional settings include database pool limits, `WEBAPP_INIT_DATA_TTL`, rate-limit/cache
 configuration, object storage, Teacher Academy notification chat IDs, and `WORKER_*` batch,
-polling, lease, and retry settings.
+polling, lease, and retry settings. `WORKER_ALLOWED_TOPICS` is a comma-separated exact allowlist;
+an empty value permits all registered topics.
+
+## Staged Finance Worker
+
+Do not create or enable a production worker as part of the web deployment. First deploy the web
+code and migration, then review:
+
+```text
+GET /api/v1/customer-support/payments/automation-status
+```
+
+The report must be checked for due profiles, invoices without enforcement schedules, Telegram
+coverage, delivery failures, active payment-only holds, and the last successful finance-worker
+activity.
+
+Starting the dedicated Railway finance worker requires explicit approval because queued jobs can
+create invoices, send Telegram messages, and restrict real accounts. Its initial exact allowlist
+is:
+
+```text
+finance.generate_invoices
+finance.bootstrap_billing_enforcement
+finance.process_billing_enforcement_stage
+finance.send_billing_notification
+finance.reconcile_billing_enforcement
+finance.reconcile_legacy_payments
+```
+
+Configure these as a comma-separated `WORKER_ALLOWED_TOPICS` value. Keep Payme disabled until new
+sandbox credentials are supplied through production environment variables; never place Payme
+credentials in Git or documentation.
 
 ## Pre-release Gate
 

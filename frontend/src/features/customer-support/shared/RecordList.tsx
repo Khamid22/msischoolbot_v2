@@ -34,7 +34,7 @@ export function RecordList({
 
   return (
     <section
-      className={`${selectedId ? "hidden lg:flex" : "flex"} min-h-[28rem] min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-card lg:max-h-[calc(100dvh-14rem)]`}
+      className="flex min-h-[28rem] min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-card lg:max-h-[calc(100dvh-14rem)]"
       aria-label={`${title} search results`}
     >
       <header className="flex min-h-14 items-center justify-between border-b border-border px-4 py-3">

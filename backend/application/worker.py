@@ -110,9 +110,10 @@ def run_worker(
     shutdown = stop_event or Event()
     worker_id = active_container.settings.worker.worker_id or default_worker_id()
     LOGGER.info(
-        "worker_started worker_id=%s topics=%s",
+        "worker_started worker_id=%s registered_topics=%s allowed_topics=%s",
         worker_id,
         ",".join(active_registry.topics) or "(none)",
+        ",".join(active_container.settings.worker.allowed_topics) or "(all)",
     )
     try:
         while not shutdown.is_set():

@@ -219,7 +219,37 @@ export type InvoiceSettlement = {
 export type UnifiedInvoiceDetail = AdmissionInvoiceQueueItem & {
   lines: InvoiceLine[];
   payments: InvoiceSettlement[];
+  notificationTimeline: BillingNotificationTimelineEntry[];
   voidReason: string;
+};
+
+export type BillingNotificationTimelineEntry = {
+  stage: "initial" | "twenty_four_hours" | "six_hours" | "held" | "restored";
+  scheduledFor: string;
+  status: "scheduled" | "pending" | "sent" | "skipped" | "failed" | "cancelled";
+  recipientCount: number;
+  pendingCount: number;
+  sentCount: number;
+  skippedCount: number;
+  failedCount: number;
+};
+
+export type BillingAutomationStatus = {
+  generatedAt: string;
+  effectiveSchoolIds: number[];
+  allSchools: boolean;
+  activeBillingProfiles: number;
+  currentlyDueBillingProfiles: number;
+  openInvoices: number;
+  openInvoicesWithoutEnforcement: number;
+  linkedTelegramRecipients: number;
+  unlinkedTelegramRecipients: number;
+  pendingNotificationDeliveries: number;
+  failedNotificationDeliveries: number;
+  activePaymentOnlyHolds: number;
+  pendingFinanceJobs: number;
+  workerState: "healthy" | "stalled" | "not_started";
+  lastSuccessfulFinanceWorkerAt: string | null;
 };
 
 export type BillingProfileItem = {
@@ -232,6 +262,9 @@ export type BillingProfileItem = {
   amountMinor: number;
   activeFrom: string;
   activeUntil: string | null;
+  status: "active" | "cancelled";
+  cancelledAt: string | null;
+  cancellationReason: string;
 };
 
 export type BillingProfile = {

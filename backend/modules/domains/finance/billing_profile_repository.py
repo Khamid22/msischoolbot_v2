@@ -36,6 +36,7 @@ def list_billing_item_rows(conn: Connection, profile_id: int) -> list[Any]:
         JOIN msi_v2.groups group_row ON group_row.id = item.group_id
         JOIN msi_v2.subjects subject ON subject.id = item.subject_id
         WHERE item.profile_id = %s
+          AND item.status = 'active'
           AND item.active_until IS NULL
         ORDER BY subject.subject_name, group_row.group_name, item.id
         """,
@@ -112,29 +113,63 @@ def replace_billing_items(
     profile_id: int,
     starts_on: date,
     items: list[tuple[int, int, str, int]],
+    staff_id: int | None,
 ) -> None:
     conn.execute(
         """
         UPDATE msi_v2.student_billing_items
-        SET active_until = %s - 1, version = version + 1, updated_at = now()
-        WHERE profile_id = %s AND active_until IS NULL
+        SET status = 'cancelled',
+            cancelled_at = now(),
+            cancelled_by_staff_id = %s,
+            cancellation_reason = 'superseded_by_billing_profile',
+            version = version + 1,
+            updated_at = now()
+        WHERE profile_id = %s
+          AND status = 'active'
+          AND active_from >= %s
         """,
-        (starts_on, int(profile_id)),
+        (
+            int(staff_id) if staff_id else None,
+            int(profile_id),
+            starts_on,
+        ),
+    )
+    conn.execute(
+        """
+        UPDATE msi_v2.student_billing_items
+        SET active_until = %s - 1,
+            version = version + 1,
+            updated_at = now()
+        WHERE profile_id = %s
+          AND status = 'active'
+          AND active_from < %s
+          AND (active_until IS NULL OR active_until >= %s)
+        """,
+        (starts_on, int(profile_id), starts_on, starts_on),
     )
     for group_id, subject_id, description, amount_minor in items:
         conn.execute(
             """
             INSERT INTO msi_v2.student_billing_items (
                 profile_id, group_id, subject_id, description,
-                amount_minor, active_from, version, created_at, updated_at
+                amount_minor, active_from, active_until, status,
+                cancelled_at, cancelled_by_staff_id, cancellation_reason,
+                version, created_at, updated_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, 1, now(), now())
+            VALUES (
+                %s, %s, %s, %s, %s, %s, NULL, 'active',
+                NULL, NULL, '', 1, now(), now()
+            )
             ON CONFLICT (profile_id, group_id, active_from)
             DO UPDATE SET
                 subject_id = excluded.subject_id,
                 description = excluded.description,
                 amount_minor = excluded.amount_minor,
                 active_until = NULL,
+                status = 'active',
+                cancelled_at = NULL,
+                cancelled_by_staff_id = NULL,
+                cancellation_reason = '',
                 version = msi_v2.student_billing_items.version + 1,
                 updated_at = now()
             """,
@@ -194,6 +229,7 @@ def list_active_profile_item_rows(
          AND enrollment.group_id = item.group_id
          AND enrollment.enrollment_status = 'active'
         WHERE item.profile_id = %s
+          AND item.status = 'active'
           AND item.active_from <= %s
           AND (item.active_until IS NULL OR item.active_until >= %s)
         ORDER BY item.id
@@ -234,11 +270,7 @@ def insert_generated_monthly_invoice(
         (
             invoice_number,
             int(profile_row["student_id"]),
-            (
-                int(profile_row["billing_parent_id"])
-                if profile_row["billing_parent_id"]
-                else None
-            ),
+            (int(profile_row["billing_parent_id"]) if profile_row["billing_parent_id"] else None),
             run_date,
             total_minor,
             run_date,

@@ -1,5 +1,9 @@
 import { ArrowLeft, ContactRound, ShieldCheck } from "lucide-react";
 import { DetailSkeleton, secondaryButton } from "@/features/customer-support/shared/ui";
+import {
+  MasterDetailLayout,
+  resolveMasterDetailCollectionState,
+} from "@/features/customer-support/shared/MasterDetailLayout";
 import { SupportErrorAlert } from "@/features/customer-support/shared/SupportErrorAlert";
 import { TeacherDetail } from "@/features/customer-support/teachers/TeacherDetail";
 import { TeacherFilters } from "@/features/customer-support/teachers/TeacherFilters";
@@ -18,6 +22,29 @@ export function TeachersPage({
   description: string;
 }) {
   const controller = useTeacherDirectory();
+  const hasDetailError = Boolean(
+    controller.selectedId
+    && !controller.loadingDetail
+    && !controller.detail
+    && controller.errorState,
+  );
+  const collectionState = resolveMasterDetailCollectionState({
+    isLoading: controller.loadingTeachers,
+    isError: Boolean(controller.errorState && !hasDetailError),
+    itemCount: controller.teachers.length,
+  });
+  const teacherList = (
+    <TeacherList
+      items={controller.teachers}
+      selectedId={controller.selectedId}
+      loading={controller.loadingTeachers}
+      loadingMore={controller.loadingMore}
+      hasMore={Boolean(controller.nextCursor)}
+      scrollRef={controller.listScrollRef}
+      onSelect={controller.selectTeacher}
+      onLoadMore={() => void controller.loadMore()}
+    />
+  );
 
   return (
     <div className="flex min-w-0 flex-col gap-4 overflow-x-hidden">
@@ -48,27 +75,47 @@ export function TeachersPage({
         onSchoolChange={controller.setSchoolId}
       />
 
-      <SupportErrorAlert
-        state={controller.errorState}
-        onDismiss={controller.dismissError}
-      />
-
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(20rem,0.72fr)_minmax(0,1.55fr)]">
-        <TeacherList
-          items={controller.teachers}
-          selectedId={controller.selectedId}
-          loading={controller.loadingTeachers}
-          loadingMore={controller.loadingMore}
-          hasMore={Boolean(controller.nextCursor)}
-          scrollRef={controller.listScrollRef}
-          onSelect={controller.selectTeacher}
-          onLoadMore={() => void controller.loadMore()}
+      {!hasDetailError && collectionState !== "error" ? (
+        <SupportErrorAlert
+          state={controller.errorState}
+          onDismiss={controller.dismissError}
         />
+      ) : null}
 
-        <section
-          className={`${controller.selectedId ? "block" : "hidden lg:block"} min-w-0`}
-          aria-label="Selected teacher"
-        >
+      <MasterDetailLayout
+        collectionState={collectionState}
+        isDetailOpen={Boolean(controller.selectedId)}
+        collection={teacherList}
+        fallback={collectionState === "loading" ? teacherList : (
+          <EmptyState
+            title={collectionState === "error"
+              ? "Teachers could not be loaded"
+              : "No matching teachers"}
+            detail={collectionState === "error"
+              ? controller.errorState?.error.message
+              : "Try another name, login, contact, school, subject, group, or status."}
+            icon={<ContactRound className="h-5 w-5" />}
+            action={(
+              <button
+                type="button"
+                className={secondaryButton}
+                onClick={() => {
+                  if (collectionState === "error") {
+                    controller.reloadTeachers();
+                    return;
+                  }
+                  controller.setQuery("");
+                  controller.setStatus("all");
+                  controller.setSchoolId("");
+                }}
+              >
+                {collectionState === "error" ? "Try again" : "Reset filters"}
+              </button>
+            )}
+          />
+        )}
+        detail={(
+          <section className="min-w-0" aria-label="Selected teacher">
           {controller.selectedId ? (
             <button
               type="button"
@@ -83,11 +130,21 @@ export function TeachersPage({
             <DetailSkeleton />
           ) : controller.detail ? (
             <TeacherDetail detail={controller.detail} />
-          ) : controller.detailUnavailable ? (
+          ) : hasDetailError || controller.detailUnavailable ? (
             <EmptyState
               title="Teacher unavailable"
-              detail="This teacher could not be loaded from your assigned schools."
+              detail={controller.errorState?.error.message
+                || "This teacher could not be loaded from your assigned schools."}
               icon={<ContactRound className="h-5 w-5" />}
+              action={hasDetailError ? (
+                <button
+                  type="button"
+                  className={secondaryButton}
+                  onClick={controller.reloadDetail}
+                >
+                  Try again
+                </button>
+              ) : undefined}
             />
           ) : !controller.selectedId ? (
             <EmptyState
@@ -96,8 +153,9 @@ export function TeachersPage({
               icon={<ContactRound className="h-5 w-5" />}
             />
           ) : null}
-        </section>
-      </div>
+          </section>
+        )}
+      />
     </div>
   );
 }

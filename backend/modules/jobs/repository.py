@@ -68,15 +68,22 @@ def claim_due_jobs(
     worker_id: str,
     limit: int,
     lease_seconds: int,
+    allowed_topics: tuple[str, ...] = (),
 ) -> list[JobRecord]:
+    topic_filter = "AND topic = ANY(%s::text[])" if allowed_topics else ""
+    claim_params: list[Any] = []
+    if allowed_topics:
+        claim_params.append(list(allowed_topics))
+    claim_params.extend((int(limit), worker_id, int(lease_seconds)))
     rows = conn.execute(
-        """
+        f"""
         WITH claimable AS (
             SELECT id
             FROM msi_v2.outbox_jobs
             WHERE status IN ('pending', 'retry')
               AND available_at <= now()
               AND (lease_expires_at IS NULL OR lease_expires_at <= now())
+              {topic_filter}
             ORDER BY available_at ASC, id ASC
             FOR UPDATE SKIP LOCKED
             LIMIT %s
@@ -92,7 +99,7 @@ def claim_due_jobs(
         WHERE job.id = claimable.id
         RETURNING job.*
         """,
-        (int(limit), worker_id, int(lease_seconds)),
+        tuple(claim_params),
     ).fetchall()
     return [_job_record(row) for row in rows]
 
@@ -147,9 +154,14 @@ def record_job_failure(
     return int(getattr(result, "rowcount", 0) or 0) > 0
 
 
-def release_expired_leases(conn: Connection) -> int:
+def release_expired_leases(
+    conn: Connection,
+    *,
+    allowed_topics: tuple[str, ...] = (),
+) -> int:
+    topic_filter = "AND topic = ANY(%s::text[])" if allowed_topics else ""
     result = conn.execute(
-        """
+        f"""
         UPDATE msi_v2.outbox_jobs
         SET status = CASE
                 WHEN attempts >= max_attempts THEN 'dead'
@@ -164,8 +176,11 @@ def release_expired_leases(conn: Connection) -> int:
             END,
             last_error = COALESCE(last_error, 'Worker lease expired.'),
             updated_at = now()
-        WHERE status = 'running' AND lease_expires_at <= now()
-        """
+        WHERE status = 'running'
+          AND lease_expires_at <= now()
+          {topic_filter}
+        """,
+        (list(allowed_topics),) if allowed_topics else None,
     )
     return int(getattr(result, "rowcount", 0) or 0)
 

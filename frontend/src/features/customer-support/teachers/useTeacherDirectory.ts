@@ -192,6 +192,8 @@ export function useTeacherDirectory() {
     loadingDetail: Boolean(selectedId && detailQuery.isPending),
     errorState,
     dismissError: () => setDismissedError(activeError),
+    reloadTeachers: () => void teachersQuery.refetch(),
+    reloadDetail: () => void detailQuery.refetch(),
     listScrollRef,
     selectTeacher,
     closeDetail,

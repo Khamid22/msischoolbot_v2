@@ -89,6 +89,33 @@ def test_claim_uses_skip_locked_and_a_bounded_lease():
     assert params == (25, "worker-1", 300)
 
 
+def test_claim_can_be_restricted_to_an_exact_topic_allowlist():
+    conn = _Connection([_Rows()])
+
+    repository.claim_due_jobs(
+        conn,
+        worker_id="finance-worker",
+        limit=10,
+        lease_seconds=300,
+        allowed_topics=(
+            "finance.generate_invoices",
+            "finance.send_billing_notification",
+        ),
+    )
+
+    sql, params = conn.calls[0]
+    assert "topic = ANY(%s::text[])" in sql
+    assert params == (
+        [
+            "finance.generate_invoices",
+            "finance.send_billing_notification",
+        ],
+        10,
+        "finance-worker",
+        300,
+    )
+
+
 def test_failure_retries_with_exponential_backoff(monkeypatch):
     captured = {}
 
@@ -153,6 +180,19 @@ def test_expired_final_lease_moves_job_to_dead_instead_of_retry_loop():
     sql, _params = conn.calls[0]
     assert "WHEN attempts >= max_attempts THEN 'dead'" in sql
     assert "WHEN attempts >= max_attempts THEN now()" in sql
+
+
+def test_expired_lease_recovery_uses_the_same_topic_allowlist():
+    conn = _Connection([_Rows(rowcount=1)])
+
+    repository.release_expired_leases(
+        conn,
+        allowed_topics=("finance.generate_invoices",),
+    )
+
+    sql, params = conn.calls[0]
+    assert "topic = ANY(%s::text[])" in sql
+    assert params == (["finance.generate_invoices"],)
 
 
 def test_migration_and_process_entrypoint_define_the_durable_worker():

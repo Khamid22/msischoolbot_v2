@@ -7,16 +7,21 @@ from uuid import uuid4
 
 import pytest
 
+from backend.modules.domains.finance import billing_profile_repository
 from backend.modules.domains.finance.commands import (
     BillingActor,
     issue_student_invoice,
     record_manual_payment,
 )
 from backend.modules.domains.finance.domain_types import (
+    BillingProfileStatus,
     InvoiceKind,
     ManualPaymentMethod,
 )
-from backend.modules.domains.finance.queries import BillingSchoolScope
+from backend.modules.domains.finance.queries import (
+    BillingSchoolScope,
+    get_billing_automation_status,
+)
 from backend.modules.domains.finance.schemas import (
     IssueStudentInvoiceCommand,
     RecordManualInvoicePaymentCommand,
@@ -28,7 +33,7 @@ def _active_student_enrollment(connection):
     existing = connection.execute(
         """
         SELECT student.id AS student_id, student.version,
-               subject.id AS subject_id
+               student.school_id, enrollment.group_id, subject.id AS subject_id
         FROM msi_v2.students student
         JOIN msi_v2.group_students enrollment
           ON enrollment.student_id = student.id
@@ -111,6 +116,8 @@ def _active_student_enrollment(connection):
     return {
         "student_id": student["id"],
         "version": student["version"],
+        "school_id": school["id"],
+        "group_id": group_row["id"],
         "subject_id": subject["id"],
     }
 
@@ -120,15 +127,18 @@ def test_current_invoice_and_manual_settlement_roll_back_atomically():
     connection = _connect_test_database()
     invoice_number = ""
     try:
-        if connection.execute(
-            """
+        if (
+            connection.execute(
+                """
             SELECT 1
             FROM information_schema.columns
             WHERE table_schema = 'msi_v2'
               AND table_name = 'invoices'
               AND column_name = 'origin'
             """
-        ).fetchone() is None:
+            ).fetchone()
+            is None
+        ):
             pytest.fail("Run `alembic upgrade head` on MSI_TEST_DATABASE_URL first.")
         enrollment = _active_student_enrollment(connection)
         if enrollment is None:
@@ -169,9 +179,101 @@ def test_current_invoice_and_manual_settlement_roll_back_atomically():
     finally:
         connection.rollback()
         if invoice_number:
-            assert connection.execute(
-                "SELECT id FROM msi_v2.invoices WHERE invoice_number = %s",
-                (invoice_number,),
-            ).fetchone() is None
+            assert (
+                connection.execute(
+                    "SELECT id FROM msi_v2.invoices WHERE invoice_number = %s",
+                    (invoice_number,),
+                ).fetchone()
+                is None
+            )
             connection.rollback()
+        connection.close()
+
+
+@pytest.mark.postgres
+def test_same_day_billing_profile_resave_preserves_valid_history():
+    connection = _connect_test_database()
+    try:
+        enrollment = _active_student_enrollment(connection)
+        effective_date = date(2026, 8, 1)
+        profile_id = billing_profile_repository.upsert_billing_profile(
+            connection,
+            student_id=int(enrollment["student_id"]),
+            school_id=int(enrollment["school_id"]),
+            billing_parent_id=None,
+            billing_day=1,
+            starts_on=effective_date,
+            status=BillingProfileStatus.ACTIVE,
+            expected_version=None,
+            staff_id=None,
+        )
+        assert profile_id > 0
+        item = (
+            int(enrollment["group_id"]),
+            int(enrollment["subject_id"]),
+            "Billing Integration Subject",
+            20_000,
+        )
+        billing_profile_repository.replace_billing_items(
+            connection,
+            profile_id=profile_id,
+            starts_on=effective_date,
+            items=[item],
+            staff_id=None,
+        )
+        updated_profile_id = billing_profile_repository.upsert_billing_profile(
+            connection,
+            student_id=int(enrollment["student_id"]),
+            school_id=int(enrollment["school_id"]),
+            billing_parent_id=None,
+            billing_day=1,
+            starts_on=effective_date,
+            status=BillingProfileStatus.ACTIVE,
+            expected_version=1,
+            staff_id=None,
+        )
+        assert updated_profile_id == profile_id
+        billing_profile_repository.replace_billing_items(
+            connection,
+            profile_id=profile_id,
+            starts_on=effective_date,
+            items=[(*item[:3], 25_000)],
+            staff_id=None,
+        )
+
+        rows = connection.execute(
+            """
+            SELECT status, active_from, active_until, amount_minor, cancelled_at
+            FROM msi_v2.student_billing_items
+            WHERE profile_id = %s
+            ORDER BY id
+            """,
+            (profile_id,),
+        ).fetchall()
+        assert len(rows) == 1
+        assert rows[0]["status"] == "active"
+        assert rows[0]["active_from"] == effective_date
+        assert rows[0]["active_until"] is None
+        assert rows[0]["amount_minor"] == 25_000
+        assert rows[0]["cancelled_at"] is None
+    finally:
+        connection.rollback()
+        connection.close()
+
+
+@pytest.mark.postgres
+def test_empty_school_scope_automation_status_query_is_typed():
+    connection = _connect_test_database()
+    try:
+        result = get_billing_automation_status(
+            connection,
+            scope=BillingSchoolScope(all_schools=True),
+            now=datetime(2026, 7, 30, 8, tzinfo=UTC),
+        )
+        assert result.active_billing_profiles == 0
+        assert result.open_invoices == 0
+        assert result.worker_state.value == "not_started"
+        assert result.last_successful_finance_worker_at is None
+    finally:
+        connection.rollback()
         connection.close()

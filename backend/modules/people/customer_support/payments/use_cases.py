@@ -9,6 +9,7 @@ from backend.modules.domains.finance import contracts as finance_contracts
 from backend.modules.domains.finance.contracts import (
     AddPaidStudentInvoiceCommand,
     BillingActor,
+    BillingAutomationStatus,
     BillingProfileResult,
     BillingSchoolScope,
     ConfigureBillingProfileCommand,
@@ -78,6 +79,17 @@ class CustomerSupportPayments:
             return finance_contracts.get_invoice(
                 unit_of_work.conn,
                 invoice_id,
+                scope=_scope(scoped_actor),
+            )
+
+    def get_automation_status(
+        self,
+        actor: ActorContext,
+    ) -> BillingAutomationStatus:
+        scoped_actor = self._scoped_actor(actor)
+        with self._unit_of_work_factory.read() as unit_of_work:
+            return finance_contracts.get_billing_automation_status(
+                unit_of_work.conn,
                 scope=_scope(scoped_actor),
             )
 

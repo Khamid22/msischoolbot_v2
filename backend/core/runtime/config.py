@@ -55,6 +55,7 @@ class WorkerSettings:
     default_max_attempts: int
     retry_base_seconds: int
     retry_max_seconds: int
+    allowed_topics: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -159,6 +160,11 @@ def _bool_env(name: str, default: bool = False) -> bool:
     return value.strip().casefold() not in {"0", "false", "no", "off"}
 
 
+def _csv_env(name: str) -> tuple[str, ...]:
+    values = {item.strip() for item in getenv(name, "").split(",") if item.strip()}
+    return tuple(sorted(values))
+
+
 def _session_secret(environment: str) -> str:
     secret_key = getenv("APP_SECRET_KEY", getenv("FLASK_SECRET_KEY", "")).strip()
     if secret_key:
@@ -213,6 +219,7 @@ def _worker_settings() -> WorkerSettings:
         default_max_attempts=max(1, _int_env("WORKER_MAX_ATTEMPTS", 5)),
         retry_base_seconds=max(1, _int_env("WORKER_RETRY_BASE_SECONDS", 15)),
         retry_max_seconds=max(1, _int_env("WORKER_RETRY_MAX_SECONDS", 3600)),
+        allowed_topics=_csv_env("WORKER_ALLOWED_TOPICS"),
     )
 
 

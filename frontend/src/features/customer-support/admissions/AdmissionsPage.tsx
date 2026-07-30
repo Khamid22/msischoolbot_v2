@@ -1,11 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClipboardCheck, Plus, Search } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, Plus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getSupport, sendSupport, sendSupportForm } from "@/features/customer-support/api";
 import { AdmissionDetailPanel } from "@/features/customer-support/admissions/AdmissionDetailPanel";
 import { AdmissionWizard, type CreateAdmissionValues } from "@/features/customer-support/admissions/AdmissionWizard";
 import type { AdmissionCreated, AdmissionDetail, AdmissionGroupOption, AdmissionPage } from "@/features/customer-support/model";
-import { formatDate, inputClass, primaryButton } from "@/features/customer-support/shared/ui";
+import {
+  MasterDetailLayout,
+  resolveMasterDetailCollectionState,
+} from "@/features/customer-support/shared/MasterDetailLayout";
+import {
+  formatDate,
+  inputClass,
+  primaryButton,
+  secondaryButton,
+} from "@/features/customer-support/shared/ui";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { PageHeader } from "@/shared/ui/PageHeader";
 
@@ -44,9 +53,35 @@ export function AdmissionsPage({
   });
 
   useEffect(() => {
-    if (initialAdmissionId || selectedId || !listQuery.data?.items.length) return;
-    setSelectedId(listQuery.data.items[0].admissionId);
-  }, [initialAdmissionId, listQuery.data, selectedId]);
+    const onPopState = () => {
+      const admissionId = Number(
+        new URLSearchParams(window.location.search).get("admissionId") || 0,
+      );
+      setSelectedId(admissionId);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  function selectAdmission(admissionId: number, push = true) {
+    setSelectedId(admissionId);
+    const params = new URLSearchParams(window.location.search);
+    if (admissionId) params.set("admissionId", String(admissionId));
+    else params.delete("admissionId");
+    window.history[push ? "pushState" : "replaceState"](
+      push ? { ...window.history.state, admissionDetail: true } : window.history.state,
+      "",
+      `${window.location.pathname}${params.size ? `?${params}` : ""}`,
+    );
+  }
+
+  function closeAdmission() {
+    if (window.history.state?.admissionDetail) {
+      window.history.back();
+      return;
+    }
+    selectAdmission(0, false);
+  }
 
   const refresh = async (admission?: AdmissionDetail) => {
     if (admission) queryClient.setQueryData(["customer-support", "admission", admission.admissionId], admission);
@@ -59,7 +94,7 @@ export function AdmissionsPage({
       setError("");
       const admission = "admissionId" in result ? result : result.admission;
       if ("publicUrl" in result) setPublicUrl(result.publicUrl);
-      setSelectedId(admission.admissionId);
+      selectAdmission(admission.admissionId, false);
       setShowWizard(false);
       await refresh(admission);
     },
@@ -71,6 +106,12 @@ export function AdmissionsPage({
   }
 
   const admission = detailQuery.data;
+  const admissions = listQuery.data?.items || [];
+  const collectionState = resolveMasterDetailCollectionState({
+    isLoading: listQuery.isLoading,
+    isError: listQuery.isError,
+    itemCount: admissions.length,
+  });
   return (
     <div className="space-y-4">
       <PageHeader
@@ -97,7 +138,58 @@ export function AdmissionsPage({
         </select>
       </div>
       {error ? <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm font-bold text-destructive">{error}</p> : null}
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(18rem,0.65fr)_minmax(0,1.5fr)]">
+      <MasterDetailLayout
+        collectionState={collectionState}
+        isDetailOpen={selectedId > 0}
+        desktopColumnsClassName="lg:grid-cols-[minmax(18rem,0.65fr)_minmax(0,1.5fr)]"
+        fallback={collectionState === "loading" ? (
+          <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <header className="border-b border-border px-4 py-3">
+              <h2 className="text-sm font-black text-foreground">Admission queue</h2>
+              <p className="text-xs font-semibold text-muted-foreground">Loading…</p>
+            </header>
+            <div className="space-y-2 p-3" role="status">
+              {[1, 2, 3].map((item) => (
+                <div key={item} className="h-24 animate-pulse rounded-lg bg-muted motion-reduce:animate-none" />
+              ))}
+            </div>
+          </section>
+        ) : (
+          <EmptyState
+            title={collectionState === "error"
+              ? "Admissions could not be loaded"
+              : "No admissions found"}
+            detail={collectionState === "error"
+              ? (listQuery.error instanceof Error ? listQuery.error.message : "Try again.")
+              : "Create a prospective admission or reset the filters."}
+            icon={<ClipboardCheck className="h-5 w-5" />}
+            action={(
+              <button
+                type="button"
+                className={collectionState === "error" ? secondaryButton : primaryButton}
+                onClick={() => {
+                  if (collectionState === "error") {
+                    void listQuery.refetch();
+                    return;
+                  }
+                  if (search || status !== "all") {
+                    setSearch("");
+                    setStatus("all");
+                    return;
+                  }
+                  setShowWizard(true);
+                }}
+              >
+                {collectionState === "error"
+                  ? "Try again"
+                  : search || status !== "all"
+                    ? "Reset filters"
+                    : "New admission"}
+              </button>
+            )}
+          />
+        )}
+        collection={(
         <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
           <header className="border-b border-border px-4 py-3">
             <h2 className="text-sm font-black text-foreground">Admission queue</h2>
@@ -106,11 +198,11 @@ export function AdmissionsPage({
           <div className="max-h-[70vh] overflow-y-auto">
             {listQuery.isLoading ? (
               <div className="space-y-2 p-3" role="status">{[1, 2, 3].map((item) => <div key={item} className="h-24 animate-pulse rounded-lg bg-muted motion-reduce:animate-none" />)}</div>
-            ) : listQuery.data?.items.length ? listQuery.data.items.map((item) => (
+            ) : admissions.length ? admissions.map((item) => (
               <button
                 key={item.admissionId}
                 type="button"
-                onClick={() => setSelectedId(item.admissionId)}
+                onClick={() => selectAdmission(item.admissionId)}
                 className={`w-full border-b border-border px-4 py-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 motion-reduce:transition-none ${selectedId === item.admissionId ? "bg-primary/8" : "hover:bg-muted/60"}`}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -127,9 +219,32 @@ export function AdmissionsPage({
             )}
           </div>
         </section>
+        )}
+        detail={(
         <section className="min-w-0">
+          {selectedId ? (
+            <button
+              type="button"
+              onClick={closeAdmission}
+              className={`${secondaryButton} mb-3 lg:hidden`}
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              Back to admissions
+            </button>
+          ) : null}
           {detailQuery.isLoading ? (
             <div className="h-80 animate-pulse rounded-xl bg-muted motion-reduce:animate-none" role="status" />
+          ) : detailQuery.isError ? (
+            <EmptyState
+              title="Admission could not be loaded"
+              detail={detailQuery.error instanceof Error ? detailQuery.error.message : "Try again."}
+              icon={<ClipboardCheck className="h-5 w-5" />}
+              action={(
+                <button type="button" className={secondaryButton} onClick={() => void detailQuery.refetch()}>
+                  Try again
+                </button>
+              )}
+            />
           ) : admission ? (
             <AdmissionDetailPanel
               admission={admission}
@@ -149,7 +264,8 @@ export function AdmissionsPage({
             <EmptyState title="Select an admission" detail="Open a prospective student to review the contract, invoice, and activation state." icon={<ClipboardCheck className="h-5 w-5" />} />
           )}
         </section>
-      </div>
+        )}
+      />
       {showWizard ? (
         <AdmissionWizard
           groupOptions={groupsQuery.data || []}

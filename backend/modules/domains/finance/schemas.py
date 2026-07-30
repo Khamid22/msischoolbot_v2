@@ -9,8 +9,12 @@ from pydantic import Field, field_validator
 from backend.core.api import ApiModel
 from backend.modules.domains.finance.domain_types import (
     BillingAccessMode,
+    BillingAutomationWorkerState,
     BillingEnforcementState,
     BillingHoldTarget,
+    BillingItemStatus,
+    BillingNotificationDeliveryStatus,
+    BillingNotificationStage,
     BillingProfileStatus,
     InvoiceKind,
     InvoiceOrigin,
@@ -47,6 +51,17 @@ class InvoicePaymentResult(BillingModel):
     reversal_reason: str = ""
 
 
+class BillingNotificationTimelineEntry(BillingModel):
+    stage: BillingNotificationStage
+    scheduled_for: datetime
+    status: BillingNotificationDeliveryStatus
+    recipient_count: int = Field(default=0, ge=0)
+    pending_count: int = Field(default=0, ge=0)
+    sent_count: int = Field(default=0, ge=0)
+    skipped_count: int = Field(default=0, ge=0)
+    failed_count: int = Field(default=0, ge=0)
+
+
 class InvoiceSummary(BillingModel):
     invoice_id: int
     invoice_number: str
@@ -78,6 +93,7 @@ class InvoiceSummary(BillingModel):
 class InvoiceDetail(InvoiceSummary):
     lines: list[InvoiceLineResult] = Field(default_factory=list)
     payments: list[InvoicePaymentResult] = Field(default_factory=list)
+    notification_timeline: list[BillingNotificationTimelineEntry] = Field(default_factory=list)
     void_reason: str = ""
 
 
@@ -162,6 +178,9 @@ class BillingProfileItemResult(BillingModel):
     amount_minor: int
     active_from: date
     active_until: date | None = None
+    status: BillingItemStatus = BillingItemStatus.ACTIVE
+    cancelled_at: datetime | None = None
+    cancellation_reason: str = ""
 
 
 class BillingProfileResult(BillingModel):
@@ -211,12 +230,32 @@ class BillingAccessStatus(BillingModel):
     affected_students: list[BillingAccessStudent] = Field(default_factory=list)
 
 
+class BillingAutomationStatus(BillingModel):
+    generated_at: datetime
+    effective_school_ids: list[int] = Field(default_factory=list)
+    all_schools: bool = False
+    active_billing_profiles: int = Field(default=0, ge=0)
+    currently_due_billing_profiles: int = Field(default=0, ge=0)
+    open_invoices: int = Field(default=0, ge=0)
+    open_invoices_without_enforcement: int = Field(default=0, ge=0)
+    linked_telegram_recipients: int = Field(default=0, ge=0)
+    unlinked_telegram_recipients: int = Field(default=0, ge=0)
+    pending_notification_deliveries: int = Field(default=0, ge=0)
+    failed_notification_deliveries: int = Field(default=0, ge=0)
+    active_payment_only_holds: int = Field(default=0, ge=0)
+    pending_finance_jobs: int = Field(default=0, ge=0)
+    worker_state: BillingAutomationWorkerState
+    last_successful_finance_worker_at: datetime | None = None
+
+
 __all__ = [
     "AddPaidStudentInvoiceCommand",
     "BillingItemInput",
     "BillingAccessInvoice",
     "BillingAccessStatus",
     "BillingAccessStudent",
+    "BillingAutomationStatus",
+    "BillingNotificationTimelineEntry",
     "BillingProfileItemResult",
     "BillingProfileResult",
     "ConfigureBillingProfileCommand",
