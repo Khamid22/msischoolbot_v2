@@ -10,9 +10,11 @@ from backend.core.api.pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from backend.core.unit_of_work import UnitOfWorkFactory
 from backend.modules.domains.communications.contracts import list_parent_announcements
 from backend.modules.domains.finance.contracts import (
-    PaymentRecord,
+    BillingCycleState,
     get_account_billing_access,
-    list_payment_records,
+    list_parent_billing_cycles,
+    list_parent_payment_records,
+    parent_has_linked_student,
     parent_invoice_checkout_data,
 )
 from backend.modules.domains.parent_relationships.contracts import (
@@ -30,6 +32,7 @@ from backend.modules.people.parent.policies import (
 from backend.modules.people.parent.schemas import (
     ParentAcademicIndicatorResponse,
     ParentAnnouncementResponse,
+    ParentBillingScheduleResponse,
     ParentBillingStatusResponse,
     ParentChildrenResponse,
     ParentChildResponse,
@@ -193,36 +196,57 @@ class ParentQueries:
         *,
         student_row_id: int | None = None,
     ) -> ParentPaymentsResponse:
-        require_parent_capability(actor, Capability.VIEW_PAYMENTS)
-        children = self.list_children(actor).items
-        if student_row_id is not None:
-            children = [
-                child for child in children if child.student_row_id == student_row_id
-            ]
-            if not children:
-                raise ParentRecordNotFoundError("Linked child was not found.")
-        records: list[PaymentRecord] = []
+        parent_id = require_parent_capability(actor, Capability.VIEW_PAYMENTS)
         with self._unit_of_work_factory.read() as unit_of_work:
-            for child in children:
-                records.extend(
-                    list_payment_records(
-                        unit_of_work.conn,
-                        student_row_id=child.student_row_id,
-                    )
+            if student_row_id is not None and not parent_has_linked_student(
+                unit_of_work.conn,
+                parent_id=parent_id,
+                student_row_id=student_row_id,
+            ):
+                raise ParentRecordNotFoundError("Linked child was not found.")
+            records = list(
+                list_parent_payment_records(
+                    unit_of_work.conn,
+                    parent_id=parent_id,
+                    student_row_id=student_row_id,
                 )
+            )
+            cycles = list_parent_billing_cycles(
+                unit_of_work.conn,
+                parent_id=parent_id,
+                student_row_id=student_row_id,
+            )
         currency = next((record.currency for record in records if record.currency), "UZS")
         summary = ParentPaymentSummaryResponse(
             currency=currency,
             debt_total=sum(record.amount for record in records if record.state == "debt"),
             due_total=sum(record.amount for record in records if record.state == "due"),
-            upcoming_total=sum(
-                record.amount for record in records if record.state == "upcoming"
-            ),
+            upcoming_total=sum(record.amount for record in records if record.state == "upcoming"),
             paid_total=sum(record.amount for record in records if record.state == "paid"),
         )
         return ParentPaymentsResponse(
             items=[ParentPaymentRecordResponse.from_record(record) for record in records],
             summary=summary,
+            schedules=[
+                ParentBillingScheduleResponse(
+                    cycle_id=cycle.cycle_id,
+                    student_row_id=cycle.student_row_id,
+                    student_name=cycle.student_name,
+                    student_code=cycle.student_code,
+                    billing_period=cycle.billing_period.isoformat(),
+                    issue_at=cycle.issue_at.isoformat(),
+                    deadline_at=cycle.deadline_at.isoformat(),
+                    expected_minor=cycle.expected_minor,
+                    allocated_minor=cycle.allocated_minor,
+                    remaining_minor=cycle.remaining_minor,
+                    currency=cycle.currency,
+                    state=cycle.state,
+                    invoice_id=cycle.invoice_id,
+                    invoice_number=cycle.invoice_number,
+                    review_required=cycle.state is BillingCycleState.REVIEW_REQUIRED,
+                )
+                for cycle in cycles
+            ],
         )
 
     def get_invoice_checkout(

@@ -75,6 +75,24 @@ export type ParentPayment = {
   canPayOnline: boolean;
 };
 
+export type ParentBillingSchedule = {
+  cycleId: number;
+  studentRowId: number | null;
+  studentName: string;
+  studentCode: string;
+  billingPeriod: string;
+  issueAt: string;
+  deadlineAt: string;
+  expectedMinor: number;
+  allocatedMinor: number;
+  remainingMinor: number;
+  currency: string;
+  state: "scheduled" | "review_required" | "invoiced" | "satisfied" | "cancelled";
+  invoiceId: number | null;
+  invoiceNumber: string;
+  reviewRequired: boolean;
+};
+
 export type ParentInvoiceCheckout = {
   checkoutUrl: string;
   merchantId: string;
@@ -129,7 +147,11 @@ export type ParentOverview = {
 
 export type ChildrenPayload = { items: ParentChild[] };
 export type UpdatesPayload = { items: ParentAnnouncement[] };
-export type PaymentsPayload = { items: ParentPayment[]; summary: PaymentSummary };
+export type PaymentsPayload = {
+  items: ParentPayment[];
+  summary: PaymentSummary;
+  schedules: ParentBillingSchedule[];
+};
 export type TicketsPayload = { items: ParentTicket[] };
 
 export type ParentBootstrapProps = {

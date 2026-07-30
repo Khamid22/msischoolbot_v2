@@ -11,7 +11,7 @@ from backend.core.clock import SystemClock
 from backend.core.jobs import JobExecutionContext, JobHandlerSpec
 from backend.core.time import SCHOOL_TIMEZONE
 from backend.core.unit_of_work import UnitOfWorkFactory, commit_unit_of_work
-from backend.modules.domains.finance import billing_profile_repository
+from backend.modules.domains.finance import billing_cycles
 from backend.modules.domains.finance import enforcement as billing_enforcement
 from backend.modules.domains.finance import enforcement_repository
 from backend.modules.domains.finance.domain_types import (
@@ -27,6 +27,7 @@ from backend.modules.jobs.contracts import enqueue_on_connection
 from backend.modules.jobs.schemas import EnqueueJobCommand
 
 GENERATE_INVOICES_TOPIC = BillingJobTopic.GENERATE_INVOICES.value
+ISSUE_BILLING_CYCLE_TOPIC = BillingJobTopic.ISSUE_BILLING_CYCLE.value
 BOOTSTRAP_ENFORCEMENT_TOPIC = BillingJobTopic.BOOTSTRAP_ENFORCEMENT.value
 PROCESS_ENFORCEMENT_STAGE_TOPIC = BillingJobTopic.PROCESS_ENFORCEMENT_STAGE.value
 SEND_BILLING_NOTIFICATION_TOPIC = BillingJobTopic.SEND_BILLING_NOTIFICATION.value
@@ -40,6 +41,10 @@ class JobPayload(BaseModel):
 
 class GenerateInvoicesPayload(JobPayload):
     run_date: date | None = None
+
+
+class IssueBillingCyclePayload(JobPayload):
+    cycle_id: int
 
 
 class BootstrapEnforcementPayload(JobPayload):
@@ -77,8 +82,7 @@ def _enqueue_reconciliation(conn, now: datetime) -> None:
             topic=RECONCILE_ENFORCEMENT_TOPIC,
             payload={},
             idempotency_key=(
-                "billing-enforcement-reconcile:"
-                f"{next_run.strftime('%Y-%m-%dT%H:%M')}"
+                f"billing-enforcement-reconcile:{next_run.strftime('%Y-%m-%dT%H:%M')}"
             ),
             available_at=next_run,
             max_attempts=10,
@@ -95,39 +99,32 @@ def generate_recurring_invoices(
     run_date = payload.run_date or now.astimezone(SCHOOL_TIMEZONE).date()
     unit_of_work_factory = UnitOfWorkFactory(job_enqueuer=enqueue_on_connection)
     with unit_of_work_factory.transaction() as unit_of_work:
-        profiles = billing_profile_repository.list_due_billing_profile_rows(
-            unit_of_work.conn,
-            run_date,
-        )
-        for profile in profiles:
-            items = billing_profile_repository.list_active_profile_item_rows(
-                unit_of_work.conn,
-                profile_id=int(profile["id"]),
-                run_date=run_date,
-            )
-            invoice_id = billing_profile_repository.insert_generated_monthly_invoice(
-                unit_of_work.conn,
-                profile_row=profile,
-                item_rows=items,
-                run_date=run_date,
-            )
-            if invoice_id:
-                billing_enforcement.start_invoice_enforcement(
-                    unit_of_work.conn,
-                    invoice_id=invoice_id,
-                    now=now,
-                )
+        billing_cycles.plan_billing_cycles(unit_of_work.conn, now=now)
         unit_of_work.enqueue(
             EnqueueJobCommand(
                 topic=GENERATE_INVOICES_TOPIC,
                 payload={},
                 idempotency_key=(
-                    "finance-generate-invoices:"
-                    f"{(run_date + timedelta(days=1)).isoformat()}"
+                    f"finance-generate-invoices:{(run_date + timedelta(days=1)).isoformat()}"
                 ),
                 available_at=_next_school_midnight(now),
                 max_attempts=10,
             )
+        )
+        commit_unit_of_work(unit_of_work)
+
+
+def issue_billing_cycle(
+    payload: IssueBillingCyclePayload,
+    context: JobExecutionContext,
+) -> None:
+    del context
+    unit_of_work_factory = UnitOfWorkFactory(job_enqueuer=enqueue_on_connection)
+    with unit_of_work_factory.transaction() as unit_of_work:
+        billing_cycles.issue_billing_cycle(
+            unit_of_work.conn,
+            cycle_id=payload.cycle_id,
+            now=SystemClock().now(),
         )
         commit_unit_of_work(unit_of_work)
 
@@ -157,8 +154,7 @@ def bootstrap_billing_enforcement(
                     topic=BOOTSTRAP_ENFORCEMENT_TOPIC,
                     payload={},
                     idempotency_key=(
-                        "finance-bootstrap-billing-enforcement:"
-                        f"after-{int(rows[-1]['id'])}"
+                        f"finance-bootstrap-billing-enforcement:after-{int(rows[-1]['id'])}"
                     ),
                     max_attempts=10,
                 )
@@ -282,6 +278,11 @@ GENERATE_INVOICES_HANDLER = JobHandlerSpec(
     payload_model=GenerateInvoicesPayload,
     handler=generate_recurring_invoices,
 )
+ISSUE_BILLING_CYCLE_HANDLER = JobHandlerSpec(
+    topic=ISSUE_BILLING_CYCLE_TOPIC,
+    payload_model=IssueBillingCyclePayload,
+    handler=issue_billing_cycle,
+)
 BOOTSTRAP_ENFORCEMENT_HANDLER = JobHandlerSpec(
     topic=BOOTSTRAP_ENFORCEMENT_TOPIC,
     payload_model=BootstrapEnforcementPayload,
@@ -309,6 +310,8 @@ __all__ = [
     "BOOTSTRAP_ENFORCEMENT_TOPIC",
     "GENERATE_INVOICES_HANDLER",
     "GENERATE_INVOICES_TOPIC",
+    "ISSUE_BILLING_CYCLE_HANDLER",
+    "ISSUE_BILLING_CYCLE_TOPIC",
     "PROCESS_ENFORCEMENT_STAGE_HANDLER",
     "PROCESS_ENFORCEMENT_STAGE_TOPIC",
     "RECONCILE_ENFORCEMENT_HANDLER",
@@ -317,6 +320,7 @@ __all__ = [
     "SEND_BILLING_NOTIFICATION_TOPIC",
     "bootstrap_billing_enforcement",
     "generate_recurring_invoices",
+    "issue_billing_cycle",
     "process_enforcement_stage",
     "reconcile_billing_enforcement",
     "send_billing_notification",

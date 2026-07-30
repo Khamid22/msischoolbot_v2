@@ -5,7 +5,11 @@ from __future__ import annotations
 from pydantic import Field
 
 from backend.core.api import ApiModel
-from backend.modules.domains.finance.contracts import BillingAccessStatus, PaymentRecord
+from backend.modules.domains.finance.contracts import (
+    BillingAccessStatus,
+    BillingCycleState,
+    PaymentRecord,
+)
 from backend.modules.domains.support_cases.tickets.contracts import (
     TicketCategory,
     TicketData,
@@ -69,6 +73,24 @@ class ParentPaymentSummaryResponse(ApiModel):
     paid_total: float = 0
 
 
+class ParentBillingScheduleResponse(ApiModel):
+    cycle_id: int
+    student_row_id: int | None = None
+    student_name: str
+    student_code: str
+    billing_period: str
+    issue_at: str
+    deadline_at: str
+    expected_minor: int
+    allocated_minor: int
+    remaining_minor: int
+    currency: str
+    state: BillingCycleState
+    invoice_id: int | None = None
+    invoice_number: str = ""
+    review_required: bool = False
+
+
 class ParentChildResponse(ApiModel):
     student_row_id: int
     student_code: str
@@ -107,6 +129,7 @@ class ParentPaymentsResponse(ApiModel):
     summary: ParentPaymentSummaryResponse = Field(
         default_factory=ParentPaymentSummaryResponse
     )
+    schedules: list[ParentBillingScheduleResponse] = Field(default_factory=list)
 
 
 class ParentInvoiceCheckoutResponse(ApiModel):

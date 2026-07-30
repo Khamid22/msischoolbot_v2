@@ -85,6 +85,9 @@
 /api/v1/customer-support/payments/automation-status | GET
 /api/v1/customer-support/payments/billing-accounts | GET
 /api/v1/customer-support/payments/billing-accounts/{account_type}/{account_id} | GET
+/api/v1/customer-support/payments/billing-cycle-reviews/{review_id}/reversal | POST
+/api/v1/customer-support/payments/billing-cycles/readiness | GET
+/api/v1/customer-support/payments/billing-cycles/{cycle_id}/invoice-review | POST
 /api/v1/customer-support/payments/invoice-payments/{payment_id}/reversal | POST
 /api/v1/customer-support/payments/invoices | GET
 /api/v1/customer-support/payments/invoices/{invoice_id} | GET

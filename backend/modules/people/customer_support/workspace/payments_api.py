@@ -18,6 +18,9 @@ from backend.modules.people.customer_support.payments.contracts import (
     BillingAccountPage,
     BillingAccountType,
     BillingAutomationStatus,
+    BillingCycleReadiness,
+    BillingCycleReviewDecision,
+    BillingCycleSummary,
     BillingError,
     BillingItemInput,
     BillingProfileResult,
@@ -28,7 +31,9 @@ from backend.modules.people.customer_support.payments.contracts import (
     IssueStudentInvoiceCommand,
     ManualPaymentMethod,
     RecordManualInvoicePaymentCommand,
+    ReverseBillingCycleReviewCommand,
     ReverseInvoicePaymentCommand,
+    ReviewBillingCycleInvoiceCommand,
     VoidStudentInvoiceCommand,
     major_to_minor,
 )
@@ -67,6 +72,9 @@ class AddPaidInvoiceRequest(IssueInvoiceRequest):
     paid_at: datetime
     reference: str = Field(min_length=1, max_length=200)
     reason: str = Field(min_length=2, max_length=1000)
+    billing_treatment: BillingCycleReviewDecision
+    billing_cycle_id: int = Field(gt=0)
+    expected_cycle_version: int = Field(gt=0)
 
 
 class ManualInvoicePaymentRequest(ApiModel):
@@ -84,6 +92,19 @@ class ReverseInvoicePaymentRequest(ApiModel):
 
 
 class VoidInvoiceRequest(ApiModel):
+    expected_version: int = Field(gt=0)
+    reason: str = Field(min_length=2, max_length=1000)
+
+
+class ReviewBillingCycleInvoiceRequest(ApiModel):
+    invoice_id: int = Field(gt=0)
+    decision: BillingCycleReviewDecision
+    amount: float = Field(default=0, ge=0)
+    reason: str = Field(min_length=2, max_length=1000)
+    expected_cycle_version: int = Field(gt=0)
+
+
+class ReverseBillingCycleReviewRequest(ApiModel):
     expected_version: int = Field(gt=0)
     reason: str = Field(min_length=2, max_length=1000)
 
@@ -123,6 +144,76 @@ def get_billing_automation_status(
 ):
     try:
         return api_success(use_case.get_automation_status(actor))
+    except Exception as exc:
+        return _error(exc)
+
+
+@router.get(
+    "/billing-cycles/readiness",
+    response_model=ApiSuccess[BillingCycleReadiness],
+    operation_id="api_v1_customer_support_billing_cycle_readiness",
+)
+def get_billing_cycle_readiness(
+    actor: ActorDependency,
+    use_case: PaymentsUseCaseDependency,
+):
+    try:
+        return api_success(use_case.get_cycle_readiness(actor))
+    except Exception as exc:
+        return _error(exc)
+
+
+@router.post(
+    "/billing-cycles/{cycle_id}/invoice-review",
+    response_model=ApiSuccess[BillingCycleSummary],
+    operation_id="api_v1_customer_support_review_billing_cycle_invoice",
+)
+def review_billing_cycle_invoice(
+    cycle_id: int,
+    payload: ReviewBillingCycleInvoiceRequest,
+    actor: ActorDependency,
+    use_case: PaymentsUseCaseDependency,
+):
+    try:
+        return api_success(
+            use_case.review_cycle_invoice(
+                actor,
+                ReviewBillingCycleInvoiceCommand(
+                    cycle_id=cycle_id,
+                    invoice_id=payload.invoice_id,
+                    decision=payload.decision,
+                    allocated_minor=major_to_minor(payload.amount),
+                    reason=payload.reason,
+                    expected_cycle_version=payload.expected_cycle_version,
+                ),
+            )
+        )
+    except Exception as exc:
+        return _error(exc)
+
+
+@router.post(
+    "/billing-cycle-reviews/{review_id}/reversal",
+    response_model=ApiSuccess[BillingCycleSummary],
+    operation_id="api_v1_customer_support_reverse_billing_cycle_review",
+)
+def reverse_billing_cycle_review(
+    review_id: int,
+    payload: ReverseBillingCycleReviewRequest,
+    actor: ActorDependency,
+    use_case: PaymentsUseCaseDependency,
+):
+    try:
+        return api_success(
+            use_case.reverse_cycle_review(
+                actor,
+                review_id,
+                ReverseBillingCycleReviewCommand(
+                    expected_version=payload.expected_version,
+                    reason=payload.reason,
+                ),
+            )
+        )
     except Exception as exc:
         return _error(exc)
 
@@ -295,6 +386,9 @@ def add_paid_student_invoice(
                     paid_at=payload.paid_at,
                     reference=payload.reference,
                     reason=payload.reason,
+                    billing_treatment=payload.billing_treatment,
+                    billing_cycle_id=payload.billing_cycle_id,
+                    expected_cycle_version=payload.expected_cycle_version,
                 ),
             )
         )

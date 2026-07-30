@@ -9,6 +9,9 @@ from backend.core.clock import SystemClock
 from backend.core.time import SCHOOL_TIMEZONE
 from backend.core.unit_of_work import Connection
 from backend.modules.domains.finance import (
+    billing_cycle_queries,
+    billing_cycle_repository,
+    billing_cycles,
     billing_profile_repository,
     commands,
     enforcement,
@@ -20,6 +23,9 @@ from backend.modules.domains.finance import (
 from backend.modules.domains.finance.commands import BillingActor
 from backend.modules.domains.finance.domain_types import (
     BillingAccountType,
+    BillingCycleReviewDecision,
+    BillingCycleReviewStatus,
+    BillingCycleState,
     BillingItemStatus,
     BillingJobTopic,
     BillingProfileStatus,
@@ -34,6 +40,8 @@ from backend.modules.domains.finance.schemas import (
     BillingAccountDetail,
     BillingAccountPage,
     BillingAutomationStatus,
+    BillingCycleReadiness,
+    BillingCycleSummary,
     BillingItemInput,
     BillingProfileResult,
     ConfigureBillingProfileCommand,
@@ -41,7 +49,9 @@ from backend.modules.domains.finance.schemas import (
     InvoicePage,
     IssueStudentInvoiceCommand,
     RecordManualInvoicePaymentCommand,
+    ReverseBillingCycleReviewCommand,
     ReverseInvoicePaymentCommand,
+    ReviewBillingCycleInvoiceCommand,
     VoidStudentInvoiceCommand,
 )
 from backend.modules.domains.finance.service import payment_row_to_record
@@ -192,6 +202,51 @@ def list_payment_records(
     return tuple(
         _payment_record_from_row(row)
         for row in repository.list_student_payment_rows(conn, student_row_id)
+    )
+
+
+def list_parent_payment_records(
+    conn: Connection,
+    *,
+    parent_id: int,
+    student_row_id: int | None = None,
+) -> tuple[PaymentRecord, ...]:
+    return tuple(
+        _payment_record_from_row(row)
+        for row in repository.list_parent_payment_rows(
+            conn,
+            parent_id=parent_id,
+            student_row_id=student_row_id,
+        )
+    )
+
+
+def parent_has_linked_student(
+    conn: Connection,
+    *,
+    parent_id: int,
+    student_row_id: int,
+) -> bool:
+    return repository.parent_has_linked_student_row(
+        conn,
+        parent_id=parent_id,
+        student_row_id=student_row_id,
+    )
+
+
+def list_parent_billing_cycles(
+    conn: Connection,
+    *,
+    parent_id: int,
+    student_row_id: int | None = None,
+) -> tuple[BillingCycleSummary, ...]:
+    return tuple(
+        billing_cycle_queries.cycle_summary(conn, row)
+        for row in billing_cycle_repository.list_parent_cycle_rows(
+            conn,
+            parent_id=parent_id,
+            student_row_id=student_row_id,
+        )
     )
 
 
@@ -423,6 +478,51 @@ def get_billing_automation_status(
     )
 
 
+def get_billing_cycle_readiness(
+    conn: Connection,
+    *,
+    scope: BillingSchoolScope,
+    now: datetime | None = None,
+) -> BillingCycleReadiness:
+    return billing_cycle_queries.get_billing_cycle_readiness(
+        conn,
+        scope=scope,
+        now=now,
+    )
+
+
+def review_billing_cycle_invoice(
+    conn: Connection,
+    command: ReviewBillingCycleInvoiceCommand,
+    *,
+    actor: BillingActor,
+    scope: BillingSchoolScope,
+) -> BillingCycleSummary:
+    return billing_cycles.review_manual_invoice(
+        conn,
+        command,
+        actor=actor,
+        scope=scope,
+    )
+
+
+def reverse_billing_cycle_review(
+    conn: Connection,
+    review_id: int,
+    command: ReverseBillingCycleReviewCommand,
+    *,
+    actor: BillingActor,
+    scope: BillingSchoolScope,
+) -> BillingCycleSummary:
+    return billing_cycles.reverse_manual_invoice_review(
+        conn,
+        review_id,
+        command,
+        actor=actor,
+        scope=scope,
+    )
+
+
 def configure_billing_profile(
     conn: Connection,
     command: ConfigureBillingProfileCommand,
@@ -484,6 +584,11 @@ __all__ = [
     "BillingAccountType",
     "BillingAccessStatus",
     "BillingAutomationStatus",
+    "BillingCycleReadiness",
+    "BillingCycleReviewDecision",
+    "BillingCycleReviewStatus",
+    "BillingCycleState",
+    "BillingCycleSummary",
     "BillingError",
     "BillingProfileItemCommand",
     "BillingProfileResult",
@@ -500,6 +605,8 @@ __all__ = [
     "ManualPaymentMethod",
     "PaymentRecord",
     "RecordManualInvoicePaymentCommand",
+    "ReviewBillingCycleInvoiceCommand",
+    "ReverseBillingCycleReviewCommand",
     "ReverseInvoicePaymentCommand",
     "VoidStudentInvoiceCommand",
     "add_paid_student_invoice",
@@ -510,6 +617,7 @@ __all__ = [
     "get_billing_profile",
     "get_billing_account",
     "get_billing_automation_status",
+    "get_billing_cycle_readiness",
     "get_account_billing_access",
     "get_invoice",
     "issue_student_invoice",
@@ -517,11 +625,16 @@ __all__ = [
     "list_invoices",
     "list_billing_accounts",
     "list_payment_records",
+    "list_parent_billing_cycles",
+    "list_parent_payment_records",
     "list_student_account_payment_records",
     "major_to_minor",
     "parent_invoice_checkout_data",
+    "parent_has_linked_student",
     "record_manual_invoice_payment",
     "reverse_invoice_payment",
+    "review_billing_cycle_invoice",
+    "reverse_billing_cycle_review",
     "student_invoice_checkout_data",
     "void_student_invoice",
 ]

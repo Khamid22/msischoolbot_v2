@@ -164,6 +164,7 @@ export type AdmissionCreated = {
 export type AdmissionInvoiceQueueItem = {
   invoiceId: number;
   invoiceNumber: string;
+  billingCycleId?: number | null;
   admissionId: number | null;
   studentId: number | null;
   studentRowId: number | null;
@@ -271,6 +272,88 @@ export type BillingAccountDetail = BillingAccountSummary & {
   invoices: AdmissionInvoiceQueueItem[];
   linkedTelegramRecipients: number;
   unlinkedTelegramRecipients: number;
+  billingCycles: BillingCycle[];
+};
+
+export type BillingCycleState =
+  | "scheduled"
+  | "review_required"
+  | "invoiced"
+  | "satisfied"
+  | "cancelled";
+
+export type BillingCycleItem = {
+  cycleItemId: number;
+  groupId: number | null;
+  subjectId: number | null;
+  description: string;
+  amountMinor: number;
+};
+
+export type BillingCycleReview = {
+  reviewId: number;
+  cycleId: number;
+  invoiceId: number;
+  invoiceNumber: string;
+  decision: "apply" | "exclude";
+  allocatedMinor: number;
+  status: "active" | "reversed";
+  reason: string;
+  reviewedAt: string;
+  reversedAt: string | null;
+  reversalReason: string;
+  version: number;
+};
+
+export type BillingCycleInvoiceCandidate = {
+  invoiceId: number;
+  invoiceNumber: string;
+  totalMinor: number;
+  completedMinor: number;
+  availableMinor: number;
+  currency: string;
+  origin: "admission" | "student_billing" | "legacy_migration";
+  status: AdmissionInvoiceStatus;
+  paidAt: string | null;
+};
+
+export type BillingCycle = {
+  cycleId: number;
+  profileId: number;
+  studentId: number;
+  studentRowId: number | null;
+  studentName: string;
+  studentCode: string;
+  schoolId: number;
+  schoolName: string;
+  billingPeriod: string;
+  deadlineAt: string;
+  issueAt: string;
+  currency: string;
+  expectedMinor: number;
+  allocatedMinor: number;
+  remainingMinor: number;
+  state: BillingCycleState;
+  invoiceId: number | null;
+  invoiceNumber: string;
+  version: number;
+  isPreview: boolean;
+  items: BillingCycleItem[];
+  reviews: BillingCycleReview[];
+  reviewCandidates: BillingCycleInvoiceCandidate[];
+};
+
+export type BillingCycleReadiness = {
+  generatedAt: string;
+  effectiveSchoolIds: number[];
+  scheduledCycles: number;
+  reviewRequiredCycles: number;
+  readyToIssueCycles: number;
+  satisfiedCycles: number;
+  potentialHoldCount: number;
+  linkedTelegramRecipients: number;
+  unlinkedTelegramRecipients: number;
+  cycles: BillingCycle[];
 };
 
 export type InvoiceLine = {
@@ -300,6 +383,7 @@ export type UnifiedInvoiceDetail = AdmissionInvoiceQueueItem & {
   payments: InvoiceSettlement[];
   notificationTimeline: BillingNotificationTimelineEntry[];
   voidReason: string;
+  billingCycle?: BillingCycle | null;
 };
 
 export type BillingNotificationTimelineEntry = {

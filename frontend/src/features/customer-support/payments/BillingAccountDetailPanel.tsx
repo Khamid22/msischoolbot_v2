@@ -1,6 +1,11 @@
 import { CalendarClock, ExternalLink, Loader2, ReceiptText, X } from "lucide-react";
 import type { FormEvent } from "react";
-import type { BillingAccountDetail } from "@/features/customer-support/model";
+import type {
+  BillingAccountDetail,
+  BillingCycle,
+  BillingCycleInvoiceCandidate,
+  BillingCycleReview,
+} from "@/features/customer-support/model";
 import {
   formatDate,
   inputClass,
@@ -23,6 +28,15 @@ type Props = {
     account: BillingAccountDetail,
   ) => void;
   onOpenInvoice: (invoiceId: number) => void;
+  onReviewInvoice: (
+    event: FormEvent<HTMLFormElement>,
+    cycle: BillingCycle,
+    candidate: BillingCycleInvoiceCandidate,
+  ) => void;
+  onReverseReview: (
+    event: FormEvent<HTMLFormElement>,
+    review: BillingCycleReview,
+  ) => void;
 };
 
 export function BillingAccountDetailPanel({
@@ -35,6 +49,8 @@ export function BillingAccountDetailPanel({
   onRetry,
   onSaveSchedule,
   onOpenInvoice,
+  onReviewInvoice,
+  onReverseReview,
 }: Props) {
   if (loading) {
     return (
@@ -179,6 +195,135 @@ export function BillingAccountDetailPanel({
             </button>
           </form>
         )}
+
+        {account.accountType === "student" ? (
+          <div>
+            <h3 className="flex items-center gap-2 font-black text-foreground">
+              <CalendarClock className="h-4 w-4 text-primary" /> Billing cycles
+            </h3>
+            <div className="mt-2 space-y-3">
+              {account.billingCycles.length ? account.billingCycles.map((cycle) => (
+                <section key={cycle.cycleId} className="rounded-lg border border-border p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-black">{formatDate(cycle.billingPeriod)}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Deadline {formatDate(cycle.deadlineAt, true)}
+                      </p>
+                    </div>
+                    <span className={`rounded-full px-2 py-1 text-[0.625rem] font-black uppercase ${
+                      cycle.state === "review_required"
+                        ? "bg-amber-100 text-amber-900"
+                        : cycle.state === "satisfied"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-primary/10 text-primary"
+                    }`}>
+                      {cycle.state.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                  <dl className="mt-3 grid grid-cols-3 gap-2">
+                    {[
+                      ["Expected", cycle.expectedMinor],
+                      ["Allocated", cycle.allocatedMinor],
+                      ["Remaining", cycle.remainingMinor],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-md bg-muted/60 p-2">
+                        <dt className="text-[0.5625rem] font-black uppercase text-muted-foreground">{label}</dt>
+                        <dd className="mt-1 break-words text-xs font-black">
+                          {money(Number(value) / 100, cycle.currency)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                  {cycle.reviewCandidates.map((candidate) => (
+                    <div key={candidate.invoiceId} className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
+                      <p className="text-sm font-black text-amber-950">
+                        Review paid invoice {candidate.invoiceNumber}
+                      </p>
+                      <p className="mt-1 text-xs text-amber-900">
+                        {money(candidate.availableMinor / 100, candidate.currency)} is available.
+                        Applying it prevents a duplicate monthly invoice.
+                      </p>
+                      <form
+                        className="mt-3 grid gap-2"
+                        onSubmit={(event) => onReviewInvoice(event, cycle, candidate)}
+                      >
+                        <div>
+                          <Label htmlFor={`cycle-allocation-${cycle.cycleId}-${candidate.invoiceId}`}>Amount to apply</Label>
+                          <input
+                            id={`cycle-allocation-${cycle.cycleId}-${candidate.invoiceId}`}
+                            name="amount"
+                            type="number"
+                            min="1"
+                            max={Math.min(candidate.availableMinor, cycle.remainingMinor) / 100}
+                            defaultValue={Math.min(candidate.availableMinor, cycle.remainingMinor) / 100}
+                            required
+                            className={inputClass}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`cycle-reason-${cycle.cycleId}-${candidate.invoiceId}`}>Review reason</Label>
+                          <input
+                            id={`cycle-reason-${cycle.cycleId}-${candidate.invoiceId}`}
+                            name="reason"
+                            minLength={2}
+                            defaultValue="Apply completed payment to this billing cycle."
+                            required
+                            className={inputClass}
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button type="submit" name="decision" value="apply" disabled={saving} className={primaryButton}>
+                            Apply payment
+                          </button>
+                          <button
+                            type="submit"
+                            name="decision"
+                            value="exclude"
+                            disabled={saving}
+                            className={secondaryButton}
+                          >
+                            Exclude from cycle
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  ))}
+                  {cycle.reviews.map((review) => (
+                    <div key={review.reviewId} className="mt-3 rounded-lg bg-muted/60 p-3">
+                      <p className="text-xs font-black">
+                        {review.invoiceNumber} · {review.decision} · {money(review.allocatedMinor / 100, cycle.currency)}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">{review.reason}</p>
+                      {review.status === "active" && !cycle.invoiceId ? (
+                        <form
+                          className="mt-2 flex gap-2"
+                          onSubmit={(event) => onReverseReview(event, review)}
+                        >
+                          <input
+                            name="reason"
+                            aria-label="Reversal reason"
+                            minLength={2}
+                            placeholder="Correction reason"
+                            required
+                            className={inputClass}
+                          />
+                          <button type="submit" disabled={saving} className={secondaryButton}>
+                            Reverse
+                          </button>
+                        </form>
+                      ) : null}
+                    </div>
+                  ))}
+                </section>
+              )) : (
+                <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                  No billing cycle has been planned yet.
+                </p>
+              )}
+            </div>
+          </div>
+        ) : null}
 
         <div>
           <h3 className="flex items-center gap-2 font-black text-foreground">

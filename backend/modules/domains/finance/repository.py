@@ -100,6 +100,99 @@ def list_student_payment_rows(conn, student_row_id):
     ).fetchall()
 
 
+def list_parent_payment_rows(conn, *, parent_id, student_row_id=None):
+    return conn.execute(
+        f"""
+        WITH linked_students AS (
+            SELECT student.id, student.legacy_student_row_id
+            FROM msi_v2.parent_student_links link
+            JOIN msi_v2.students student ON student.id = link.student_id
+            WHERE link.parent_id = %s
+              AND link.status = 'active'
+              AND (
+                  %s::bigint IS NULL
+                  OR student.legacy_student_row_id = %s
+              )
+        ),
+        legacy_payments AS (
+            SELECT {_payment_select()}
+            FROM msi_v2.payments p
+            JOIN linked_students st ON st.id = p.student_id
+            LEFT JOIN msi_v2.groups g ON g.id = p.group_id
+            LEFT JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+            LEFT JOIN msi_v2.subjects sub ON sub.id = sp.subject_id
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM msi_v2.invoices migrated_invoice
+                WHERE migrated_invoice.legacy_payment_id = p.id
+            )
+        ),
+        canonical_invoices AS (
+            SELECT
+                %s + invoice.id AS id,
+                student.legacy_student_row_id AS student_row_id,
+                COALESCE(
+                    string_agg(line.description, ', ' ORDER BY line.id),
+                    'School services'
+                ) AS subject,
+                to_char(invoice.billing_period, 'YYYY-MM') AS month_label,
+                (
+                    CASE
+                        WHEN invoice.status = 'paid' THEN invoice.total_minor
+                        ELSE invoice.total_minor - invoice.paid_minor
+                    END::numeric / 100
+                )::float AS amount,
+                invoice.currency,
+                invoice.status,
+                invoice.due_date::text AS due_date,
+                COALESCE(invoice.paid_at::text, '') AS paid_at,
+                'Invoice ' || invoice.invoice_number AS notes,
+                invoice.version,
+                COALESCE(invoice.voided_at::text, '') AS voided_at,
+                invoice.void_reason,
+                invoice.created_by_staff_id AS created_by_admin_id,
+                invoice.created_at::text AS created_at,
+                invoice.updated_at::text AS updated_at
+            FROM msi_v2.invoices invoice
+            JOIN linked_students student ON student.id = invoice.student_id
+            LEFT JOIN msi_v2.invoice_lines line ON line.invoice_id = invoice.id
+            GROUP BY invoice.id, student.legacy_student_row_id
+        )
+        SELECT *
+        FROM (
+            SELECT * FROM legacy_payments
+            UNION ALL
+            SELECT * FROM canonical_invoices
+        ) payment_record
+        ORDER BY
+            COALESCE(NULLIF(payment_record.due_date, '')::date, DATE '9999-12-31'),
+            payment_record.id
+        """,
+        (
+            int(parent_id),
+            student_row_id,
+            student_row_id,
+            NEW_INVOICE_PAYMENT_ID_OFFSET,
+        ),
+    ).fetchall()
+
+
+def parent_has_linked_student_row(conn, *, parent_id, student_row_id):
+    row = conn.execute(
+        """
+        SELECT 1
+        FROM msi_v2.parent_student_links link
+        JOIN msi_v2.students student ON student.id = link.student_id
+        WHERE link.parent_id = %s
+          AND link.status = 'active'
+          AND student.legacy_student_row_id = %s
+        LIMIT 1
+        """,
+        (int(parent_id), int(student_row_id)),
+    ).fetchone()
+    return bool(row)
+
+
 def list_canonical_student_payment_rows(conn, student_id):
     row = conn.execute(
         """
@@ -263,6 +356,8 @@ __all__ = [
     "get_internal_student_group_id",
     "insert_student_payment_row",
     "list_canonical_student_payment_rows",
+    "list_parent_payment_rows",
+    "parent_has_linked_student_row",
     "list_student_payment_rows",
     "update_student_payment_paid_row",
 ]

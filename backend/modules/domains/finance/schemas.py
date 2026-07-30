@@ -12,6 +12,9 @@ from backend.modules.domains.finance.domain_types import (
     BillingAccountType,
     BillingAttentionFlag,
     BillingAutomationWorkerState,
+    BillingCycleReviewDecision,
+    BillingCycleReviewStatus,
+    BillingCycleState,
     BillingEnforcementState,
     BillingHoldTarget,
     BillingItemStatus,
@@ -68,6 +71,7 @@ class BillingNotificationTimelineEntry(BillingModel):
 class InvoiceSummary(BillingModel):
     invoice_id: int
     invoice_number: str
+    billing_cycle_id: int | None = None
     admission_id: int | None = None
     student_id: int | None = None
     student_row_id: int | None = None
@@ -98,6 +102,7 @@ class InvoiceDetail(InvoiceSummary):
     payments: list[InvoicePaymentResult] = Field(default_factory=list)
     notification_timeline: list[BillingNotificationTimelineEntry] = Field(default_factory=list)
     void_reason: str = ""
+    billing_cycle: "BillingCycleSummary | None" = None
 
 
 class InvoicePage(BillingModel):
@@ -167,6 +172,7 @@ class BillingAccountDetail(BillingAccountSummary):
     invoices: list[InvoiceSummary] = Field(default_factory=list)
     linked_telegram_recipients: int = 0
     unlinked_telegram_recipients: int = 0
+    billing_cycles: list["BillingCycleSummary"] = Field(default_factory=list)
 
 
 class BillingAccountPage(BillingModel):
@@ -191,6 +197,9 @@ class AddPaidStudentInvoiceCommand(IssueStudentInvoiceCommand):
     paid_at: datetime
     reference: str = Field(min_length=1, max_length=200)
     reason: str = Field(min_length=2, max_length=1000)
+    billing_treatment: BillingCycleReviewDecision | None = None
+    billing_cycle_id: int | None = Field(default=None, gt=0)
+    expected_cycle_version: int | None = Field(default=None, gt=0)
 
     @field_validator("paid_at")
     @classmethod
@@ -270,6 +279,104 @@ class BillingProfileResult(BillingModel):
     items: list[BillingProfileItemResult] = Field(default_factory=list)
 
 
+class BillingCycleItemResult(BillingModel):
+    cycle_item_id: int
+    group_id: int | None = None
+    subject_id: int | None = None
+    description: str
+    amount_minor: int
+
+
+class BillingCycleReviewResult(BillingModel):
+    review_id: int
+    cycle_id: int
+    invoice_id: int
+    invoice_number: str
+    decision: BillingCycleReviewDecision
+    allocated_minor: int
+    status: BillingCycleReviewStatus
+    reason: str
+    reviewed_at: datetime
+    reversed_at: datetime | None = None
+    reversal_reason: str = ""
+    version: int
+
+
+class BillingCycleInvoiceCandidate(BillingModel):
+    invoice_id: int
+    invoice_number: str
+    total_minor: int
+    completed_minor: int
+    available_minor: int
+    currency: str
+    origin: InvoiceOrigin
+    status: InvoiceStatus
+    paid_at: datetime | None = None
+
+
+class BillingCycleSummary(BillingModel):
+    cycle_id: int
+    profile_id: int
+    student_id: int
+    student_row_id: int | None = None
+    student_name: str
+    student_code: str
+    school_id: int
+    school_name: str
+    billing_period: date
+    deadline_at: datetime
+    issue_at: datetime
+    currency: str
+    expected_minor: int
+    allocated_minor: int
+    remaining_minor: int
+    state: BillingCycleState
+    invoice_id: int | None = None
+    invoice_number: str = ""
+    version: int
+    is_preview: bool = False
+    items: list[BillingCycleItemResult] = Field(default_factory=list)
+    reviews: list[BillingCycleReviewResult] = Field(default_factory=list)
+    review_candidates: list[BillingCycleInvoiceCandidate] = Field(default_factory=list)
+
+
+class BillingCycleReadiness(BillingModel):
+    generated_at: datetime
+    effective_school_ids: list[int] = Field(default_factory=list)
+    scheduled_cycles: int = 0
+    review_required_cycles: int = 0
+    ready_to_issue_cycles: int = 0
+    satisfied_cycles: int = 0
+    potential_hold_count: int = 0
+    linked_telegram_recipients: int = 0
+    unlinked_telegram_recipients: int = 0
+    cycles: list[BillingCycleSummary] = Field(default_factory=list)
+
+
+class ReviewBillingCycleInvoiceCommand(BillingModel):
+    cycle_id: int = Field(gt=0)
+    invoice_id: int = Field(gt=0)
+    decision: BillingCycleReviewDecision
+    allocated_minor: int = Field(default=0, ge=0)
+    reason: str = Field(min_length=2, max_length=1000)
+    expected_cycle_version: int = Field(gt=0)
+
+    @field_validator("allocated_minor")
+    @classmethod
+    def validate_allocation(cls, value: int, info):
+        decision = info.data.get("decision")
+        if decision is BillingCycleReviewDecision.APPLY and value <= 0:
+            raise ValueError("Applied reviews require a positive amount.")
+        if decision is BillingCycleReviewDecision.EXCLUDE and value != 0:
+            raise ValueError("Excluded reviews cannot allocate an amount.")
+        return value
+
+
+class ReverseBillingCycleReviewCommand(BillingModel):
+    expected_version: int = Field(gt=0)
+    reason: str = Field(min_length=2, max_length=1000)
+
+
 class BillingAccessInvoice(BillingModel):
     invoice_id: int
     invoice_number: str
@@ -333,6 +440,11 @@ __all__ = [
     "BillingAccessStatus",
     "BillingAccessStudent",
     "BillingAutomationStatus",
+    "BillingCycleInvoiceCandidate",
+    "BillingCycleItemResult",
+    "BillingCycleReadiness",
+    "BillingCycleReviewResult",
+    "BillingCycleSummary",
     "BillingEnrollmentOption",
     "BillingNotificationTimelineEntry",
     "BillingProfileItemResult",
@@ -346,6 +458,8 @@ __all__ = [
     "InvoiceSummary",
     "IssueStudentInvoiceCommand",
     "RecordManualInvoicePaymentCommand",
+    "ReviewBillingCycleInvoiceCommand",
+    "ReverseBillingCycleReviewCommand",
     "ReverseInvoicePaymentCommand",
     "VoidStudentInvoiceCommand",
 ]

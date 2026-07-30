@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Clock3, CreditCard, Loader2, TriangleAlert, WalletCards } from "lucide-react";
+import { useEffect, useState } from "react";
 import { getParent } from "@/workspaces/parent/api";
 import {
   EmptyState,
@@ -11,6 +12,7 @@ import {
 } from "@/workspaces/parent/components";
 import type {
   ParentChild,
+  ParentBillingSchedule,
   ParentLanguage,
   ParentInvoiceCheckout,
   ParentPayment,
@@ -53,6 +55,7 @@ export function PaymentsScreen({
 
   const payload = query.data;
   const records = payload?.items || [];
+  const schedules = payload?.schedules || [];
   const summary = payload?.summary;
   const childNames = new Map(children.map((child) => [child.studentRowId, child.fullName]));
   const grouped = STATE_ORDER.map((state) => ({
@@ -90,6 +93,22 @@ export function PaymentsScreen({
           })}
         </div>
       ) : null}
+      {schedules.length ? (
+        <section>
+          <h2 className="mb-2 text-sm font-black uppercase tracking-wide text-muted-foreground">
+            {isRu ? "График оплаты" : "To‘lov jadvali"}
+          </h2>
+          <div className="grid gap-3 md:grid-cols-2">
+            {schedules.map((schedule) => (
+              <BillingScheduleCard
+                key={schedule.cycleId}
+                schedule={schedule}
+                language={language}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
       {grouped.length ? (
         <div className="space-y-5">
           {grouped.map((group) => (
@@ -110,7 +129,7 @@ export function PaymentsScreen({
             </section>
           ))}
         </div>
-      ) : (
+      ) : schedules.length ? null : (
         <EmptyState
           title={isRu ? "Платежей пока нет" : "Hozircha to‘lovlar yo‘q"}
           description={isRu
@@ -120,6 +139,123 @@ export function PaymentsScreen({
       )}
     </>
   );
+}
+
+function BillingScheduleCard({
+  schedule,
+  language,
+}: {
+  schedule: ParentBillingSchedule;
+  language: ParentLanguage;
+}) {
+  const isRu = language === "ru";
+  const now = useCurrentTime();
+  const remainingSeconds = Math.max(
+    0,
+    Math.floor((new Date(schedule.deadlineAt).getTime() - now) / 1000),
+  );
+  const isSettled = schedule.state === "satisfied";
+  const isReview = schedule.reviewRequired;
+  const title = new Intl.DateTimeFormat(isRu ? "ru-RU" : "uz-UZ", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(`${schedule.billingPeriod}T00:00:00`));
+  return (
+    <article className="rounded-xl border border-border bg-surface p-4 shadow-card">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-black text-foreground">{schedule.studentName}</h3>
+          <p className="mt-1 text-xs font-bold capitalize text-muted-foreground">{title}</p>
+        </div>
+        <span className={`rounded-full px-2 py-1 text-[0.6875rem] font-black uppercase ${
+          isSettled
+            ? "bg-emerald-100 text-emerald-800"
+            : isReview
+              ? "bg-amber-100 text-amber-800"
+              : "bg-primary/10 text-primary"
+        }`}>
+          {scheduleStateLabel(schedule.state, language)}
+        </span>
+      </div>
+      <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
+        <div>
+          <dt className="text-xs font-bold text-muted-foreground">
+            {isRu ? "Начислено" : "Hisoblangan"}
+          </dt>
+          <dd className="mt-1 font-black tabular-nums">
+            {formatMoney(schedule.expectedMinor / 100, schedule.currency)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-bold text-muted-foreground">
+            {isRu ? "Осталось" : "Qoldiq"}
+          </dt>
+          <dd className="mt-1 font-black tabular-nums">
+            {formatMoney(schedule.remainingMinor / 100, schedule.currency)}
+          </dd>
+        </div>
+      </dl>
+      {isReview ? (
+        <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs font-bold text-amber-900">
+          {isRu
+            ? "Оплата проверяется школой. Кнопка оплаты появится только при наличии остатка."
+            : "To‘lov maktab tomonidan tekshirilmoqda. Qoldiq bo‘lsa, to‘lov tugmasi keyin chiqadi."}
+        </p>
+      ) : isSettled ? (
+        <p className="mt-4 flex items-center gap-2 text-sm font-bold text-emerald-700">
+          <CheckCircle2 className="h-4 w-4" />
+          {isRu ? "Этот платёжный период закрыт." : "Bu to‘lov davri yopilgan."}
+        </p>
+      ) : (
+        <div className="mt-4 rounded-lg bg-primary/5 p-3">
+          <p className="text-xs font-bold text-muted-foreground">
+            {isRu ? "До режима «только оплата»" : "Faqat to‘lov rejimigacha"}
+          </p>
+          <p className="mt-1 font-mono text-xl font-black tabular-nums text-primary">
+            {formatCountdown(remainingSeconds)}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {isRu ? "Срок" : "Muddat"}: {formatDate(schedule.deadlineAt)}
+          </p>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function useCurrentTime() {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(interval);
+  }, []);
+  return now;
+}
+
+function formatCountdown(totalSeconds: number) {
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${days ? `${days}d ` : ""}${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function scheduleStateLabel(state: ParentBillingSchedule["state"], language: ParentLanguage) {
+  const ru: Record<ParentBillingSchedule["state"], string> = {
+    scheduled: "Запланирован",
+    review_required: "Проверка",
+    invoiced: "К оплате",
+    satisfied: "Оплачен",
+    cancelled: "Отменён",
+  };
+  const uz: Record<ParentBillingSchedule["state"], string> = {
+    scheduled: "Rejalashtirilgan",
+    review_required: "Tekshiruvda",
+    invoiced: "To‘lash",
+    satisfied: "To‘langan",
+    cancelled: "Bekor qilingan",
+  };
+  return (language === "ru" ? ru : uz)[state];
 }
 
 function PaymentRow({

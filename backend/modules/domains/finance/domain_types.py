@@ -78,6 +78,7 @@ class BillingItemStatus(StrEnum):
 
 class BillingJobTopic(StrEnum):
     GENERATE_INVOICES = "finance.generate_invoices"
+    ISSUE_BILLING_CYCLE = "finance.issue_billing_cycle"
     RECONCILE_LEGACY_PAYMENTS = "finance.reconcile_legacy_payments"
     BOOTSTRAP_ENFORCEMENT = "finance.bootstrap_billing_enforcement"
     PROCESS_ENFORCEMENT_STAGE = "finance.process_billing_enforcement_stage"
@@ -127,8 +128,29 @@ class BillingHoldTarget(StrEnum):
     HOUSEHOLD_STUDENT = "household_student"
 
 
+class BillingCycleState(StrEnum):
+    SCHEDULED = "scheduled"
+    REVIEW_REQUIRED = "review_required"
+    INVOICED = "invoiced"
+    SATISFIED = "satisfied"
+    CANCELLED = "cancelled"
+
+
+class BillingCycleReviewDecision(StrEnum):
+    APPLY = "apply"
+    EXCLUDE = "exclude"
+
+
+class BillingCycleReviewStatus(StrEnum):
+    ACTIVE = "active"
+    REVERSED = "reversed"
+
+
 __all__ = [
     "BillingAccountType",
+    "BillingCycleReviewDecision",
+    "BillingCycleReviewStatus",
+    "BillingCycleState",
     "BillingAttentionFlag",
     "BillingJobTopic",
     "BillingAccessMode",

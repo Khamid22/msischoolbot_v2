@@ -16,10 +16,12 @@ from backend.core.unit_of_work import Connection
 from backend.modules.domains.finance import (
     automation_repository,
     billing_account_repository,
+    billing_cycle_repository,
     billing_profile_repository,
     enforcement_repository,
 )
 from backend.modules.domains.finance import ledger_repository as repository
+from backend.modules.domains.finance.billing_cycle_queries import cycle_summary
 from backend.modules.domains.finance.domain_types import (
     BillingAccountType,
     BillingAttentionFlag,
@@ -286,6 +288,20 @@ def get_billing_account(
         invoices=[_invoice_summary(item) for item in invoice_rows],
         linked_telegram_recipients=linked_recipients,
         unlinked_telegram_recipients=unlinked_recipients,
+        billing_cycles=(
+            [
+                cycle_summary(conn, item)
+                for item in billing_cycle_repository.list_scoped_cycle_rows(
+                    conn,
+                    school_ids=scope.school_ids,
+                    all_schools=scope.all_schools,
+                    student_id=account_id,
+                    limit=24,
+                )
+            ]
+            if account_type is BillingAccountType.STUDENT
+            else []
+        ),
     )
 
 
@@ -294,6 +310,11 @@ def _invoice_summary(row: Mapping[str, Any]) -> InvoiceSummary:
     return InvoiceSummary(
         invoice_id=int(values["id"]),
         invoice_number=str(values["invoice_number"]),
+        billing_cycle_id=(
+            int(values["billing_cycle_id"])
+            if values.get("billing_cycle_id") is not None
+            else None
+        ),
         admission_id=(
             int(values["admission_id"]) if values.get("admission_id") is not None else None
         ),
@@ -496,6 +517,12 @@ def get_invoice(
         )
         for payment in repository.list_invoice_payment_rows(conn, invoice_id)
     ]
+    billing_cycle_row = (
+        billing_cycle_repository.get_cycle_row(conn, summary.billing_cycle_id)
+        if summary.billing_cycle_id is not None
+        else None
+    )
+    billing_cycle = cycle_summary(conn, billing_cycle_row) if billing_cycle_row else None
     return InvoiceDetail(
         **summary.model_dump(),
         lines=lines,
@@ -505,6 +532,7 @@ def get_invoice(
             invoice_id=invoice_id,
         ),
         void_reason=str(row["void_reason"]),
+        billing_cycle=billing_cycle,
     )
 
 

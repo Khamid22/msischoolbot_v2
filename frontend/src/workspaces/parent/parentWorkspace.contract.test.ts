@@ -67,5 +67,8 @@ describe("Parent workspace routes and screens", () => {
     assert.match(payments, /account\[invoice_id\]/);
     assert.match(payments, /\/payments\/\$\{payment\.invoiceId\}\/checkout/);
     assert.doesNotMatch(payments, /settings\.key|merchantKey/);
+    assert.match(payments, /BillingScheduleCard/);
+    assert.match(payments, /formatCountdown/);
+    assert.match(payments, /reviewRequired/);
   });
 });

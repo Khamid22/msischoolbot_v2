@@ -1,6 +1,8 @@
+import { useQuery } from "@tanstack/react-query";
 import { CreditCard, Loader2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
-import type { StudentEnrollment } from "@/features/customer-support/model";
+import { getSupport } from "@/features/customer-support/api";
+import type { BillingAccountDetail, StudentEnrollment } from "@/features/customer-support/model";
 import { inputClass, Label, primaryButton, secondaryButton } from "@/features/customer-support/shared/ui";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 
@@ -15,24 +17,42 @@ export type PaymentValues = {
   reference?: string;
   reason?: string;
   notes: string;
+  billingTreatment?: "apply" | "exclude";
+  billingCycleId?: number;
+  expectedCycleVersion?: number;
 };
 
 export function PaymentDialog({
   activeSubjects,
+  studentId,
   saving,
   onClose,
   onSubmit,
 }: {
   activeSubjects: StudentEnrollment[];
+  studentId: number;
   saving: boolean;
   onClose: () => void;
   onSubmit: (values: PaymentValues) => void;
 }) {
   const [isAlreadyPaid, setIsAlreadyPaid] = useState(false);
+  const billingAccount = useQuery({
+    queryKey: ["customer-support", "billing-account", "student", studentId],
+    queryFn: ({ signal }) => getSupport<BillingAccountDetail>(
+      `/payments/billing-accounts/student/${studentId}`,
+      signal,
+    ),
+    enabled: isAlreadyPaid,
+  });
+  const availableCycles = (billingAccount.data?.billingCycles || []).filter(
+    (cycle) => !cycle.invoiceId && !["satisfied", "cancelled"].includes(cycle.state),
+  );
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
+    const cycleId = Number(data.get("billingCycleId"));
+    const cycle = billingAccount.data?.billingCycles.find((item) => item.cycleId === cycleId);
     onSubmit({
       subjectId: Number(data.get("subjectId")),
       monthLabel: String(data.get("monthLabel") || "").trim(),
@@ -46,6 +66,11 @@ export function PaymentDialog({
       reference: isAlreadyPaid ? String(data.get("reference") || "").trim() : undefined,
       reason: isAlreadyPaid ? String(data.get("reason") || "").trim() : undefined,
       notes: String(data.get("notes") || "").trim(),
+      billingTreatment: isAlreadyPaid
+        ? String(data.get("billingTreatment") || "") as PaymentValues["billingTreatment"]
+        : undefined,
+      billingCycleId: isAlreadyPaid ? cycleId : undefined,
+      expectedCycleVersion: isAlreadyPaid ? cycle?.version : undefined,
     });
   }
 
@@ -129,6 +154,44 @@ export function PaymentDialog({
                   <Label htmlFor="payment-reason">Reason</Label>
                   <textarea id="payment-reason" name="reason" required minLength={2} rows={2} className={`${inputClass} py-3`} />
                 </div>
+                <div>
+                  <Label htmlFor="payment-billing-cycle">Recurring billing treatment</Label>
+                  <select
+                    id="payment-billing-cycle"
+                    name="billingCycleId"
+                    required
+                    defaultValue=""
+                    className={inputClass}
+                  >
+                    <option value="" disabled>Select billing cycle</option>
+                    {availableCycles.map((cycle) => (
+                        <option key={cycle.cycleId} value={cycle.cycleId}>
+                          {cycle.billingPeriod.slice(0, 7)} · {(cycle.remainingMinor / 100).toLocaleString()} {cycle.currency}
+                        </option>
+                      ))}
+                  </select>
+                  {billingAccount.isLoading ? (
+                    <p className="mt-1 text-xs text-muted-foreground">Loading billing cycles…</p>
+                  ) : null}
+                  {!billingAccount.isLoading && !availableCycles.length ? (
+                    <p className="mt-1 text-xs font-bold text-destructive">
+                      Create the billing schedule before recording a paid recurring invoice.
+                    </p>
+                  ) : null}
+                </div>
+                <div>
+                  <Label htmlFor="payment-billing-treatment">Apply this payment?</Label>
+                  <select
+                    id="payment-billing-treatment"
+                    name="billingTreatment"
+                    required
+                    defaultValue="apply"
+                    className={inputClass}
+                  >
+                    <option value="apply">Apply to selected cycle</option>
+                    <option value="exclude">Exclude from recurring billing</option>
+                  </select>
+                </div>
               </div>
             ) : null}
             <div>
@@ -140,7 +203,15 @@ export function PaymentDialog({
         <ModalFooter>
           <div className="flex justify-end gap-2">
             <button type="button" className={secondaryButton} onClick={onClose}>Cancel</button>
-            <button type="submit" disabled={saving || !activeSubjects.length} className={primaryButton}>
+            <button
+              type="submit"
+              disabled={
+                saving
+                || !activeSubjects.length
+                || (isAlreadyPaid && !availableCycles.length)
+              }
+              className={primaryButton}
+            >
               {saving ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <CreditCard className="h-4 w-4" />}
               {isAlreadyPaid ? "Add paid invoice" : "Issue invoice"}
             </button>

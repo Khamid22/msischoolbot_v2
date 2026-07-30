@@ -203,6 +203,18 @@ function InvoiceSummary({ invoice }: { invoice: UnifiedInvoiceDetail }) {
           </div>
         </div>
       ) : null}
+      {invoice.billingCycle ? (
+        <div className="rounded-lg border border-border p-3">
+          <p className="text-sm font-black">Recurring billing allocation</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {formatDate(invoice.billingCycle.billingPeriod)} ·{" "}
+            {money(invoice.billingCycle.allocatedMinor / 100, invoice.billingCycle.currency)}
+            {" "}reviewed ·{" "}
+            {money(invoice.billingCycle.remainingMinor / 100, invoice.billingCycle.currency)}
+            {" "}invoiced
+          </p>
+        </div>
+      ) : null}
     </>
   );
 }

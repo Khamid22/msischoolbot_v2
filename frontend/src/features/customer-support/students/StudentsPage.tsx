@@ -154,6 +154,9 @@ export function StudentsPage({
             paidAt: `${values.paidAt}T12:00:00+05:00`,
             reference: values.reference,
             reason: values.reason,
+            billingTreatment: values.billingTreatment,
+            billingCycleId: values.billingCycleId,
+            expectedCycleVersion: values.expectedCycleVersion,
           }
         : {}),
     };
@@ -266,6 +269,7 @@ export function StudentsPage({
       {dialog?.type === "payment" && detail ? (
         <PaymentDialog
           activeSubjects={activeSubjects}
+          studentId={detail.profile.id}
           saving={saving}
           onClose={() => setDialog(null)}
           onSubmit={savePayment}

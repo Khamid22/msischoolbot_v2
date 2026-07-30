@@ -9,7 +9,7 @@ from psycopg.errors import CheckViolation, UniqueViolation
 from backend.core.clock import SystemClock
 from backend.core.time import SCHOOL_TIMEZONE
 from backend.core.unit_of_work import Connection
-from backend.modules.domains.finance import billing_profile_repository, enforcement
+from backend.modules.domains.finance import billing_cycles, billing_profile_repository, enforcement
 from backend.modules.domains.finance import ledger_repository as repository
 from backend.modules.domains.finance.domain_types import (
     BillingJobTopic,
@@ -34,6 +34,7 @@ from backend.modules.domains.finance.schemas import (
     InvoiceDetail,
     IssueStudentInvoiceCommand,
     RecordManualInvoicePaymentCommand,
+    ReviewBillingCycleInvoiceCommand,
     ReverseInvoicePaymentCommand,
     VoidStudentInvoiceCommand,
 )
@@ -214,7 +215,7 @@ def add_paid_student_invoice(
     scope: BillingSchoolScope,
 ) -> InvoiceDetail:
     invoice = issue_student_invoice(conn, command, actor=actor, scope=scope)
-    return record_manual_payment(
+    paid_invoice = record_manual_payment(
         conn,
         invoice.invoice_id,
         RecordManualInvoicePaymentCommand(
@@ -228,6 +229,27 @@ def add_paid_student_invoice(
         actor=actor,
         scope=scope,
     )
+    if (
+        command.billing_cycle_id is not None
+        and command.billing_treatment is not None
+        and command.expected_cycle_version is not None
+    ):
+        billing_cycles.review_manual_invoice(
+            conn,
+            ReviewBillingCycleInvoiceCommand(
+                cycle_id=command.billing_cycle_id,
+                invoice_id=paid_invoice.invoice_id,
+                decision=command.billing_treatment,
+                allocated_minor=(
+                    command.amount_minor if command.billing_treatment.value == "apply" else 0
+                ),
+                reason=command.reason,
+                expected_cycle_version=command.expected_cycle_version,
+            ),
+            actor=actor,
+            scope=scope,
+        )
+    return get_invoice(conn, paid_invoice.invoice_id, scope=scope)
 
 
 def reverse_invoice_payment(

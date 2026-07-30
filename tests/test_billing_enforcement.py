@@ -141,6 +141,7 @@ def test_finance_module_registers_generation_reminder_delivery_and_reconciliatio
 
     assert topics == {
         "finance.generate_invoices",
+        "finance.issue_billing_cycle",
         "finance.bootstrap_billing_enforcement",
         "finance.process_billing_enforcement_stage",
         "finance.send_billing_notification",

@@ -7,6 +7,7 @@ from typing import Any
 
 from backend.core.unit_of_work import Connection
 from backend.modules.domains.finance import enforcement_repository as repository
+from backend.modules.domains.finance import billing_cycle_repository
 from backend.modules.domains.finance import ledger_repository
 from backend.modules.domains.finance.domain_types import (
     BillingAccessMode,
@@ -64,9 +65,7 @@ def _enqueue_stage_jobs(
             EnqueueJobCommand(
                 topic=BillingJobTopic.PROCESS_ENFORCEMENT_STAGE.value,
                 payload={"schedule_id": schedule_id, "stage": stage.value},
-                idempotency_key=(
-                    f"billing-enforcement-stage:{schedule_id}:{stage.value}"
-                ),
+                idempotency_key=(f"billing-enforcement-stage:{schedule_id}:{stage.value}"),
                 available_at=_stage_available_at(
                     stage=stage,
                     countdown_started_at=countdown_started_at,
@@ -83,6 +82,8 @@ def start_invoice_enforcement(
     invoice_id: int,
     now: datetime,
     bootstrap: bool = False,
+    countdown_started_at: datetime | None = None,
+    deadline_at: datetime | None = None,
 ) -> int:
     invoice = ledger_repository.get_invoice_row(
         conn,
@@ -101,7 +102,14 @@ def start_invoice_enforcement(
     if existing:
         return int(existing["id"])
     normalized_now = now.astimezone(UTC)
-    if bootstrap:
+    if (countdown_started_at is None) != (deadline_at is None):
+        raise ValueError("Countdown start and deadline must be provided together.")
+    if countdown_started_at is not None and deadline_at is not None:
+        countdown_started_at = countdown_started_at.astimezone(UTC)
+        deadline_at = deadline_at.astimezone(UTC)
+        if deadline_at - countdown_started_at != timedelta(hours=PAYMENT_WINDOW_HOURS):
+            raise ValueError("Billing enforcement must provide a full 48-hour window.")
+    elif bootstrap:
         countdown_started_at = normalized_now
         deadline_at = normalized_now + timedelta(hours=PAYMENT_WINDOW_HOURS)
     else:
@@ -144,20 +152,14 @@ def _enqueue_notifications(
     seen_telegram_ids: set[int] = set()
     for target in targets:
         telegram_user_id = (
-            int(target["telegram_user_id"])
-            if target["telegram_user_id"] is not None
-            else None
+            int(target["telegram_user_id"]) if target["telegram_user_id"] is not None else None
         )
         delivery_id = repository.insert_notification_delivery(
             conn,
             schedule_id=schedule_id,
             stage=stage,
             recipient_key=_recipient_key(target),
-            account_id=(
-                int(target["account_id"])
-                if target["account_id"] is not None
-                else None
-            ),
+            account_id=(int(target["account_id"]) if target["account_id"] is not None else None),
             telegram_user_id=telegram_user_id,
             language=str(target["language"]),
         )
@@ -237,9 +239,7 @@ def process_enforcement_stage(
             targets=targets,
         )
         active_accounts = [
-            int(target["account_id"])
-            for target in targets
-            if target["account_id"] is not None
+            int(target["account_id"]) for target in targets if target["account_id"] is not None
         ]
         repository.release_removed_household_holds(
             conn,
@@ -281,6 +281,7 @@ def reconcile_invoice_enforcement(
     invoice_id: int,
     now: datetime,
 ) -> None:
+    billing_cycle_repository.sync_cycle_state_for_invoice(conn, invoice_id)
     schedule = repository.get_schedule_by_invoice_row(
         conn,
         invoice_id,
@@ -293,10 +294,9 @@ def reconcile_invoice_enforcement(
             now=now,
         )
         return
-    is_payable = (
-        str(schedule["invoice_status"]) in repository.OPEN_INVOICE_STATUSES
-        and int(schedule["total_minor"]) > int(schedule["paid_minor"])
-    )
+    is_payable = str(schedule["invoice_status"]) in repository.OPEN_INVOICE_STATUSES and int(
+        schedule["total_minor"]
+    ) > int(schedule["paid_minor"])
     if not is_payable:
         was_held = str(schedule["state"]) == BillingEnforcementState.HELD.value
         released_account_ids = repository.release_schedule_holds(
@@ -383,9 +383,7 @@ def reconcile_active_schedules(conn: Connection, *, now: datetime) -> None:
             conn,
             schedule_id=int(refreshed["id"]),
             active_account_ids=[
-                int(target["account_id"])
-                for target in targets
-                if target["account_id"] is not None
+                int(target["account_id"]) for target in targets if target["account_id"] is not None
             ],
         )
 
@@ -442,9 +440,7 @@ def account_billing_access(
                 )
             )
     return BillingAccessStatus(
-        mode=(
-            BillingAccessMode.PAYMENT_ONLY if is_held else BillingAccessMode.NORMAL
-        ),
+        mode=(BillingAccessMode.PAYMENT_ONLY if is_held else BillingAccessMode.NORMAL),
         countdown_deadline_at=earliest_deadline,
         remaining_seconds=remaining_seconds,
         blocking_invoice_count=len(
@@ -468,10 +464,7 @@ def student_invoice_checkout_data(
     ):
         raise ValueError("Invoice was not found.")
     invoice = ledger_repository.get_invoice_row(conn, invoice_id=invoice_id)
-    if (
-        not invoice
-        or str(invoice["status"]) not in repository.OPEN_INVOICE_STATUSES
-    ):
+    if not invoice or str(invoice["status"]) not in repository.OPEN_INVOICE_STATUSES:
         raise ValueError("This invoice is not payable.")
     balance_minor = int(invoice["total_minor"]) - int(invoice["paid_minor"])
     if balance_minor <= 0:

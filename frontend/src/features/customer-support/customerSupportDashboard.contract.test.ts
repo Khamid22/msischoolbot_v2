@@ -198,6 +198,10 @@ describe("Customer Support master-detail reliability", () => {
 
   it("exposes billing automation and privacy-safe notification results", () => {
     assert.match(payments, /\/payments\/automation-status/);
+    assert.match(payments, /\/payments\/billing-cycles\/readiness/);
+    assert.match(payments, /reviewCycleInvoice/);
+    assert.match(source("./payments/BillingAccountDetailPanel.tsx"), /Apply payment/);
+    assert.match(source("./payments/BillingAccountDetailPanel.tsx"), /Exclude from cycle/);
     assert.match(automation, /Billing automation/);
     assert.match(invoiceDetail, /Notification timeline/);
     assert.match(invoiceDetail, /without exposing Telegram identifiers/);

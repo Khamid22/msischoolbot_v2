@@ -14,15 +14,18 @@ import type {
   BillingAccountPage,
   BillingAccountSummary,
   BillingAutomationStatus,
+  BillingCycle,
+  BillingCycleInvoiceCandidate,
+  BillingCycleReadiness,
+  BillingCycleReview,
   BillingProfile,
   SupportContext,
   UnifiedInvoiceDetail,
 } from "@/features/customer-support/model";
 import { AutomationStatusPanel } from "@/features/customer-support/payments/AutomationStatusPanel";
 import { BillingAccountDetailPanel } from "@/features/customer-support/payments/BillingAccountDetailPanel";
-import {
-  BillingAccountList,
-} from "@/features/customer-support/payments/BillingAccountList";
+import { BillingAccountList } from "@/features/customer-support/payments/BillingAccountList";
+import { CycleReadinessPanel } from "@/features/customer-support/payments/CycleReadinessPanel";
 import { InvoiceDetailPanel } from "@/features/customer-support/payments/InvoiceDetailPanel";
 import { InvoiceList } from "@/features/customer-support/payments/InvoiceList";
 import {
@@ -137,6 +140,14 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
     ),
     refetchInterval: 60_000,
   });
+  const readinessQuery = useQuery({
+    queryKey: ["customer-support", "payments", "billing-cycle-readiness"],
+    queryFn: ({ signal }) => getSupport<BillingCycleReadiness>(
+      "/payments/billing-cycles/readiness",
+      signal,
+    ),
+    refetchInterval: 60_000,
+  });
 
   const invoiceMutation = useMutation({
     mutationFn: (operation: () => Promise<UnifiedInvoiceDetail>) => operation(),
@@ -163,6 +174,14 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
     ),
     onSuccess: () => {
       void invalidatePayments(queryClient);
+      void accountDetail.refetch();
+    },
+  });
+  const cycleMutation = useMutation({
+    mutationFn: (operation: () => Promise<BillingCycle>) => operation(),
+    onSuccess: () => {
+      void invalidatePayments(queryClient);
+      void readinessQuery.refetch();
       void accountDetail.refetch();
     },
   });
@@ -284,6 +303,13 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
     setSelectedInvoiceId(invoiceId);
   }
 
+  function openBillingAccount(studentId: number) {
+    setView("accounts");
+    setSelectedInvoiceId(null);
+    setSelectedAccountType("student");
+    setSelectedAccountId(studentId);
+  }
+
   function saveSchedule(
     event: FormEvent<HTMLFormElement>,
     account: BillingAccountDetail,
@@ -368,6 +394,46 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
     ));
   }
 
+  function reviewCycleInvoice(
+    event: FormEvent<HTMLFormElement>,
+    cycle: BillingCycle,
+    candidate: BillingCycleInvoiceCandidate,
+  ) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const decision = submitter?.value === "exclude" ? "exclude" : "apply";
+    cycleMutation.mutate(() => sendSupport<BillingCycle>(
+      `/payments/billing-cycles/${cycle.cycleId}/invoice-review`,
+      "POST",
+      {
+        invoiceId: candidate.invoiceId,
+        decision,
+        amount: decision === "apply" ? Number(data.get("amount")) : 0,
+        reason: String(data.get("reason") || "").trim(),
+        expectedCycleVersion: cycle.version,
+      },
+      csrfToken,
+    ));
+  }
+
+  function reverseCycleReview(
+    event: FormEvent<HTMLFormElement>,
+    review: BillingCycleReview,
+  ) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    cycleMutation.mutate(() => sendSupport<BillingCycle>(
+      `/payments/billing-cycle-reviews/${review.reviewId}/reversal`,
+      "POST",
+      {
+        expectedVersion: review.version,
+        reason: String(data.get("reason") || "").trim(),
+      },
+      csrfToken,
+    ));
+  }
+
   const collectionState = view === "accounts"
     ? accountCollectionState
     : invoiceCollectionState;
@@ -422,6 +488,13 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
         loading={automationQuery.isLoading}
         error={automationQuery.error}
         onRetry={() => void automationQuery.refetch()}
+      />
+      <CycleReadinessPanel
+        readiness={readinessQuery.data}
+        loading={readinessQuery.isLoading}
+        error={readinessQuery.error}
+        onRetry={() => void readinessQuery.refetch()}
+        onOpenAccount={openBillingAccount}
       />
       <MasterDetailLayout
         collectionState={collectionState}
@@ -478,12 +551,14 @@ export function PaymentsPage({ csrfToken }: { csrfToken: string }) {
                 account={accountDetail.data}
                 loading={accountDetail.isLoading}
                 error={accountDetail.error}
-                saving={scheduleMutation.isPending}
-                mutationError={scheduleMutation.error}
+                saving={scheduleMutation.isPending || cycleMutation.isPending}
+                mutationError={scheduleMutation.error || cycleMutation.error}
                 onClose={closeDetail}
                 onRetry={() => void accountDetail.refetch()}
                 onSaveSchedule={saveSchedule}
                 onOpenInvoice={openAccountInvoice}
+                onReviewInvoice={reviewCycleInvoice}
+                onReverseReview={reverseCycleReview}
               />
             ) : (
               <InvoiceDetailPanel

@@ -15,6 +15,8 @@ from backend.modules.domains.finance.contracts import (
     BillingAccountType,
     BillingActor,
     BillingAutomationStatus,
+    BillingCycleReadiness,
+    BillingCycleSummary,
     BillingProfileResult,
     BillingSchoolScope,
     ConfigureBillingProfileCommand,
@@ -22,7 +24,9 @@ from backend.modules.domains.finance.contracts import (
     InvoicePage,
     IssueStudentInvoiceCommand,
     RecordManualInvoicePaymentCommand,
+    ReviewBillingCycleInvoiceCommand,
     ReverseInvoicePaymentCommand,
+    ReverseBillingCycleReviewCommand,
     VoidStudentInvoiceCommand,
 )
 from backend.modules.people.customer_support.policies import require_capability
@@ -147,6 +151,48 @@ class CustomerSupportPayments:
                 unit_of_work.conn,
                 scope=_scope(scoped_actor),
             )
+
+    def get_cycle_readiness(self, actor: ActorContext) -> BillingCycleReadiness:
+        scoped_actor = self._scoped_actor(actor)
+        with self._unit_of_work_factory.read() as unit_of_work:
+            return finance_contracts.get_billing_cycle_readiness(
+                unit_of_work.conn,
+                scope=_scope(scoped_actor),
+            )
+
+    def review_cycle_invoice(
+        self,
+        actor: ActorContext,
+        command: ReviewBillingCycleInvoiceCommand,
+    ) -> BillingCycleSummary:
+        scoped_actor = self._scoped_actor(actor)
+        with self._unit_of_work_factory.transaction() as unit_of_work:
+            result = finance_contracts.review_billing_cycle_invoice(
+                unit_of_work.conn,
+                command,
+                actor=_billing_actor(scoped_actor),
+                scope=_scope(scoped_actor),
+            )
+            commit_unit_of_work(unit_of_work)
+        return result
+
+    def reverse_cycle_review(
+        self,
+        actor: ActorContext,
+        review_id: int,
+        command: ReverseBillingCycleReviewCommand,
+    ) -> BillingCycleSummary:
+        scoped_actor = self._scoped_actor(actor)
+        with self._unit_of_work_factory.transaction() as unit_of_work:
+            result = finance_contracts.reverse_billing_cycle_review(
+                unit_of_work.conn,
+                review_id,
+                command,
+                actor=_billing_actor(scoped_actor),
+                scope=_scope(scoped_actor),
+            )
+            commit_unit_of_work(unit_of_work)
+        return result
 
     def issue_invoice(
         self,
