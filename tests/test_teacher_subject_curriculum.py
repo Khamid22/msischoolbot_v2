@@ -16,10 +16,15 @@ from backend.modules.domains.academics.subject_curriculum.domain_types import (
     CurriculumAssetKind,
     CurriculumVariant,
 )
+from backend.modules.domains.academics.subject_curriculum.read_models import (
+    items_from_rows,
+)
 from backend.modules.domains.academics.subject_curriculum.schemas import (
     CurriculumContentBlock,
     CurriculumExternalAssetWrite,
-    CurriculumItemWrite,
+    FundamentalsLessonWrite,
+    LessonGuidanceDocument,
+    LessonGuidanceSection,
 )
 
 
@@ -85,16 +90,36 @@ def test_esl_catalog_exposes_fundamentals_before_primary_with_camel_case():
 
 
 def test_lesson_write_models_normalize_content_and_reject_insecure_assets():
-    lesson = CurriculumItemWrite(
-        lesson_number="  F-01  ",
+    lesson = FundamentalsLessonWrite(
         title="  Study skills  ",
-        content_blocks=[
-            CurriculumContentBlock(block_type="paragraph", text="  Read actively.  ")
-        ],
+        guidance=LessonGuidanceDocument(
+            overview="  Prepare students to read with purpose.  ",
+            tags=[" Study skills ", "Study skills"],
+            before_teaching=[
+                CurriculumContentBlock(block_type="paragraph", text="  Open the text.  ")
+            ],
+            sections=[
+                LessonGuidanceSection(
+                    section_key="guided-reading",
+                    title="  Guided reading  ",
+                    planning_blocks=[
+                        CurriculumContentBlock(
+                            block_type="bullets",
+                            text="  Read actively.  ",
+                        )
+                    ],
+                )
+            ],
+        ),
     )
-    assert lesson.lesson_number == "F-01"
     assert lesson.title == "Study skills"
-    assert lesson.content_blocks[0].text == "Read actively."
+    assert lesson.guidance.overview == "Prepare students to read with purpose."
+    assert lesson.guidance.tags == ["Study skills"]
+    assert lesson.guidance.sections[0].title == "Guided reading"
+    assert lesson.guidance.sections[0].planning_blocks[0].text == "Read actively."
+    payload = lesson.model_dump(mode="json", by_alias=True)
+    assert payload["guidance"]["durationMinutes"] == 0
+    assert payload["guidance"]["sections"][0]["sectionKey"] == "guided-reading"
 
     with pytest.raises(ValidationError):
         CurriculumExternalAssetWrite(
@@ -102,6 +127,63 @@ def test_lesson_write_models_normalize_content_and_reject_insecure_assets():
             title="Unsafe link",
             external_url="http://example.com/material",
         )
+
+
+def test_legacy_fundamentals_blocks_map_into_the_constructor_without_data_loss():
+    row = {
+        "item_id": 8,
+        "item_order": 1,
+        "lesson_number": "F-01",
+        "item_type": "lesson",
+        "title": "Legacy lesson",
+        "term_label": "",
+        "week_label": "",
+        "specification_points": "Legacy overview",
+        "book_pages": "",
+        "lesson_count": "",
+        "duration_hours": "",
+        "content_json": [
+            {"block_type": "heading", "text": "Starter"},
+            {"block_type": "paragraph", "text": "Welcome the class."},
+        ],
+        "guidance_json": {
+            "overview": "",
+            "tags": [],
+            "duration_minutes": 0,
+            "before_teaching": [],
+            "sections": [],
+        },
+        "status": "active",
+        "version": 1,
+        "updated_at": datetime(2026, 7, 31, tzinfo=UTC),
+    }
+
+    item = items_from_rows([row], [], url_prefix="/assets")[0]
+
+    assert item.guidance.overview == "Legacy overview"
+    assert item.guidance.sections[0].title == "Starter"
+    assert item.guidance.sections[0].planning_blocks[0].text == "Welcome the class."
+
+
+def test_legacy_write_payload_is_upgraded_without_exposing_row_fields():
+    lesson = FundamentalsLessonWrite.model_validate(
+        {
+            "lessonNumber": "F-01",
+            "itemType": "lesson",
+            "title": "Legacy editor",
+            "specificationPoints": "Legacy overview",
+            "bookPages": "Not used",
+            "contentBlocks": [
+                {"blockType": "heading", "text": "Practice"},
+                {"blockType": "paragraph", "text": "Model the activity."},
+            ],
+        }
+    )
+
+    assert lesson.guidance.overview == "Legacy overview"
+    assert lesson.guidance.sections[0].title == "Practice"
+    assert lesson.guidance.sections[0].planning_blocks[0].text == "Model the activity."
+    assert "bookPages" not in lesson.model_dump(mode="json", by_alias=True)
 
 
 def test_teacher_curriculum_query_requires_active_teacher_and_subject_assignment():
@@ -129,6 +211,16 @@ def test_curriculum_migration_is_additive_and_seeds_only_supplemental_data():
     assert "DELETE FROM" not in upgrade
     assert "TRUNCATE " not in upgrade
     assert "DROP TABLE" not in upgrade
+
+    constructor_source = Path(
+        "database/alembic/versions/0053_fundamentals_lesson_constructor.py"
+    ).read_text(encoding="utf-8")
+    constructor_upgrade = constructor_source.split("def downgrade", 1)[0].upper()
+    assert 'revision = "0053_lesson_constructor"' in constructor_source
+    assert 'down_revision = "0052_teacher_curricula"' in constructor_source
+    assert "ADD COLUMN IF NOT EXISTS GUIDANCE_JSON JSONB" in constructor_upgrade
+    assert "DELETE FROM" not in constructor_upgrade
+    assert "TRUNCATE " not in constructor_upgrade
 
 
 def test_primary_curriculum_has_no_mutation_repository():

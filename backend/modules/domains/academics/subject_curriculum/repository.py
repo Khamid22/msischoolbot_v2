@@ -292,6 +292,7 @@ def list_primary_item_rows(conn, program_id: int):
                item.lesson_count,
                item.duration_hours,
                '[]'::jsonb AS content_json,
+               '{}'::jsonb AS guidance_json,
                'active'::text AS status,
                1::bigint AS version,
                item.updated_at
@@ -324,6 +325,7 @@ def list_supplemental_item_rows(
                item.lesson_count,
                item.duration_hours,
                item.content_json,
+               item.guidance_json,
                item.status,
                item.version,
                item.updated_at
@@ -394,11 +396,11 @@ def insert_supplemental_item(
         INSERT INTO msi_v2.supplemental_curriculum_items (
             curriculum_id, item_order, lesson_number, item_type, title,
             term_label, week_label, specification_points, book_pages,
-            lesson_count, duration_hours, content_json, status, version,
+            lesson_count, duration_hours, content_json, guidance_json, status, version,
             created_by_staff_id, updated_by_staff_id, created_at, updated_at
         )
         VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb,
+            %s, %s, %s, 'lesson', %s, '', '', '', '', '', '', '[]'::jsonb, %s::jsonb,
             'active', 1, %s, %s, now(), now()
         )
         RETURNING id
@@ -407,15 +409,8 @@ def insert_supplemental_item(
             curriculum_id,
             item_order,
             payload["lesson_number"],
-            payload["item_type"],
             payload["title"],
-            payload["term_label"],
-            payload["week_label"],
-            payload["specification_points"],
-            payload["book_pages"],
-            payload["lesson_count"],
-            payload["duration_hours"],
-            json.dumps(payload["content_blocks"], ensure_ascii=False),
+            json.dumps(payload["guidance"], ensure_ascii=False),
             actor_staff_id,
             actor_staff_id,
         ),
@@ -433,16 +428,8 @@ def update_supplemental_item(
     return conn.execute(
         """
         UPDATE msi_v2.supplemental_curriculum_items
-        SET lesson_number = %s,
-            item_type = %s,
-            title = %s,
-            term_label = %s,
-            week_label = %s,
-            specification_points = %s,
-            book_pages = %s,
-            lesson_count = %s,
-            duration_hours = %s,
-            content_json = %s::jsonb,
+        SET title = %s,
+            guidance_json = %s::jsonb,
             updated_by_staff_id = %s,
             version = version + 1,
             updated_at = now()
@@ -452,16 +439,8 @@ def update_supplemental_item(
         RETURNING id, version
         """,
         (
-            payload["lesson_number"],
-            payload["item_type"],
             payload["title"],
-            payload["term_label"],
-            payload["week_label"],
-            payload["specification_points"],
-            payload["book_pages"],
-            payload["lesson_count"],
-            payload["duration_hours"],
-            json.dumps(payload["content_blocks"], ensure_ascii=False),
+            json.dumps(payload["guidance"], ensure_ascii=False),
             actor_staff_id,
             item_id,
             expected_version,

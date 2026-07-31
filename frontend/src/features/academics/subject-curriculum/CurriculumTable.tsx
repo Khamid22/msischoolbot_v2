@@ -64,7 +64,7 @@ function LessonDetail({
       <Modal
         open={Boolean(item)}
         title="Fundamentals teacher guidance"
-        subtitle={item ? [item.lessonNumber, item.termLabel, item.weekLabel].filter(Boolean).join(" · ") : ""}
+        subtitle="Planning and teaching reference"
         onClose={onClose}
         size="wide"
         mobileMode="fullscreen"
@@ -162,7 +162,7 @@ export function CurriculumTable({
   const rows = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return (detail?.items || []).filter((item) => {
-      if (type !== "all" && item.itemType !== type) return false;
+      if (!useGuidanceLayout && type !== "all" && item.itemType !== type) return false;
       if (!normalized) return true;
       return [
         item.lessonNumber,
@@ -171,9 +171,12 @@ export function CurriculumTable({
         item.termLabel,
         item.weekLabel,
         item.bookPages,
+        item.guidance.overview,
+        item.guidance.tags.join(" "),
+        item.guidance.sections.map((section) => section.title).join(" "),
       ].join(" ").toLowerCase().includes(normalized);
     });
-  }, [detail?.items, query, type]);
+  }, [detail?.items, query, type, useGuidanceLayout]);
 
   if (error) {
     return (
@@ -207,6 +210,7 @@ export function CurriculumTable({
             className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
           />
         </label>
+        {!useGuidanceLayout ? (
         <div className="grid grid-cols-3 rounded-lg bg-muted p-1" aria-label="Curriculum item filter">
           {(["all", "lesson", "exam"] as const).map((value) => (
             <button
@@ -222,6 +226,7 @@ export function CurriculumTable({
             </button>
           ))}
         </div>
+        ) : null}
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-surface">
@@ -230,10 +235,19 @@ export function CurriculumTable({
             {rows.map((item, index) => (
               <article
                 key={item.itemId}
-                className={`grid gap-3 px-3 py-3 md:grid-cols-[5.25rem_1fr_9rem_8rem_auto] ${
+                className={`grid gap-3 px-3 py-3 ${
+                  useGuidanceLayout
+                    ? "md:grid-cols-[3rem_1fr_7rem_7rem_7rem_auto]"
+                    : "md:grid-cols-[5.25rem_1fr_9rem_8rem_auto]"
+                } ${
                   item.itemType === "exam" ? "bg-warning/5" : ""
                 }`}
               >
+                {useGuidanceLayout ? (
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-xs font-black text-primary">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                ) : (
                 <div>
                   <p className="text-xs font-black">{item.lessonNumber}</p>
                   <span className={`mt-1 inline-flex rounded-md px-2 py-0.5 text-[0.625rem] font-black ${
@@ -242,18 +256,44 @@ export function CurriculumTable({
                     {item.itemType === "exam" ? "Exam" : "Lesson"}
                   </span>
                 </div>
+                )}
                 <button
                   type="button"
                   onClick={() => setSelected(item)}
                   className="min-w-0 rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 >
                   <p className="text-sm font-black leading-5 hover:text-primary">{item.title}</p>
-                  {item.specificationPoints ? (
+                  {useGuidanceLayout && item.guidance.overview ? (
+                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                      {item.guidance.overview}
+                    </p>
+                  ) : item.specificationPoints ? (
                     <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
                       {item.specificationPoints}
                     </p>
                   ) : null}
                 </button>
+                {useGuidanceLayout ? (
+                  <>
+                    <div className="text-xs leading-5 text-muted-foreground">
+                      <span className="font-bold text-foreground">
+                        {item.guidance.sections.length}
+                      </span>
+                      <br />sections
+                    </div>
+                    <div className="text-xs leading-5 text-muted-foreground">
+                      <span className="font-bold text-foreground">
+                        {item.guidance.durationMinutes || "—"}
+                      </span>
+                      <br />minutes
+                    </div>
+                    <div className="text-xs leading-5 text-muted-foreground">
+                      <span className="font-bold text-foreground">{item.assets.length}</span>
+                      <br />materials
+                    </div>
+                  </>
+                ) : (
+                  <>
                 <div className="text-xs leading-5 text-muted-foreground">
                   <span className="font-bold text-foreground">{item.termLabel || "Term not set"}</span>
                   <br />{item.weekLabel || "Week not set"}
@@ -262,6 +302,8 @@ export function CurriculumTable({
                   {item.bookPages || "No book pages"}
                   {item.durationHours ? <><br />{item.durationHours}</> : null}
                 </div>
+                  </>
+                )}
                 {editable ? (
                   <div className="flex items-center justify-end gap-1">
                     <button

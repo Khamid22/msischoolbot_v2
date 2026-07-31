@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from datetime import UTC, datetime
 
 from backend.core.unit_of_work import UnitOfWorkFactory
 from backend.modules.domains.academics.subject_curriculum import repository
 from backend.modules.domains.academics.subject_curriculum.domain_types import (
     CurriculumAssetKind,
-    CurriculumItemType,
     CurriculumRecordStatus,
     CurriculumVariant,
 )
@@ -19,15 +17,15 @@ from backend.modules.domains.academics.subject_curriculum.exceptions import (
     CurriculumPermissionError,
     CurriculumValidationError,
 )
+from backend.modules.domains.academics.subject_curriculum.read_models import (
+    items_from_rows,
+)
 from backend.modules.domains.academics.subject_curriculum.schemas import (
-    CurriculumAsset,
-    CurriculumContentBlock,
     CurriculumDetail,
     CurriculumExternalAssetWrite,
-    CurriculumItem,
-    CurriculumItemWrite,
     CurriculumVariantSummary,
     CurriculumViewAcknowledgement,
+    FundamentalsLessonWrite,
     SubjectCurriculumCatalog,
     SubjectCurriculumSummary,
 )
@@ -92,66 +90,6 @@ def _catalog_from_rows(rows, *, is_director: bool) -> SubjectCurriculumCatalog:
     return SubjectCurriculumCatalog(subjects=list(subjects.values()))
 
 
-def _content_blocks(raw_value: object) -> list[CurriculumContentBlock]:
-    if not isinstance(raw_value, list):
-        return []
-    blocks: list[CurriculumContentBlock] = []
-    for value in raw_value:
-        try:
-            blocks.append(CurriculumContentBlock.model_validate(value))
-        except (TypeError, ValueError):
-            continue
-    return blocks
-
-
-def _assets_by_item(rows, url_prefix: str) -> dict[int, list[CurriculumAsset]]:
-    grouped: dict[int, list[CurriculumAsset]] = defaultdict(list)
-    for row in rows:
-        asset_id = int(row["asset_id"])
-        is_file = str(row["asset_kind"]) == CurriculumAssetKind.FILE
-        grouped[int(row["item_id"])].append(
-            CurriculumAsset(
-                asset_id=asset_id,
-                asset_kind=CurriculumAssetKind(str(row["asset_kind"])),
-                title=str(row["title"] or ""),
-                external_url=str(row["external_url"] or ""),
-                download_url=f"{url_prefix}/{asset_id}/open" if is_file else "",
-                original_file_name=str(row["original_file_name"] or ""),
-                mime_type=str(row["mime_type"] or ""),
-                size_bytes=int(row["size_bytes"] or 0),
-                display_order=int(row["display_order"] or 1),
-                status=CurriculumRecordStatus(str(row["status"])),
-                version=int(row["version"] or 1),
-            )
-        )
-    return grouped
-
-
-def _items_from_rows(rows, asset_rows, *, url_prefix: str) -> list[CurriculumItem]:
-    assets = _assets_by_item(asset_rows, url_prefix)
-    return [
-        CurriculumItem(
-            item_id=int(row["item_id"]),
-            item_order=int(row["item_order"]),
-            lesson_number=str(row["lesson_number"] or ""),
-            item_type=CurriculumItemType(str(row["item_type"])),
-            title=str(row["title"] or ""),
-            term_label=str(row["term_label"] or ""),
-            week_label=str(row["week_label"] or ""),
-            specification_points=str(row["specification_points"] or ""),
-            book_pages=str(row["book_pages"] or ""),
-            lesson_count=str(row["lesson_count"] or ""),
-            duration_hours=str(row["duration_hours"] or ""),
-            content_blocks=_content_blocks(row["content_json"]),
-            assets=assets.get(int(row["item_id"]), []),
-            status=CurriculumRecordStatus(str(row["status"])),
-            version=int(row["version"] or 1),
-            updated_at=_as_iso(row["updated_at"]),
-        )
-        for row in rows
-    ]
-
-
 def _variant_for_subject(
     catalog: SubjectCurriculumCatalog,
     subject_id: int,
@@ -212,7 +150,7 @@ def _curriculum_detail(
             if variant.program_id
             else []
         )
-        items = _items_from_rows(rows, [], url_prefix=url_prefix)
+        items = items_from_rows(rows, [], url_prefix=url_prefix)
         return CurriculumDetail(subject=subject, variant=variant, items=items)
 
     if not variant.curriculum_id:
@@ -228,7 +166,7 @@ def _curriculum_detail(
         item_ids,
         include_archived=include_archived,
     )
-    mapped = _items_from_rows(rows, asset_rows, url_prefix=url_prefix)
+    mapped = items_from_rows(rows, asset_rows, url_prefix=url_prefix)
     return CurriculumDetail(
         subject=subject,
         variant=variant,
@@ -320,18 +258,21 @@ def acknowledge_teacher_curriculum_view(
     )
 
 
-def _write_payload(payload: CurriculumItemWrite) -> dict[str, object]:
-    data = payload.model_dump(mode="json")
-    data["item_type"] = payload.item_type.value
-    data["content_blocks"] = [
-        block.model_dump(mode="json") for block in payload.content_blocks
-    ]
-    return data
+def _write_payload(
+    payload: FundamentalsLessonWrite,
+    *,
+    lesson_number: str,
+) -> dict[str, object]:
+    return {
+        "lesson_number": lesson_number,
+        "title": payload.title,
+        "guidance": payload.guidance.model_dump(mode="json"),
+    }
 
 
 def create_fundamentals_item(
     subject_id: int,
-    payload: CurriculumItemWrite,
+    payload: FundamentalsLessonWrite,
     *,
     actor_staff_id: int | None,
     unit_of_work_factory: UnitOfWorkFactory | None = None,
@@ -355,7 +296,7 @@ def create_fundamentals_item(
             unit_of_work.conn,
             curriculum_id=curriculum_id,
             item_order=item_order,
-            payload=_write_payload(payload),
+            payload=_write_payload(payload, lesson_number=f"F-{item_order:02d}"),
             actor_staff_id=actor_staff_id,
         )
         item_id = int(row["id"]) if row else 0
@@ -383,7 +324,7 @@ def create_fundamentals_item(
 def update_fundamentals_item(
     subject_id: int,
     item_id: int,
-    payload: CurriculumItemWrite,
+    payload: FundamentalsLessonWrite,
     *,
     actor_staff_id: int | None,
     unit_of_work_factory: UnitOfWorkFactory | None = None,
@@ -407,7 +348,10 @@ def update_fundamentals_item(
             unit_of_work.conn,
             item_id=item_id,
             expected_version=payload.expected_version,
-            payload=_write_payload(payload),
+            payload=_write_payload(
+                payload,
+                lesson_number=str(current["lesson_number"] or f"F-{item_id:02d}"),
+            ),
             actor_staff_id=actor_staff_id,
         )
         if not updated:

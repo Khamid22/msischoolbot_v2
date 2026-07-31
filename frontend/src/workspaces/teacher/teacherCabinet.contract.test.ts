@@ -22,6 +22,13 @@ const fundamentalsGuidance = readFileSync(
   ),
   "utf8",
 );
+const fundamentalsEditor = readFileSync(
+  new URL(
+    "../../features/academics/subject-curriculum/FundamentalsItemEditor.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
 test("Teacher Academy uses its own responsive cabinet instead of an Admin preview", () => {
   assert.doesNotMatch(teacherHome, /AcademyTeacherPreview/);
@@ -92,4 +99,18 @@ test("Fundamentals lesson details use the teacher-guidance interaction design", 
   assert.match(fundamentalsGuidance, /role="switch"/);
   assert.match(fundamentalsGuidance, /aria-expanded/);
   assert.doesNotMatch(fundamentalsGuidance, /dangerouslySetInnerHTML/);
+});
+
+test("Fundamentals is a lesson constructor rather than a curriculum-row form", () => {
+  assert.match(fundamentalsEditor, /Lesson identity/);
+  assert.match(fundamentalsEditor, /Before You Teach/);
+  assert.match(fundamentalsEditor, /Lesson flow/);
+  assert.match(fundamentalsEditor, /Planning content/);
+  assert.match(fundamentalsEditor, /Teaching content/);
+  assert.match(fundamentalsEditor, /Lesson materials/);
+  assert.doesNotMatch(
+    fundamentalsEditor,
+    /Student book|Book pages|\bTerm\b|\bWeek\b|Specification|\bExam\b/i,
+  );
+  assert.doesNotMatch(fundamentalsGuidance, /termLabel|weekLabel|bookPages|specificationPoints/);
 });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { BookMarked, Clock3, GraduationCap, Layers } from "lucide-react";
+import { BookMarked, Clock3, GraduationCap, Layers, Paperclip } from "lucide-react";
 import { jsonCsrfHeaders } from "@/shared/lib/api";
 import { CurriculumTable } from "./CurriculumTable";
 import {
@@ -191,9 +191,30 @@ export function TeacherSubjectCurriculum({
       {selectedVariant ? (
         <section className="rounded-xl border border-border bg-surface p-3 shadow-card sm:p-4">
           <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {metric("Rows", selectedVariant.itemCount, <Layers className="h-3.5 w-3.5" />)}
-            {metric("Lessons", selectedVariant.lessonCount, <BookMarked className="h-3.5 w-3.5" />)}
-            {metric("Exams", selectedVariant.examCount, <GraduationCap className="h-3.5 w-3.5" />)}
+            {selectedVariant.curriculumKey === "fundamentals" ? (
+              <>
+                {metric("Lessons", selectedVariant.lessonCount, <BookMarked className="h-3.5 w-3.5" />)}
+                {metric(
+                  "Sections",
+                  detail?.items.reduce(
+                    (total, item) => total + item.guidance.sections.length,
+                    0,
+                  ) || 0,
+                  <Layers className="h-3.5 w-3.5" />,
+                )}
+                {metric(
+                  "Materials",
+                  detail?.items.reduce((total, item) => total + item.assets.length, 0) || 0,
+                  <Paperclip className="h-3.5 w-3.5" />,
+                )}
+              </>
+            ) : (
+              <>
+                {metric("Rows", selectedVariant.itemCount, <Layers className="h-3.5 w-3.5" />)}
+                {metric("Lessons", selectedVariant.lessonCount, <BookMarked className="h-3.5 w-3.5" />)}
+                {metric("Exams", selectedVariant.examCount, <GraduationCap className="h-3.5 w-3.5" />)}
+              </>
+            )}
             <div className="rounded-lg border border-border bg-background px-3 py-2.5">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Clock3 className="h-3.5 w-3.5" />

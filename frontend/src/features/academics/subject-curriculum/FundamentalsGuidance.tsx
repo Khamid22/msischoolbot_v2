@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChevronDown,
   Clock3,
@@ -16,47 +16,13 @@ import type {
   CurriculumItem,
 } from "./model";
 
-interface GuidanceSection {
-  sectionId: string;
-  title: string;
-  blocks: CurriculumContentBlock[];
-}
-
-function splitGuidance(blocks: CurriculumContentBlock[]) {
-  const beforeTeaching: CurriculumContentBlock[] = [];
-  const sections: GuidanceSection[] = [];
-  let current: GuidanceSection | null = null;
-
-  for (const block of blocks) {
-    if (block.blockType === "heading") {
-      if (current) sections.push(current);
-      current = {
-        sectionId: `section-${sections.length + 1}`,
-        title: block.text.trim() || `Guidance section ${sections.length + 1}`,
-        blocks: [],
-      };
-      continue;
-    }
-    if (current) current.blocks.push(block);
-    else beforeTeaching.push(block);
-  }
-  if (current) sections.push(current);
-  if (!sections.length && beforeTeaching.length) {
-    sections.push({
-      sectionId: "section-1",
-      title: "Lesson guidance",
-      blocks: beforeTeaching.splice(0),
-    });
-  }
-  return { beforeTeaching, sections };
-}
-
-function guidanceTags(item: CurriculumItem) {
-  return item.specificationPoints
-    .split(/[\n,;]+/)
-    .map((tag) => tag.trim())
-    .filter(Boolean)
-    .slice(0, 3);
+function durationLabel(minutes: number) {
+  if (!minutes) return "";
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (!hours) return `${remainder} min`;
+  if (!remainder) return `${hours} hr`;
+  return `${hours} hr ${remainder} min`;
 }
 
 function AssetIcon({ asset }: { asset: CurriculumAsset }) {
@@ -110,23 +76,19 @@ function GuidanceBlock({
 }
 
 export function FundamentalsGuidance({ item }: { item: CurriculumItem }) {
-  const { beforeTeaching, sections } = useMemo(
-    () => splitGuidance(item.contentBlocks),
-    [item.contentBlocks],
-  );
-  const tags = useMemo(() => guidanceTags(item), [item]);
+  const { beforeTeaching, durationMinutes, overview, sections, tags } = item.guidance;
   const [teachingMode, setTeachingMode] = useState(false);
   const [openSections, setOpenSections] = useState<Set<string>>(
-    () => new Set(sections[0] ? [sections[0].sectionId] : []),
+    () => new Set(sections[0] ? [sections[0].sectionKey] : []),
   );
 
   useEffect(() => {
     setTeachingMode(false);
-    setOpenSections(new Set(sections[0] ? [sections[0].sectionId] : []));
+    setOpenSections(new Set(sections[0] ? [sections[0].sectionKey] : []));
   }, [item.itemId, sections]);
 
   function setAllSections(isOpen: boolean) {
-    setOpenSections(new Set(isOpen ? sections.map((section) => section.sectionId) : []));
+    setOpenSections(new Set(isOpen ? sections.map((section) => section.sectionKey) : []));
   }
 
   function toggleSection(sectionId: string) {
@@ -165,9 +127,9 @@ export function FundamentalsGuidance({ item }: { item: CurriculumItem }) {
             <h2 className="mt-3 font-display text-2xl font-black tracking-tight sm:text-3xl">
               {item.title}
             </h2>
-            {item.specificationPoints ? (
+            {overview ? (
               <p className="mt-3 max-w-2xl text-sm leading-6 text-primary-foreground/80 sm:text-base">
-                {item.specificationPoints}
+                {overview}
               </p>
             ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
@@ -177,14 +139,6 @@ export function FundamentalsGuidance({ item }: { item: CurriculumItem }) {
                   className="rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-[0.6875rem] font-bold"
                 >
                   {tag}
-                </span>
-              ))}
-              {[item.termLabel, item.weekLabel].filter(Boolean).map((label) => (
-                <span
-                  key={label}
-                  className="rounded-md border border-primary-foreground/20 px-3 py-1.5 text-[0.6875rem] font-bold text-primary-foreground/75"
-                >
-                  {label}
                 </span>
               ))}
             </div>
@@ -253,26 +207,29 @@ export function FundamentalsGuidance({ item }: { item: CurriculumItem }) {
                   Collapse all
                 </button>
               </div>
-              {item.durationHours ? (
+              {durationMinutes ? (
                 <span className="inline-flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs font-black text-primary">
                   <Clock3 className="h-4 w-4" />
-                  {item.durationHours}
+                  {durationLabel(durationMinutes)}
                 </span>
               ) : null}
             </div>
 
             <div className="space-y-3">
               {sections.map((section, index) => {
-                const isOpen = openSections.has(section.sectionId);
+                const isOpen = openSections.has(section.sectionKey);
+                const visibleBlocks = teachingMode && section.teachingBlocks.length
+                  ? section.teachingBlocks
+                  : section.planningBlocks;
                 return (
                   <section
-                    key={section.sectionId}
+                    key={section.sectionKey}
                     className="overflow-hidden rounded-xl border border-border bg-surface shadow-card"
                   >
                     <button
                       type="button"
                       aria-expanded={isOpen}
-                      onClick={() => toggleSection(section.sectionId)}
+                      onClick={() => toggleSection(section.sectionKey)}
                       className="flex min-h-16 w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/35 sm:px-5"
                     >
                       <span className="flex min-w-0 items-center gap-3">
@@ -285,7 +242,8 @@ export function FundamentalsGuidance({ item }: { item: CurriculumItem }) {
                           </span>
                           <span className="mt-0.5 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
                             {teachingMode ? <MonitorPlay className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
-                            {teachingMode ? "Teaching view" : "Teacher preparation"}
+                            {section.activityLabel || (teachingMode ? "Teaching view" : "Teacher preparation")}
+                            {section.durationMinutes ? ` · ${durationLabel(section.durationMinutes)}` : ""}
                           </span>
                         </span>
                       </span>
@@ -297,8 +255,8 @@ export function FundamentalsGuidance({ item }: { item: CurriculumItem }) {
                     </button>
                     {isOpen ? (
                       <div className="space-y-4 border-t border-border/70 px-4 py-4 sm:px-5 sm:py-5">
-                        {section.blocks.length ? (
-                          section.blocks.map((block, blockIndex) => (
+                        {visibleBlocks.length ? (
+                          visibleBlocks.map((block, blockIndex) => (
                             <GuidanceBlock
                               key={`${block.blockType}-${blockIndex}`}
                               block={block}
@@ -307,7 +265,9 @@ export function FundamentalsGuidance({ item }: { item: CurriculumItem }) {
                           ))
                         ) : (
                           <p className="text-sm font-semibold text-muted-foreground">
-                            This section is ready for guidance content.
+                            {teachingMode
+                              ? "No teaching-view content has been added to this section."
+                              : "This section is ready for planning guidance."}
                           </p>
                         )}
                       </div>

@@ -7,46 +7,41 @@ import { FundamentalsItemEditor } from "./FundamentalsItemEditor";
 import {
   curriculumApi,
   defaultVariant,
+  EMPTY_LESSON_GUIDANCE,
   moveItemIds,
   type CurriculumDetail,
   type CurriculumItem,
-  type CurriculumItemWrite,
   type CurriculumVariantKey,
+  type FundamentalsLessonWrite,
   type SubjectCurriculumCatalog,
 } from "./model";
 
 const API_ROOT = "/api/v1/academic-director/academic/subject-curricula";
 
-const EMPTY_ITEM: CurriculumItemWrite = {
-  lessonNumber: "",
-  itemType: "lesson",
+const EMPTY_ITEM: FundamentalsLessonWrite = {
   title: "",
-  termLabel: "",
-  weekLabel: "",
-  specificationPoints: "",
-  bookPages: "",
-  lessonCount: "",
-  durationHours: "",
-  contentBlocks: [],
+  guidance: EMPTY_LESSON_GUIDANCE,
 };
 
 function normalizeSubject(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
-function itemDraft(item: CurriculumItem | null): CurriculumItemWrite {
-  if (!item) return { ...EMPTY_ITEM };
+function itemDraft(item: CurriculumItem | null): FundamentalsLessonWrite {
+  if (!item) {
+    return {
+      ...EMPTY_ITEM,
+      guidance: {
+        ...EMPTY_LESSON_GUIDANCE,
+        tags: [],
+        beforeTeaching: [],
+        sections: [],
+      },
+    };
+  }
   return {
-    lessonNumber: item.lessonNumber,
-    itemType: item.itemType,
     title: item.title,
-    termLabel: item.termLabel,
-    weekLabel: item.weekLabel,
-    specificationPoints: item.specificationPoints,
-    bookPages: item.bookPages,
-    lessonCount: item.lessonCount,
-    durationHours: item.durationHours,
-    contentBlocks: item.contentBlocks,
+    guidance: item.guidance,
     expectedVersion: item.version,
   };
 }
@@ -64,7 +59,7 @@ export function DirectorSubjectCurriculum({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editorItem, setEditorItem] = useState<CurriculumItem | null | undefined>();
-  const [draft, setDraft] = useState<CurriculumItemWrite>(EMPTY_ITEM);
+  const [draft, setDraft] = useState<FundamentalsLessonWrite>(EMPTY_ITEM);
   const [busy, setBusy] = useState(false);
   const [busyItemId, setBusyItemId] = useState(0);
   const [archiveItem, setArchiveItem] = useState<CurriculumItem | null>(null);

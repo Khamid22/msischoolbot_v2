@@ -8,6 +8,31 @@ export interface CurriculumContentBlock {
   text: string;
 }
 
+export interface LessonGuidanceSection {
+  sectionKey: string;
+  title: string;
+  activityLabel: string;
+  durationMinutes: number;
+  planningBlocks: CurriculumContentBlock[];
+  teachingBlocks: CurriculumContentBlock[];
+}
+
+export interface LessonGuidanceDocument {
+  overview: string;
+  tags: string[];
+  durationMinutes: number;
+  beforeTeaching: CurriculumContentBlock[];
+  sections: LessonGuidanceSection[];
+}
+
+export const EMPTY_LESSON_GUIDANCE: LessonGuidanceDocument = {
+  overview: "",
+  tags: [],
+  durationMinutes: 0,
+  beforeTeaching: [],
+  sections: [],
+};
+
 export interface CurriculumAsset {
   assetId: number;
   assetKind: CurriculumAssetKind;
@@ -35,6 +60,7 @@ export interface CurriculumItem {
   lessonCount: string;
   durationHours: string;
   contentBlocks: CurriculumContentBlock[];
+  guidance: LessonGuidanceDocument;
   assets: CurriculumAsset[];
   status: "active" | "archived";
   version: number;
@@ -74,17 +100,9 @@ export interface CurriculumDetail {
   archivedItems: CurriculumItem[];
 }
 
-export interface CurriculumItemWrite {
-  lessonNumber: string;
-  itemType: CurriculumItemType;
+export interface FundamentalsLessonWrite {
   title: string;
-  termLabel: string;
-  weekLabel: string;
-  specificationPoints: string;
-  bookPages: string;
-  lessonCount: string;
-  durationHours: string;
-  contentBlocks: CurriculumContentBlock[];
+  guidance: LessonGuidanceDocument;
   expectedVersion?: number;
 }
 

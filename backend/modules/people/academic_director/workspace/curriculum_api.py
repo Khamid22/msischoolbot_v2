@@ -17,12 +17,12 @@ from backend.modules.people.academic_director.contracts import (
     CurriculumConflictError,
     CurriculumDetail,
     CurriculumExternalAssetWrite,
-    CurriculumItemWrite,
     CurriculumNotFoundError,
     CurriculumReorderRequest,
     CurriculumRestoreRequest,
     CurriculumValidationError,
     CurriculumVariant,
+    FundamentalsLessonWrite,
     SubjectCurriculumCatalog,
     add_fundamentals_external_asset,
     archive_fundamentals_asset,
@@ -92,7 +92,7 @@ def get_curriculum(subject_id: int, curriculum_key: CurriculumVariant):
 )
 def create_item(
     subject_id: int,
-    payload: CurriculumItemWrite,
+    payload: FundamentalsLessonWrite,
     user: CurrentUserDep,
 ):
     try:
@@ -115,7 +115,7 @@ def create_item(
 def update_item(
     subject_id: int,
     item_id: int,
-    payload: CurriculumItemWrite,
+    payload: FundamentalsLessonWrite,
     user: CurrentUserDep,
 ):
     try:
