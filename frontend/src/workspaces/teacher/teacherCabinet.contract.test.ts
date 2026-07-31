@@ -29,6 +29,34 @@ const fundamentalsEditor = readFileSync(
   ),
   "utf8",
 );
+const fundamentalsIdentity = readFileSync(
+  new URL(
+    "../../features/academics/subject-curriculum/FundamentalsLessonIdentity.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const guidanceBlockEditor = readFileSync(
+  new URL(
+    "../../features/academics/subject-curriculum/GuidanceBlockEditor.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const mediaRenderer = readFileSync(
+  new URL(
+    "../../features/academics/subject-curriculum/CurriculumMediaBlock.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const presentationCarousel = readFileSync(
+  new URL(
+    "../../features/academics/subject-curriculum/PresentationCarousel.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
 test("Teacher Academy uses its own responsive cabinet instead of an Admin preview", () => {
   assert.doesNotMatch(teacherHome, /AcademyTeacherPreview/);
@@ -102,14 +130,38 @@ test("Fundamentals lesson details use the teacher-guidance interaction design", 
 });
 
 test("Fundamentals is a lesson constructor rather than a curriculum-row form", () => {
-  assert.match(fundamentalsEditor, /Lesson identity/);
+  assert.match(fundamentalsIdentity, /Lesson identity/);
   assert.match(fundamentalsEditor, /Before You Teach/);
   assert.match(fundamentalsEditor, /Lesson flow/);
   assert.match(fundamentalsEditor, /Planning content/);
   assert.match(fundamentalsEditor, /Teaching content/);
-  assert.match(fundamentalsEditor, /Lesson materials/);
+  assert.match(fundamentalsEditor, /Teacher Preview/);
+  assert.match(fundamentalsEditor, /beforeunload/);
+  for (const blockLabel of [
+    "Heading",
+    "Text",
+    "Bullet list",
+    "Checklist",
+    "Teaching note",
+    "Quote",
+    "Image",
+    "Video",
+    "Audio",
+    "File",
+    "Slides",
+    "Embed",
+    "Link",
+  ]) {
+    assert.match(guidanceBlockEditor, new RegExp(blockLabel));
+  }
+  assert.match(guidanceBlockEditor, /Replace file/);
+  assert.match(guidanceBlockEditor, /role="progressbar"/);
+  assert.match(mediaRenderer, /sandbox=/);
+  assert.match(mediaRenderer, /allowFullScreen/);
+  assert.match(presentationCarousel, /Previous slide/);
+  assert.match(presentationCarousel, /Original PowerPoint/);
   assert.doesNotMatch(
-    fundamentalsEditor,
+    fundamentalsIdentity,
     /Student book|Book pages|\bTerm\b|\bWeek\b|Specification|\bExam\b/i,
   );
   assert.doesNotMatch(fundamentalsGuidance, /termLabel|weekLabel|bookPages|specificationPoints/);

@@ -5,9 +5,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from backend.core.unit_of_work import UnitOfWorkFactory
-from backend.modules.domains.academics.subject_curriculum import repository
+from backend.modules.domains.academics.subject_curriculum import (
+    repository,
+    revision_repository,
+)
 from backend.modules.domains.academics.subject_curriculum.domain_types import (
     CurriculumAssetKind,
+    CurriculumAssetRenderKind,
     CurriculumRecordStatus,
     CurriculumVariant,
 )
@@ -16,6 +20,15 @@ from backend.modules.domains.academics.subject_curriculum.exceptions import (
     CurriculumNotFoundError,
     CurriculumPermissionError,
     CurriculumValidationError,
+)
+from backend.modules.domains.academics.subject_curriculum.media import (
+    curriculum_asset_url_for_director as private_asset_url_for_director,
+)
+from backend.modules.domains.academics.subject_curriculum.media import (
+    curriculum_asset_url_for_teacher as private_asset_url_for_teacher,
+)
+from backend.modules.domains.academics.subject_curriculum.media import (
+    normalize_external_url,
 )
 from backend.modules.domains.academics.subject_curriculum.read_models import (
     items_from_rows,
@@ -30,7 +43,6 @@ from backend.modules.domains.academics.subject_curriculum.schemas import (
     SubjectCurriculumSummary,
 )
 from backend.platform.storage.r2 import (
-    build_private_curriculum_asset_url,
     upload_private_curriculum_asset,
 )
 
@@ -161,12 +173,19 @@ def _curriculum_detail(
         include_archived=include_archived,
     )
     item_ids = [int(row["item_id"]) for row in rows]
-    asset_rows = repository.list_asset_rows(
+    asset_rows = revision_repository.list_published_asset_rows(
         conn,
         item_ids,
         include_archived=include_archived,
     )
-    mapped = items_from_rows(rows, asset_rows, url_prefix=url_prefix)
+    asset_ids = [int(row["asset_id"]) for row in asset_rows]
+    rendition_rows = revision_repository.list_rendition_rows(conn, asset_ids)
+    mapped = items_from_rows(
+        rows,
+        asset_rows,
+        rendition_rows,
+        url_prefix=url_prefix,
+    )
     return CurriculumDetail(
         subject=subject,
         variant=variant,
@@ -542,15 +561,31 @@ def add_fundamentals_external_asset(
             or str(current["status"]) != CurriculumRecordStatus.ACTIVE
         ):
             raise CurriculumNotFoundError("Active Fundamentals lesson was not found.")
+        render_kind = (
+            CurriculumAssetRenderKind.EMBED
+            if payload.asset_kind is CurriculumAssetKind.VIDEO
+            else CurriculumAssetRenderKind.LINK
+        )
+        external_url = normalize_external_url(
+            payload.external_url,
+            render_kind=render_kind,
+        )
         asset = repository.insert_external_asset(
             unit_of_work.conn,
             item_id=item_id,
             asset_kind=payload.asset_kind,
             title=payload.title.strip(),
-            external_url=payload.external_url,
+            external_url=external_url,
             actor_staff_id=actor_staff_id,
         )
         asset_id = int(asset["id"]) if asset else 0
+        if asset and current["published_revision_id"]:
+            revision_repository.attach_asset(
+                unit_of_work.conn,
+                revision_id=int(current["published_revision_id"]),
+                asset_id=asset_id,
+                display_order=int(asset["display_order"]),
+            )
         repository.touch_curriculum(
             unit_of_work.conn,
             int(current["curriculum_id"]),
@@ -618,6 +653,13 @@ def upload_fundamentals_file_asset(
             actor_staff_id=actor_staff_id,
         )
         asset_id = int(asset["id"]) if asset else 0
+        if asset and current["published_revision_id"]:
+            revision_repository.attach_asset(
+                unit_of_work.conn,
+                revision_id=int(current["published_revision_id"]),
+                asset_id=asset_id,
+                display_order=int(asset["display_order"]),
+            )
         repository.touch_curriculum(
             unit_of_work.conn,
             int(current["curriculum_id"]),
@@ -690,30 +732,12 @@ def curriculum_asset_url_for_teacher(
     download: bool,
     unit_of_work_factory: UnitOfWorkFactory | None = None,
 ) -> str:
-    factory = unit_of_work_factory or UnitOfWorkFactory()
-    with factory.read() as unit_of_work:
-        row = repository.get_asset_row(unit_of_work.conn, asset_id)
-        if (
-            not row
-            or str(row["status"]) != CurriculumRecordStatus.ACTIVE
-            or str(row["item_status"]) != CurriculumRecordStatus.ACTIVE
-            or str(row["curriculum_status"]) != CurriculumRecordStatus.ACTIVE
-            or str(row["asset_kind"]) != CurriculumAssetKind.FILE
-            or not repository.teacher_has_subject(
-                unit_of_work.conn,
-                teacher_id,
-                int(row["subject_id"]),
-            )
-        ):
-            raise CurriculumNotFoundError("Curriculum file was not found.")
-    url = build_private_curriculum_asset_url(
-        row["object_key"],
-        original_file_name=row["original_file_name"],
+    return private_asset_url_for_teacher(
+        teacher_id,
+        asset_id,
         download=download,
+        unit_of_work_factory=unit_of_work_factory,
     )
-    if not url:
-        raise CurriculumNotFoundError("Curriculum file is unavailable.")
-    return url
 
 
 def curriculum_asset_url_for_director(
@@ -722,20 +746,8 @@ def curriculum_asset_url_for_director(
     download: bool,
     unit_of_work_factory: UnitOfWorkFactory | None = None,
 ) -> str:
-    factory = unit_of_work_factory or UnitOfWorkFactory()
-    with factory.read() as unit_of_work:
-        row = repository.get_asset_row(unit_of_work.conn, asset_id)
-        if (
-            not row
-            or str(row["status"]) != CurriculumRecordStatus.ACTIVE
-            or str(row["asset_kind"]) != CurriculumAssetKind.FILE
-        ):
-            raise CurriculumNotFoundError("Curriculum file was not found.")
-    url = build_private_curriculum_asset_url(
-        row["object_key"],
-        original_file_name=row["original_file_name"],
+    return private_asset_url_for_director(
+        asset_id,
         download=download,
+        unit_of_work_factory=unit_of_work_factory,
     )
-    if not url:
-        raise CurriculumNotFoundError("Curriculum file is unavailable.")
-    return url

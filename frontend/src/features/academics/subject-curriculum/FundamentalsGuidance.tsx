@@ -1,17 +1,15 @@
 import { useEffect, useState } from "react";
 import {
+  Check,
   ChevronDown,
   Clock3,
-  ExternalLink,
-  FileText,
-  Link2,
   MonitorPlay,
-  PlayCircle,
+  Quote,
   Sparkles,
   Users,
 } from "lucide-react";
+import { CurriculumMediaBlock } from "./CurriculumMediaBlock";
 import type {
-  CurriculumAsset,
   CurriculumContentBlock,
   CurriculumItem,
 } from "./model";
@@ -25,26 +23,53 @@ function durationLabel(minutes: number) {
   return `${hours} hr ${remainder} min`;
 }
 
-function AssetIcon({ asset }: { asset: CurriculumAsset }) {
-  if (asset.assetKind === "video") return <PlayCircle className="h-4 w-4" />;
-  if (asset.assetKind === "link") return <Link2 className="h-4 w-4" />;
-  return <FileText className="h-4 w-4" />;
-}
-
 function GuidanceBlock({
   block,
   teachingMode,
+  item,
+  onRetryConversion,
 }: {
   block: CurriculumContentBlock;
   teachingMode: boolean;
+  item: CurriculumItem;
+  onRetryConversion?: (assetId: number) => void;
 }) {
-  if (block.blockType === "bullets") {
+  if (block.assetId) {
+    const asset = item.assets.find((candidate) => candidate.assetId === block.assetId);
+    return asset ? (
+      <CurriculumMediaBlock
+        asset={asset}
+        block={block}
+        onRetry={onRetryConversion}
+      />
+    ) : (
+      <p className="rounded-xl border border-dashed border-border p-4 text-sm font-semibold text-muted-foreground">
+        This lesson material is unavailable.
+      </p>
+    );
+  }
+  if (block.blockType === "heading") {
+    return (
+      <h4 className={`font-display font-black tracking-tight ${
+        teachingMode ? "text-xl" : "text-lg"
+      }`}>
+        {block.text}
+      </h4>
+    );
+  }
+  if (block.blockType === "bullets" || block.blockType === "checklist") {
     const rows = block.text.split("\n").map((row) => row.trim()).filter(Boolean);
     return (
       <ul className={`space-y-2 ${teachingMode ? "text-base leading-7" : "text-sm leading-6"}`}>
         {rows.map((row, index) => (
           <li key={`${row}-${index}`} className="flex items-start gap-3">
-            <span className="mt-[0.625rem] h-1.5 w-1.5 shrink-0 rounded-sm bg-primary" />
+            {block.blockType === "checklist" ? (
+              <span className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-primary/50 text-primary">
+                <Check className="h-3 w-3" />
+              </span>
+            ) : (
+              <span className="mt-[0.625rem] h-1.5 w-1.5 shrink-0 rounded-sm bg-primary" />
+            )}
             <span className="text-foreground/85">{row}</span>
           </li>
         ))}
@@ -66,6 +91,18 @@ function GuidanceBlock({
       </aside>
     );
   }
+  if (block.blockType === "quote") {
+    return (
+      <blockquote className="border-l-4 border-primary/45 bg-primary/[0.035] px-4 py-3">
+        <Quote className="mb-2 h-4 w-4 text-primary" />
+        <p className={`whitespace-pre-wrap italic text-foreground/80 ${
+          teachingMode ? "text-lg leading-8" : "text-sm leading-6"
+        }`}>
+          {block.text}
+        </p>
+      </blockquote>
+    );
+  }
   return (
     <p className={`whitespace-pre-wrap text-foreground/85 ${
       teachingMode ? "text-base leading-7" : "text-sm leading-6"
@@ -75,7 +112,13 @@ function GuidanceBlock({
   );
 }
 
-export function FundamentalsGuidance({ item }: { item: CurriculumItem }) {
+export function FundamentalsGuidance({
+  item,
+  onRetryConversion,
+}: {
+  item: CurriculumItem;
+  onRetryConversion?: (assetId: number) => void;
+}) {
   const { beforeTeaching, durationMinutes, overview, sections, tags } = item.guidance;
   const [teachingMode, setTeachingMode] = useState(false);
   const [openSections, setOpenSections] = useState<Set<string>>(
@@ -182,6 +225,8 @@ export function FundamentalsGuidance({ item }: { item: CurriculumItem }) {
                   key={`${block.blockType}-${index}`}
                   block={block}
                   teachingMode={teachingMode}
+                  item={item}
+                  onRetryConversion={onRetryConversion}
                 />
               ))}
             </div>
@@ -261,6 +306,8 @@ export function FundamentalsGuidance({ item }: { item: CurriculumItem }) {
                               key={`${block.blockType}-${blockIndex}`}
                               block={block}
                               teachingMode={teachingMode}
+                              item={item}
+                              onRetryConversion={onRetryConversion}
                             />
                           ))
                         ) : (
@@ -286,34 +333,6 @@ export function FundamentalsGuidance({ item }: { item: CurriculumItem }) {
           </section>
         )}
 
-        {item.assets.length ? (
-          <section className="rounded-xl border border-border bg-surface p-4 shadow-card sm:p-5">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" />
-              <h3 className="text-xs font-black uppercase tracking-[0.14em]">Lesson Materials</h3>
-            </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {item.assets.map((asset) => {
-                const href = asset.assetKind === "file" ? asset.downloadUrl : asset.externalUrl;
-                return (
-                  <a
-                    key={asset.assetId}
-                    href={href}
-                    target={asset.assetKind === "file" ? undefined : "_blank"}
-                    rel={asset.assetKind === "file" ? undefined : "noreferrer"}
-                    className="flex min-h-12 items-center gap-3 rounded-lg border border-border bg-background px-3 text-sm font-bold hover:border-primary/30 hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <AssetIcon asset={asset} />
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">{asset.title}</span>
-                    <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  </a>
-                );
-              })}
-            </div>
-          </section>
-        ) : null}
       </div>
     </article>
   );

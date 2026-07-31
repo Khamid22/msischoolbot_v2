@@ -46,7 +46,17 @@
 /api/v1/academic-director/academic/schools | POST
 /api/v1/academic-director/academic/subject-curricula | GET
 /api/v1/academic-director/academic/subject-curricula/assets/{asset_id}/open | GET
+/api/v1/academic-director/academic/subject-curricula/assets/{asset_id}/slides/{slide_number}/open | GET
 /api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/assets/{asset_id}/archive | POST
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/drafts | POST
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/drafts/{draft_id} | GET
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/drafts/{draft_id} | PATCH
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/drafts/{draft_id}/abandon | POST
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/drafts/{draft_id}/assets | POST
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/drafts/{draft_id}/assets/{asset_id}/detach | POST
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/drafts/{draft_id}/assets/{asset_id}/retry | POST
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/drafts/{draft_id}/files | POST
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/drafts/{draft_id}/publish | POST
 /api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/items | POST
 /api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/items/{item_id} | PATCH
 /api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/items/{item_id}/archive | POST
@@ -237,6 +247,7 @@
 /api/v1/system/status | GET
 /api/v1/teacher/subject-curricula | GET
 /api/v1/teacher/subject-curricula/assets/{asset_id}/open | GET
+/api/v1/teacher/subject-curricula/assets/{asset_id}/slides/{slide_number}/open | GET
 /api/v1/teacher/subject-curricula/{subject_id}/{curriculum_key} | GET
 /api/v1/teacher/subject-curricula/{subject_id}/{curriculum_key}/viewed | POST
 /auth/telegram | POST

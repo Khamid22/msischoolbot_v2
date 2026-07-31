@@ -23,6 +23,7 @@ from backend.modules.people.teacher.contracts import (
     SubjectCurriculumCatalog,
     acknowledge_teacher_curriculum_view,
     curriculum_asset_url_for_teacher,
+    curriculum_slide_url,
     get_teacher_subject_curriculum,
     list_teacher_subject_curricula,
 )
@@ -129,6 +130,26 @@ def open_asset(
             _teacher_id(user),
             asset_id,
             download=download,
+        )
+    except (CurriculumNotFoundError, CurriculumPermissionError, CurriculumValidationError) as exc:
+        raise _error(exc) from exc
+    return RedirectResponse(url=url, status_code=302)
+
+
+@router.get(
+    "/subject-curricula/assets/{asset_id}/slides/{slide_number}/open",
+    operation_id="api_v1_teacher_open_subject_curriculum_slide",
+)
+def open_slide(
+    asset_id: int,
+    slide_number: int,
+    user: CurrentUserDep,
+):
+    try:
+        url = curriculum_slide_url(
+            asset_id,
+            slide_number,
+            teacher_id=_teacher_id(user),
         )
     except (CurriculumNotFoundError, CurriculumPermissionError, CurriculumValidationError) as exc:
         raise _error(exc) from exc

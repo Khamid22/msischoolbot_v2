@@ -326,6 +326,7 @@ def list_supplemental_item_rows(
                item.duration_hours,
                item.content_json,
                item.guidance_json,
+               item.published_revision_id,
                item.status,
                item.version,
                item.updated_at
@@ -596,16 +597,25 @@ def insert_external_asset(
     return conn.execute(
         """
         INSERT INTO msi_v2.supplemental_curriculum_assets (
-            item_id, asset_kind, title, external_url, display_order,
+            item_id, asset_kind, render_kind, title, external_url, display_order,
             status, version, created_by_staff_id, created_at, updated_at
         )
-        SELECT %s, %s, %s, %s, coalesce(max(display_order), 0) + 1,
+        SELECT %s, %s, CASE WHEN %s = 'video' THEN 'embed' ELSE 'link' END,
+               %s, %s, coalesce(max(display_order), 0) + 1,
                'active', 1, %s, now(), now()
         FROM msi_v2.supplemental_curriculum_assets
         WHERE item_id = %s
-        RETURNING id
+        RETURNING id, display_order
         """,
-        (item_id, asset_kind, title, external_url, actor_staff_id, item_id),
+        (
+            item_id,
+            asset_kind,
+            asset_kind,
+            title,
+            external_url,
+            actor_staff_id,
+            item_id,
+        ),
     ).fetchone()
 
 
@@ -623,19 +633,29 @@ def insert_file_asset(
     return conn.execute(
         """
         INSERT INTO msi_v2.supplemental_curriculum_assets (
-            item_id, asset_kind, title, object_key, original_file_name,
+            item_id, asset_kind, render_kind, title, object_key, original_file_name,
             mime_type, size_bytes, display_order, status, version,
             created_by_staff_id, created_at, updated_at
         )
-        SELECT %s, 'file', %s, %s, %s, %s, %s,
+        SELECT %s, 'file',
+               CASE
+                   WHEN %s LIKE 'image/%%' THEN 'image'
+                   WHEN %s LIKE 'video/%%' THEN 'video'
+                   WHEN %s LIKE 'audio/%%' THEN 'audio'
+                   ELSE 'document'
+               END,
+               %s, %s, %s, %s, %s,
                coalesce(max(display_order), 0) + 1,
                'active', 1, %s, now(), now()
         FROM msi_v2.supplemental_curriculum_assets
         WHERE item_id = %s
-        RETURNING id
+        RETURNING id, display_order
         """,
         (
             item_id,
+            mime_type,
+            mime_type,
+            mime_type,
             title,
             object_key,
             original_file_name,

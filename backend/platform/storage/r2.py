@@ -5,8 +5,11 @@ import subprocess
 import tempfile
 import threading
 import time
-from datetime import datetime, timezone
+import zipfile
+from contextlib import suppress
+from datetime import UTC, datetime
 from urllib.parse import quote
+from uuid import uuid4
 
 boto3 = None
 _S3TransferConfig = None
@@ -26,22 +29,23 @@ def _ensure_boto3():
         return False
     try:
         import boto3 as _boto3
-        from boto3.s3.transfer import TransferConfig as transfer_config
-        from botocore.config import Config as botocore_config
-        from botocore.exceptions import BotoCoreError as boto_core_error, ClientError as client_error
+        from boto3.s3.transfer import TransferConfig
+        from botocore.config import Config
+        from botocore.exceptions import BotoCoreError as ImportedBotoCoreError
+        from botocore.exceptions import ClientError as ImportedClientError
     except Exception:  # pragma: no cover - optional dependency guard
         return False
     boto3 = _boto3
-    _S3TransferConfig = transfer_config
-    BotocoreConfig = botocore_config
-    BotoCoreError = boto_core_error
-    ClientError = client_error
+    _S3TransferConfig = TransferConfig
+    BotocoreConfig = Config
+    BotoCoreError = ImportedBotoCoreError
+    ClientError = ImportedClientError
     return True
 
 _R2_LOCK = threading.Lock()
 _R2_CLIENT = None
 _SIGNED_URL_CACHE_LOCK = threading.Lock()
-_SIGNED_URL_CACHE = {}
+_SIGNED_URL_CACHE: dict[str, dict[str, str | float]] = {}
 _FFMPEG_MISSING_LOGGED = False
 
 _ALLOWED_RESOURCE_EXTENSIONS = {
@@ -324,7 +328,7 @@ def is_r2_configured():
 
 
 def _build_r2_client():
-    if not is_r2_configured():
+    if not is_r2_configured() or boto3 is None:
         return None
     client_kwargs = {
         "endpoint_url": _endpoint_url(),
@@ -374,7 +378,7 @@ def _report_progress(progress_callback, *, percent, stage, message, eta_seconds=
 
 
 def _build_object_key(subject_name, original_name, folder_path=""):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     subject_slug = _slugify(subject_name) or "general"
     folder_slug = "/".join(_folder_slug_segments(folder_path))
     safe_name = _safe_file_name(original_name)
@@ -393,7 +397,7 @@ def _build_object_key(subject_name, original_name, folder_path=""):
 
 
 def _build_candidate_document_key(candidate_id, document_type, original_name):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     safe_name = _safe_file_name(original_name)
     extension = _file_extension(original_name)
     if extension and not safe_name.endswith(extension):
@@ -704,10 +708,8 @@ def upload_resource_file(
     finally:
         for tmp_path in (input_temp, output_temp):
             if tmp_path and os.path.isfile(tmp_path):
-                try:
+                with suppress(OSError):
                     os.remove(tmp_path)
-                except OSError:
-                    pass
 
 
 # ---------------------------------------------------------------------------
@@ -721,10 +723,8 @@ _THUMBNAIL_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
 def _read_limited_bytes(uploaded_file, limit_bytes):
     """Read a small file entirely into memory. Use only for thumbnails."""
     stream = uploaded_file.stream
-    try:
+    with suppress(Exception):
         stream.seek(0)
-    except Exception:
-        pass
 
     total = 0
     chunks = []
@@ -855,10 +855,8 @@ def upload_private_candidate_document(uploaded_file, *, candidate_id, document_t
     stream = getattr(uploaded_file, "file", None) or getattr(uploaded_file, "stream", None)
     if stream is None:
         return {}, "Unable to read the uploaded file."
-    try:
+    with suppress(Exception):
         stream.seek(0)
-    except Exception:
-        pass
 
     fd, temp_path = tempfile.mkstemp(suffix=extension)
     os.close(fd)
@@ -905,10 +903,8 @@ def upload_private_candidate_document(uploaded_file, *, candidate_id, document_t
     except Exception:
         return {}, "Failed to upload the candidate document."
     finally:
-        try:
+        with suppress(OSError):
             os.remove(temp_path)
-        except OSError:
-            pass
 
 
 def build_private_candidate_document_url(
@@ -956,10 +952,8 @@ def upload_private_curriculum_asset(uploaded_file, *, item_id):
     stream = getattr(uploaded_file, "file", None) or getattr(uploaded_file, "stream", None)
     if stream is None:
         return {}, "Unable to read the uploaded file."
-    try:
+    with suppress(Exception):
         stream.seek(0)
-    except Exception:
-        pass
 
     fd, temp_path = tempfile.mkstemp(suffix=extension)
     os.close(fd)
@@ -976,12 +970,15 @@ def upload_private_curriculum_asset(uploaded_file, *, item_id):
                 output.write(chunk)
         if size_bytes <= 0:
             return {}, "Uploaded file is empty."
+        if not _curriculum_file_signature_matches(temp_path, extension):
+            return {}, "The uploaded file content does not match its file type."
 
         safe_name = _safe_file_name(original_name)
         item_part = str(max(1, int(item_id)))
         object_key = (
             f"private/curricula/items/{item_part}/"
-            f"{int(time.time())}-{_slugify(safe_name.rsplit('.', 1)[0]) or 'asset'}{extension}"
+            f"{int(time.time())}-{uuid4().hex[:12]}-"
+            f"{_slugify(safe_name.rsplit('.', 1)[0]) or 'asset'}{extension}"
         )
         content_type = (
             infer_resource_mime_type(original_name)
@@ -1011,10 +1008,118 @@ def upload_private_curriculum_asset(uploaded_file, *, item_id):
     except Exception:
         return {}, "Failed to upload the curriculum file."
     finally:
-        try:
+        with suppress(OSError):
             os.remove(temp_path)
-        except OSError:
-            pass
+
+
+def _curriculum_file_signature_matches(file_path, extension):
+    """Reject renamed executable/HTML payloads while allowing known resources."""
+    try:
+        with open(file_path, "rb") as source:
+            header = source.read(32)
+    except OSError:
+        return False
+    if extension == ".pdf":
+        return header.startswith(b"%PDF-")
+    if extension in {".jpg", ".jpeg"}:
+        return header.startswith(b"\xff\xd8\xff")
+    if extension == ".png":
+        return header.startswith(b"\x89PNG\r\n\x1a\n")
+    if extension == ".gif":
+        return header.startswith((b"GIF87a", b"GIF89a"))
+    if extension == ".webp":
+        return header.startswith(b"RIFF") and header[8:12] == b"WEBP"
+    if extension in {".mp4", ".mov", ".m4v"}:
+        return len(header) >= 12 and header[4:8] == b"ftyp"
+    if extension == ".wav":
+        return header.startswith(b"RIFF") and header[8:12] == b"WAVE"
+    if extension == ".mp3":
+        return header.startswith(b"ID3") or (
+            len(header) >= 2 and header[0] == 0xFF and header[1] & 0xE0 == 0xE0
+        )
+    if extension in {".doc", ".ppt"}:
+        return header.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")
+    if extension in {".docx", ".pptx", ".zip"}:
+        if not zipfile.is_zipfile(file_path):
+            return False
+        if extension == ".zip":
+            return True
+        try:
+            with zipfile.ZipFile(file_path) as archive:
+                names = set(archive.namelist())
+        except (OSError, zipfile.BadZipFile):
+            return False
+        required = (
+            "word/document.xml"
+            if extension == ".docx"
+            else "ppt/presentation.xml"
+        )
+        return "[Content_Types].xml" in names and required in names
+    if extension in {".txt", ".csv"}:
+        try:
+            with open(file_path, encoding="utf-8") as source:
+                source.read(4096)
+            return True
+        except (OSError, UnicodeDecodeError):
+            return False
+    return False
+
+
+def download_private_curriculum_object(object_key, destination_path):
+    """Download one private curriculum object for a trusted worker."""
+    normalized_key = str(object_key or "").strip()
+    if not normalized_key.startswith("private/curricula/") or not is_r2_configured():
+        return False
+    client = _get_r2_client()
+    if client is None:
+        return False
+    try:
+        client.download_file(
+            _resource_bucket_name(),
+            normalized_key,
+            str(destination_path),
+        )
+        return True
+    except (BotoCoreError, ClientError, OSError):
+        return False
+
+
+def upload_private_curriculum_rendition(file_path, *, asset_id, slide_number):
+    """Upload one generated PNG slide and return immutable storage metadata."""
+    try:
+        size_bytes = os.path.getsize(file_path)
+    except OSError:
+        return {}, "Converted slide is unavailable."
+    if size_bytes <= 0:
+        return {}, "Converted slide is empty."
+    object_key = (
+        f"private/curricula/assets/{max(1, int(asset_id))}/renditions/"
+        f"slide-{max(1, int(slide_number)):03d}.png"
+    )
+    client = _get_r2_client()
+    if client is None:
+        return {}, "Unable to connect to private curriculum storage."
+    try:
+        with open(file_path, "rb") as payload:
+            client.upload_fileobj(
+                payload,
+                _resource_bucket_name(),
+                object_key,
+                ExtraArgs={
+                    "ContentType": "image/png",
+                    "ContentDisposition": (
+                        f'inline; filename="slide-{int(slide_number):03d}.png"'
+                    ),
+                    "CacheControl": "private, no-store, max-age=0",
+                },
+            )
+        return {
+            "object_key": object_key,
+            "mime_type": "image/png",
+            "size_bytes": size_bytes,
+        }, ""
+    except (BotoCoreError, ClientError, OSError):
+        return {}, "Unable to upload the converted slide."
 
 
 def build_private_curriculum_asset_url(
@@ -1093,5 +1198,7 @@ __all__ = [
     "build_private_candidate_document_url",
     "delete_private_candidate_document",
     "upload_private_curriculum_asset",
+    "download_private_curriculum_object",
+    "upload_private_curriculum_rendition",
     "build_private_curriculum_asset_url",
 ]

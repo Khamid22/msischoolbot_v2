@@ -14,6 +14,7 @@ class CurriculumItemType(StrEnum):
 
 
 class CurriculumRecordStatus(StrEnum):
+    DRAFT = "draft"
     ACTIVE = "active"
     ARCHIVED = "archived"
 
@@ -28,13 +29,50 @@ class CurriculumContentBlockType(StrEnum):
     HEADING = "heading"
     PARAGRAPH = "paragraph"
     BULLETS = "bullets"
+    CHECKLIST = "checklist"
     NOTE = "note"
+    QUOTE = "quote"
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
+    DOCUMENT = "document"
+    PRESENTATION = "presentation"
+    EMBED = "embed"
+    LINK = "link"
+
+
+class CurriculumAssetRenderKind(StrEnum):
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
+    DOCUMENT = "document"
+    PRESENTATION = "presentation"
+    EMBED = "embed"
+    LINK = "link"
+
+
+class CurriculumConversionStatus(StrEnum):
+    NOT_REQUIRED = "not_required"
+    PENDING = "pending"
+    PROCESSING = "processing"
+    READY = "ready"
+    FAILED = "failed"
+
+
+class CurriculumRevisionState(StrEnum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    SUPERSEDED = "superseded"
+    ABANDONED = "abandoned"
 
 
 __all__ = [
     "CurriculumAssetKind",
+    "CurriculumAssetRenderKind",
     "CurriculumContentBlockType",
+    "CurriculumConversionStatus",
     "CurriculumItemType",
     "CurriculumRecordStatus",
+    "CurriculumRevisionState",
     "CurriculumVariant",
 ]

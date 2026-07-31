@@ -35,6 +35,9 @@ from backend.modules.people.academic_director.contracts import (
     update_fundamentals_item,
     upload_fundamentals_file_asset,
 )
+from backend.modules.people.academic_director.workspace.curriculum_draft_api import (
+    router as draft_router,
+)
 
 CurrentUserDep = Annotated[CurrentUser, Depends(get_current_user)]
 
@@ -54,6 +57,7 @@ router = APIRouter(
     prefix="/subject-curricula",
     dependencies=[Depends(_require_curriculum_management)],
 )
+router.include_router(draft_router)
 
 
 def _error(exc: Exception) -> HTTPException:

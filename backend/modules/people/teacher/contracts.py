@@ -10,6 +10,7 @@ from backend.modules.domains.academics.contracts import (
     SubjectCurriculumCatalog,
     acknowledge_teacher_curriculum_view,
     curriculum_asset_url_for_teacher,
+    curriculum_slide_url,
     get_teacher_subject_curriculum,
     list_teacher_subject_curricula,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "SubjectCurriculumCatalog",
     "acknowledge_teacher_curriculum_view",
     "curriculum_asset_url_for_teacher",
+    "curriculum_slide_url",
     "current_auth_login",
     "current_teacher_id",
     "current_teacher_staff_id",

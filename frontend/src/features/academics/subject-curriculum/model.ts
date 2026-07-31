@@ -1,11 +1,40 @@
 export type CurriculumVariantKey = "fundamentals" | "primary";
 export type CurriculumItemType = "lesson" | "exam";
-export type CurriculumBlockType = "heading" | "paragraph" | "bullets" | "note";
+export type CurriculumBlockType =
+  | "heading"
+  | "paragraph"
+  | "bullets"
+  | "checklist"
+  | "note"
+  | "quote"
+  | "image"
+  | "video"
+  | "audio"
+  | "document"
+  | "presentation"
+  | "embed"
+  | "link";
 export type CurriculumAssetKind = "file" | "link" | "video";
+export type CurriculumAssetRenderKind =
+  | "image"
+  | "video"
+  | "audio"
+  | "document"
+  | "presentation"
+  | "embed"
+  | "link";
+export type CurriculumConversionStatus =
+  | "not_required"
+  | "pending"
+  | "processing"
+  | "ready"
+  | "failed";
 
 export interface CurriculumContentBlock {
   blockType: CurriculumBlockType;
+  blockKey: string;
   text: string;
+  assetId?: number;
 }
 
 export interface LessonGuidanceSection {
@@ -36,15 +65,32 @@ export const EMPTY_LESSON_GUIDANCE: LessonGuidanceDocument = {
 export interface CurriculumAsset {
   assetId: number;
   assetKind: CurriculumAssetKind;
+  renderKind: CurriculumAssetRenderKind;
   title: string;
   externalUrl: string;
+  previewUrl: string;
   downloadUrl: string;
   originalFileName: string;
   mimeType: string;
   sizeBytes: number;
   displayOrder: number;
+  placementVersion: number;
+  conversionStatus: CurriculumConversionStatus;
+  conversionError: string;
+  conversionAttempts: number;
+  slides: CurriculumAssetRendition[];
   status: "active" | "archived";
   version: number;
+}
+
+export interface CurriculumAssetRendition {
+  renditionId: number;
+  slideNumber: number;
+  previewUrl: string;
+  mimeType: string;
+  sizeBytes: number;
+  width: number;
+  height: number;
 }
 
 export interface CurriculumItem {
@@ -103,7 +149,21 @@ export interface CurriculumDetail {
 export interface FundamentalsLessonWrite {
   title: string;
   guidance: LessonGuidanceDocument;
-  expectedVersion?: number;
+  expectedRevisionVersion: number;
+}
+
+export interface CurriculumLessonDraft {
+  draftId: number;
+  itemId: number;
+  subjectId: number;
+  state: "draft";
+  title: string;
+  guidance: LessonGuidanceDocument;
+  assets: CurriculumAsset[];
+  baseItemVersion: number;
+  revisionVersion: number;
+  isNew: boolean;
+  updatedAt: string;
 }
 
 interface ApiEnvelope<T> {

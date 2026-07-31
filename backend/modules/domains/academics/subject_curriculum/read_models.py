@@ -7,16 +7,28 @@ from datetime import datetime
 
 from backend.modules.domains.academics.subject_curriculum.domain_types import (
     CurriculumAssetKind,
+    CurriculumAssetRenderKind,
+    CurriculumContentBlockType,
+    CurriculumConversionStatus,
     CurriculumItemType,
     CurriculumRecordStatus,
 )
 from backend.modules.domains.academics.subject_curriculum.schemas import (
     CurriculumAsset,
+    CurriculumAssetRendition,
     CurriculumContentBlock,
     CurriculumItem,
     LessonGuidanceDocument,
     LessonGuidanceSection,
 )
+
+
+def _value(row, key: str, default=None):
+    try:
+        value = row[key]
+    except (KeyError, TypeError):
+        return default
+    return default if value is None else value
 
 
 def _as_iso(value: object) -> str:
@@ -103,8 +115,37 @@ def _guidance_document(row) -> LessonGuidanceDocument:
     return _legacy_guidance_document(row)
 
 
-def _assets_by_item(rows, url_prefix: str) -> dict[int, list[CurriculumAsset]]:
+def guidance_from_row(row) -> LessonGuidanceDocument:
+    """Map stored guidance while preserving pre-constructor legacy content."""
+    return _guidance_document(row)
+
+
+def _renditions_by_asset(rows, url_prefix: str) -> dict[int, list[CurriculumAssetRendition]]:
+    grouped: dict[int, list[CurriculumAssetRendition]] = defaultdict(list)
+    for row in rows:
+        asset_id = int(row["asset_id"])
+        slide_number = int(row["slide_number"])
+        grouped[asset_id].append(
+            CurriculumAssetRendition(
+                rendition_id=int(row["rendition_id"]),
+                slide_number=slide_number,
+                preview_url=f"{url_prefix}/{asset_id}/slides/{slide_number}/open",
+                mime_type=str(row["mime_type"] or ""),
+                size_bytes=int(row["size_bytes"] or 0),
+                width=int(row["width"] or 0),
+                height=int(row["height"] or 0),
+            )
+        )
+    return grouped
+
+
+def _assets_by_item(
+    rows,
+    rendition_rows,
+    url_prefix: str,
+) -> dict[int, list[CurriculumAsset]]:
     grouped: dict[int, list[CurriculumAsset]] = defaultdict(list)
+    renditions = _renditions_by_asset(rendition_rows, url_prefix)
     for row in rows:
         asset_id = int(row["asset_id"])
         is_file = str(row["asset_kind"]) == CurriculumAssetKind.FILE
@@ -112,13 +153,32 @@ def _assets_by_item(rows, url_prefix: str) -> dict[int, list[CurriculumAsset]]:
             CurriculumAsset(
                 asset_id=asset_id,
                 asset_kind=CurriculumAssetKind(str(row["asset_kind"])),
+                render_kind=CurriculumAssetRenderKind(
+                    str(_value(row, "render_kind", CurriculumAssetRenderKind.DOCUMENT))
+                ),
                 title=str(row["title"] or ""),
                 external_url=str(row["external_url"] or ""),
-                download_url=f"{url_prefix}/{asset_id}/open" if is_file else "",
+                preview_url=f"{url_prefix}/{asset_id}/open" if is_file else "",
+                download_url=(
+                    f"{url_prefix}/{asset_id}/open?download=true" if is_file else ""
+                ),
                 original_file_name=str(row["original_file_name"] or ""),
                 mime_type=str(row["mime_type"] or ""),
                 size_bytes=int(row["size_bytes"] or 0),
                 display_order=int(row["display_order"] or 1),
+                placement_version=int(_value(row, "placement_version", 1)),
+                conversion_status=CurriculumConversionStatus(
+                    str(
+                        _value(
+                            row,
+                            "conversion_status",
+                            CurriculumConversionStatus.NOT_REQUIRED,
+                        )
+                    )
+                ),
+                conversion_error=str(_value(row, "conversion_error", "")),
+                conversion_attempts=int(_value(row, "conversion_attempts", 0)),
+                slides=renditions.get(asset_id, []),
                 status=CurriculumRecordStatus(str(row["status"])),
                 version=int(row["version"] or 1),
             )
@@ -126,8 +186,80 @@ def _assets_by_item(rows, url_prefix: str) -> dict[int, list[CurriculumAsset]]:
     return grouped
 
 
-def items_from_rows(rows, asset_rows, *, url_prefix: str) -> list[CurriculumItem]:
-    assets = _assets_by_item(asset_rows, url_prefix)
+def assets_from_rows(rows, rendition_rows, *, url_prefix: str) -> list[CurriculumAsset]:
+    grouped = _assets_by_item(rows, rendition_rows, url_prefix)
+    return [
+        asset
+        for item_assets in grouped.values()
+        for asset in item_assets
+    ]
+
+
+def _with_legacy_materials(
+    guidance: LessonGuidanceDocument,
+    item_assets: list[CurriculumAsset],
+) -> LessonGuidanceDocument:
+    all_blocks = [
+        *guidance.before_teaching,
+        *[
+            block
+            for section in guidance.sections
+            for block in [*section.planning_blocks, *section.teaching_blocks]
+        ],
+    ]
+    referenced_ids = {
+        int(block.asset_id) for block in all_blocks if block.asset_id is not None
+    }
+    missing = [asset for asset in item_assets if asset.asset_id not in referenced_ids]
+    if not missing:
+        return guidance
+    material_blocks = [
+        CurriculumContentBlock(
+            block_key=f"legacy-material-{asset.asset_id}",
+            block_type=CurriculumContentBlockType(asset.render_kind.value),
+            asset_id=asset.asset_id,
+            text=asset.title,
+        )
+        for asset in missing
+    ]
+    if any(
+        section.section_key == "legacy-materials"
+        for section in guidance.sections
+    ):
+        sections = [
+            section.model_copy(
+                update={
+                    "planning_blocks": [
+                        *section.planning_blocks,
+                        *material_blocks,
+                    ]
+                }
+            )
+            if section.section_key == "legacy-materials"
+            else section
+            for section in guidance.sections
+        ]
+    else:
+        sections = [
+            *guidance.sections,
+            LessonGuidanceSection(
+                section_key="legacy-materials",
+                title="Materials",
+                planning_blocks=material_blocks,
+                teaching_blocks=[],
+            ),
+        ]
+    return guidance.model_copy(update={"sections": sections})
+
+
+def items_from_rows(
+    rows,
+    asset_rows,
+    rendition_rows=None,
+    *,
+    url_prefix: str,
+) -> list[CurriculumItem]:
+    assets = _assets_by_item(asset_rows, rendition_rows or [], url_prefix)
     return [
         CurriculumItem(
             item_id=int(row["item_id"]),
@@ -142,7 +274,10 @@ def items_from_rows(rows, asset_rows, *, url_prefix: str) -> list[CurriculumItem
             lesson_count=str(row["lesson_count"] or ""),
             duration_hours=str(row["duration_hours"] or ""),
             content_blocks=_content_blocks(row["content_json"]),
-            guidance=_guidance_document(row),
+            guidance=_with_legacy_materials(
+                _guidance_document(row),
+                assets.get(int(row["item_id"]), []),
+            ),
             assets=assets.get(int(row["item_id"]), []),
             status=CurriculumRecordStatus(str(row["status"])),
             version=int(row["version"] or 1),
@@ -152,4 +287,4 @@ def items_from_rows(rows, asset_rows, *, url_prefix: str) -> list[CurriculumItem
     ]
 
 
-__all__ = ["items_from_rows"]
+__all__ = ["assets_from_rows", "items_from_rows"]

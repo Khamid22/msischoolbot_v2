@@ -7,24 +7,46 @@ from pydantic import Field, field_validator, model_validator
 from backend.core.api import ApiModel
 from backend.modules.domains.academics.subject_curriculum.domain_types import (
     CurriculumAssetKind,
+    CurriculumAssetRenderKind,
     CurriculumContentBlockType,
+    CurriculumConversionStatus,
     CurriculumItemType,
     CurriculumRecordStatus,
+    CurriculumRevisionState,
     CurriculumVariant,
 )
 
 
 class CurriculumContentBlock(ApiModel):
     block_type: CurriculumContentBlockType
-    text: str = Field(min_length=1, max_length=10_000)
+    block_key: str = Field(default="", max_length=80)
+    text: str = Field(default="", max_length=10_000)
+    asset_id: int | None = Field(default=None, ge=1)
 
-    @field_validator("text")
+    @field_validator("block_key", "text")
     @classmethod
     def normalize_text(cls, value: str) -> str:
-        normalized = value.strip()
-        if not normalized:
+        return value.strip()
+
+    @model_validator(mode="after")
+    def validate_block_content(self):
+        media_types = {
+            CurriculumContentBlockType.IMAGE,
+            CurriculumContentBlockType.VIDEO,
+            CurriculumContentBlockType.AUDIO,
+            CurriculumContentBlockType.DOCUMENT,
+            CurriculumContentBlockType.PRESENTATION,
+            CurriculumContentBlockType.EMBED,
+            CurriculumContentBlockType.LINK,
+        }
+        if self.block_type in media_types:
+            if self.asset_id is None:
+                raise ValueError("Media blocks require an attached asset.")
+        elif not self.text:
             raise ValueError("Content cannot be empty.")
-        return normalized
+        if self.block_key and not self.block_key.replace("-", "").replace("_", "").isalnum():
+            raise ValueError("Block keys may contain letters, numbers, dashes, and underscores.")
+        return self
 
 
 class LessonGuidanceSection(ApiModel):
@@ -57,14 +79,6 @@ class LessonGuidanceSection(ApiModel):
             raise ValueError("A section title is required.")
         return normalized
 
-    @model_validator(mode="after")
-    def reject_nested_headings(self):
-        blocks = [*self.planning_blocks, *self.teaching_blocks]
-        if any(block.block_type is CurriculumContentBlockType.HEADING for block in blocks):
-            raise ValueError("Section titles replace heading content blocks.")
-        return self
-
-
 class LessonGuidanceDocument(ApiModel):
     overview: str = Field(default="", max_length=4_000)
     tags: list[str] = Field(default_factory=list, max_length=8)
@@ -94,11 +108,6 @@ class LessonGuidanceDocument(ApiModel):
 
     @model_validator(mode="after")
     def validate_document_structure(self):
-        if any(
-            block.block_type is CurriculumContentBlockType.HEADING
-            for block in self.before_teaching
-        ):
-            raise ValueError("Before You Teach does not accept heading blocks.")
         section_keys = [section.section_key for section in self.sections]
         if len(section_keys) != len(set(section_keys)):
             raise ValueError("Lesson section keys must be unique.")
@@ -108,15 +117,32 @@ class LessonGuidanceDocument(ApiModel):
 class CurriculumAsset(ApiModel):
     asset_id: int
     asset_kind: CurriculumAssetKind
+    render_kind: CurriculumAssetRenderKind = CurriculumAssetRenderKind.DOCUMENT
     title: str
     external_url: str = ""
+    preview_url: str = ""
     download_url: str = ""
     original_file_name: str = ""
     mime_type: str = ""
     size_bytes: int = 0
     display_order: int = 1
+    placement_version: int = 1
+    conversion_status: CurriculumConversionStatus = CurriculumConversionStatus.NOT_REQUIRED
+    conversion_error: str = ""
+    conversion_attempts: int = 0
+    slides: list["CurriculumAssetRendition"] = Field(default_factory=list)
     status: CurriculumRecordStatus = CurriculumRecordStatus.ACTIVE
     version: int = 1
+
+
+class CurriculumAssetRendition(ApiModel):
+    rendition_id: int
+    slide_number: int
+    preview_url: str
+    mime_type: str
+    size_bytes: int = 0
+    width: int = 0
+    height: int = 0
 
 
 class CurriculumItem(ApiModel):
@@ -245,6 +271,38 @@ class FundamentalsLessonWrite(ApiModel):
         return normalized
 
 
+class CurriculumLessonDraft(ApiModel):
+    draft_id: int
+    item_id: int
+    subject_id: int
+    state: CurriculumRevisionState = CurriculumRevisionState.DRAFT
+    title: str
+    guidance: LessonGuidanceDocument = Field(default_factory=LessonGuidanceDocument)
+    assets: list[CurriculumAsset] = Field(default_factory=list)
+    base_item_version: int
+    revision_version: int
+    is_new: bool = False
+    updated_at: str = ""
+
+
+class CurriculumDraftStartRequest(ApiModel):
+    item_id: int | None = Field(default=None, ge=1)
+
+
+class FundamentalsLessonPublish(ApiModel):
+    title: str = Field(min_length=1, max_length=300)
+    guidance: LessonGuidanceDocument = Field(default_factory=LessonGuidanceDocument)
+    expected_revision_version: int = Field(ge=1)
+
+    @field_validator("title")
+    @classmethod
+    def normalize_title(cls, value: str) -> str:
+        normalized = " ".join(value.strip().split())
+        if not normalized:
+            raise ValueError("A lesson title is required.")
+        return normalized
+
+
 class CurriculumReorderRequest(ApiModel):
     item_ids: list[int] = Field(min_length=1)
     expected_curriculum_version: int = Field(ge=1)
@@ -261,6 +319,7 @@ class CurriculumRestoreRequest(ApiModel):
 
 class CurriculumExternalAssetWrite(ApiModel):
     asset_kind: CurriculumAssetKind
+    render_kind: CurriculumAssetRenderKind = CurriculumAssetRenderKind.LINK
     title: str = Field(min_length=1, max_length=200)
     external_url: str = Field(min_length=8, max_length=2_000)
 
@@ -269,6 +328,20 @@ class CurriculumExternalAssetWrite(ApiModel):
     def require_external_kind(cls, value: CurriculumAssetKind) -> CurriculumAssetKind:
         if value not in {CurriculumAssetKind.LINK, CurriculumAssetKind.VIDEO}:
             raise ValueError("Only link or video assets use an external URL.")
+        return value
+
+    @field_validator("render_kind")
+    @classmethod
+    def require_external_render_kind(
+        cls,
+        value: CurriculumAssetRenderKind,
+    ) -> CurriculumAssetRenderKind:
+        if value not in {
+            CurriculumAssetRenderKind.LINK,
+            CurriculumAssetRenderKind.EMBED,
+            CurriculumAssetRenderKind.VIDEO,
+        }:
+            raise ValueError("External assets must be links, embeds, or videos.")
         return value
 
     @field_validator("external_url")
@@ -288,15 +361,19 @@ class CurriculumViewAcknowledgement(ApiModel):
 __all__ = [
     "CurriculumArchiveRequest",
     "CurriculumAsset",
+    "CurriculumAssetRendition",
     "CurriculumContentBlock",
     "CurriculumDetail",
+    "CurriculumDraftStartRequest",
     "CurriculumExternalAssetWrite",
     "CurriculumItem",
+    "CurriculumLessonDraft",
     "CurriculumReorderRequest",
     "CurriculumRestoreRequest",
     "CurriculumVariantSummary",
     "CurriculumViewAcknowledgement",
     "FundamentalsLessonWrite",
+    "FundamentalsLessonPublish",
     "LessonGuidanceDocument",
     "LessonGuidanceSection",
     "SubjectCurriculumCatalog",
