@@ -27,10 +27,17 @@ export default defineConfig(() => ({
     cssCodeSplit: false,
     rollupOptions: {
       output: {
+        // The backend renders the authenticated HTML shell while the frontend
+        // service owns these assets. Stable entry names let the two services
+        // deploy independently; lazy chunks remain content-addressed.
+        entryFileNames: "app.js",
         // Add content hash so browsers can cache chunks indefinitely.
         // The hash changes only when the chunk content changes.
         chunkFileNames: "chunks/[name]-[hash].js",
-        assetFileNames: "assets/[name]-[hash][extname]",
+        assetFileNames: (assetInfo) =>
+          assetInfo.name?.endsWith(".css")
+            ? "app.css"
+            : "assets/[name]-[hash][extname]",
         // Reduce request fan-out on high-latency/mobile networks by grouping
         // many tiny node_modules chunks into a few stable vendor chunks.
         manualChunks: (id) => {

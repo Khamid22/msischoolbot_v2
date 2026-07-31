@@ -80,6 +80,8 @@ def _release_bot_polling_lock(connection, bot_token):
 
 
 async def _wait_for_bot_polling_lock(bot_token):
+    from backend.application.bot_health import BOT_HEALTH_STATE
+
     waiting_logged = False
     while True:
         try:
@@ -90,9 +92,11 @@ async def _wait_for_bot_polling_lock(bot_token):
             )
             connection = None
         if connection is not None:
+            BOT_HEALTH_STATE.set_polling_state("leader")
             if waiting_logged:
                 logging.info("Telegram polling leadership acquired.")
             return connection
+        BOT_HEALTH_STATE.set_polling_state("standby")
         if not waiting_logged:
             logging.warning(
                 "Another application instance owns Telegram polling; waiting for leadership."
@@ -234,6 +238,7 @@ async def run_bot():
     from aiogram.enums import ParseMode
     from aiogram.types import BotCommand, MenuButtonWebApp, WebAppInfo
 
+    from backend.application.bot_health import BOT_HEALTH_STATE
     from tgbot.routing import BOT_ROUTERS
     from tgbot.settings import settings as bot_settings
 
@@ -272,8 +277,10 @@ async def run_bot():
 
         # Preserve queued invite commands across deploys, then long-poll.
         await bot.delete_webhook(drop_pending_updates=False)
+        BOT_HEALTH_STATE.set_polling_state("active")
         await dp.start_polling(bot)
     finally:
+        BOT_HEALTH_STATE.set_polling_state("stopped")
         if bot is not None:
             await bot.session.close()
         _release_bot_polling_lock(polling_lock, bot_settings.bot_token)
@@ -314,7 +321,17 @@ if __name__ == "__main__":
     if run_mode == "web":
         run_web_server()
     elif run_mode == "bot":
-        asyncio.run(run_bot())
+        from backend.application.bot_health import start_bot_health_server
+
+        health_settings = get_web_settings()
+        health_server = start_bot_health_server(
+            host=health_settings.web_host,
+            port=health_settings.web_port,
+        )
+        try:
+            asyncio.run(run_bot())
+        finally:
+            health_server.close()
     elif run_mode == "worker":
         from backend.application.worker import run_worker
         from backend.application.worker_health import start_worker_health_server

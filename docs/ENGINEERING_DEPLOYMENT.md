@@ -18,7 +18,25 @@ entry flow. The worker claims typed outbox jobs in bounded PostgreSQL batches an
 handlers.
 
 Deploy web, bot, and worker as independent services sharing PostgreSQL. Do not run durable job
-polling inside a web replica.
+polling inside a web replica. The LMS services use the `FastAPI-Run-System` branch and Railway's
+`development` environment; the Railway `main` environment is out of scope.
+
+## Railway Service Topology
+
+The LMS is deployed from one repository and branch. Services are process boundaries, not Git
+branches:
+
+```text
+LMS-Frontend     -> public ingress, React assets, same-origin backend proxy
+LMS-Backend      -> FastAPI, database migrations, embedded curriculum conversion
+LMS-Telegram-Bot -> aiogram polling and its internal readiness endpoint
+finance-worker   -> existing payment worker; managed separately
+Postgres         -> shared system of record
+```
+
+Each LMS service selects its matching file under `deploy/` as its Railway config-as-code path.
+Only the backend configuration runs Alembic. The frontend receives no application secrets and the
+bot has no public domain.
 
 ## Database Deployment
 
@@ -107,6 +125,8 @@ credentials in Git or documentation.
 
 Smoke-test the bot portal-entry command and one controlled worker job before release.
 
-## Production Branch Rule
+## Protected Environment Rule
 
-Production branch `main` is read-only during rewrite work. Do not merge, push, migrate, or deploy production as part of architecture cleanup without explicit release approval.
+GitHub and Railway `main` are read-only during rewrite work. LMS releases use the
+`FastAPI-Run-System` branch and Railway `development` environment. Do not merge, push, migrate, or
+deploy `main` as part of architecture cleanup without explicit release approval.

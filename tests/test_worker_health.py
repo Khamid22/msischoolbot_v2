@@ -33,6 +33,7 @@ def test_lms_image_includes_curriculum_presentation_tools():
 
     assert "ARG RAILWAY_SERVICE_NAME" in dockerfile
     assert '[ "$RAILWAY_SERVICE_NAME" = "MSI-LMS-Portal" ]' in dockerfile
+    assert '[ "$RAILWAY_SERVICE_NAME" = "LMS-Backend" ]' in dockerfile
     assert '[ "$RAILWAY_SERVICE_NAME" = "curriculum-worker" ]' not in dockerfile
     assert "libreoffice-impress" in dockerfile
     assert "poppler-utils" in dockerfile
