@@ -119,9 +119,10 @@ test("Fundamentals lesson details use the teacher-guidance interaction design", 
   assert.match(teacherCurriculum, /curriculumKey === "fundamentals"/);
   assert.match(directorCurriculum, /useGuidanceLayout=\{isEditable\}/);
   assert.match(fundamentalsGuidance, /Teacher Guidance/);
-  assert.match(fundamentalsGuidance, /Before You Teach/);
   assert.match(fundamentalsGuidance, /Planning/);
   assert.match(fundamentalsGuidance, /Teaching/);
+  assert.match(fundamentalsGuidance, /block\.blockType !== "instruction"/);
+  assert.match(fundamentalsGuidance, /block\.blockType === "instruction"/);
   assert.match(fundamentalsGuidance, /Expand all/);
   assert.match(fundamentalsGuidance, /Collapse all/);
   assert.match(fundamentalsGuidance, /role="switch"/);
@@ -131,13 +132,15 @@ test("Fundamentals lesson details use the teacher-guidance interaction design", 
 
 test("Fundamentals is a lesson constructor rather than a curriculum-row form", () => {
   assert.match(fundamentalsIdentity, /Lesson identity/);
-  assert.match(fundamentalsEditor, /Before You Teach/);
   assert.match(fundamentalsEditor, /Lesson flow/);
-  assert.match(fundamentalsEditor, /Planning content/);
-  assert.match(fundamentalsEditor, /Teaching content/);
+  assert.match(fundamentalsEditor, /Section blocks/);
   assert.match(fundamentalsEditor, /Teacher Preview/);
   assert.match(fundamentalsEditor, /beforeunload/);
+  assert.doesNotMatch(fundamentalsEditor, /Before You Teach/);
+  assert.doesNotMatch(fundamentalsEditor, /Planning content/);
+  assert.doesNotMatch(fundamentalsEditor, /Teaching content/);
   for (const blockLabel of [
+    "Teacher Instruction",
     "Heading",
     "Text",
     "Bullet list",

@@ -19,6 +19,9 @@ from backend.modules.domains.academics.subject_curriculum.domain_types import (
     CurriculumAssetRenderKind,
     CurriculumVariant,
 )
+from backend.modules.domains.academics.subject_curriculum.draft_models import (
+    media_placements,
+)
 from backend.modules.domains.academics.subject_curriculum.exceptions import (
     CurriculumValidationError,
 )
@@ -113,16 +116,13 @@ def test_lesson_write_models_normalize_content_and_reject_insecure_assets():
         guidance=LessonGuidanceDocument(
             overview="  Prepare students to read with purpose.  ",
             tags=[" Study skills ", "Study skills"],
-            before_teaching=[
-                CurriculumContentBlock(block_type="paragraph", text="  Open the text.  ")
-            ],
             sections=[
                 LessonGuidanceSection(
                     section_key="guided-reading",
                     title="  Guided reading  ",
-                    planning_blocks=[
+                    blocks=[
                         CurriculumContentBlock(
-                            block_type="bullets",
+                            block_type="instruction",
                             text="  Read actively.  ",
                         )
                     ],
@@ -134,7 +134,7 @@ def test_lesson_write_models_normalize_content_and_reject_insecure_assets():
     assert lesson.guidance.overview == "Prepare students to read with purpose."
     assert lesson.guidance.tags == ["Study skills"]
     assert lesson.guidance.sections[0].title == "Guided reading"
-    assert lesson.guidance.sections[0].planning_blocks[0].text == "Read actively."
+    assert lesson.guidance.sections[0].blocks[0].text == "Read actively."
     payload = lesson.model_dump(mode="json", by_alias=True)
     assert payload["guidance"]["durationMinutes"] == 0
     assert payload["guidance"]["sections"][0]["sectionKey"] == "guided-reading"
@@ -168,6 +168,83 @@ def test_media_blocks_require_assets_and_keep_stable_camel_case_keys():
         "text": "Model dialogue",
         "assetId": 17,
     }
+
+    with pytest.raises(ValidationError, match="cannot reference an asset"):
+        CurriculumContentBlock(
+            block_type="instruction",
+            block_key="private-instruction",
+            text="Prepare the examples.",
+            asset_id=17,
+        )
+
+
+def test_legacy_guidance_combines_columns_and_moves_preparation_without_data_loss():
+    guidance = LessonGuidanceDocument.model_validate(
+        {
+            "beforeTeaching": [
+                {"blockType": "paragraph", "text": "Open the room early."},
+            ],
+            "sections": [
+                {
+                    "sectionKey": "starter",
+                    "title": "Starter",
+                    "planningBlocks": [
+                        {"blockType": "note", "text": "Model it first."},
+                    ],
+                    "teachingBlocks": [
+                        {"blockType": "quote", "text": "Try it together."},
+                    ],
+                }
+            ],
+        }
+    )
+
+    assert [section.title for section in guidance.sections] == [
+        "Preparation",
+        "Starter",
+    ]
+    assert guidance.sections[0].blocks[0].block_type.value == "paragraph"
+    assert [block.text for block in guidance.sections[1].blocks] == [
+        "Model it first.",
+        "Try it together.",
+    ]
+    payload = guidance.model_dump(mode="json", by_alias=True)
+    assert "beforeTeaching" not in payload
+    assert "planningBlocks" not in payload["sections"][1]
+    assert "teachingBlocks" not in payload["sections"][1]
+
+
+def test_single_flow_media_placements_keep_instruction_and_media_in_one_order():
+    guidance = LessonGuidanceDocument(
+        sections=[
+            LessonGuidanceSection(
+                section_key="starter",
+                title="Starter",
+                blocks=[
+                    CurriculumContentBlock(
+                        block_type="instruction",
+                        block_key="starter-instruction",
+                        text="Prepare the board.",
+                    ),
+                    CurriculumContentBlock(
+                        block_type="image",
+                        block_key="starter-image",
+                        text="Classroom prompt",
+                        asset_id=19,
+                    ),
+                ],
+            )
+        ]
+    )
+
+    assert media_placements(guidance) == [
+        {
+            "asset_id": 19,
+            "block_key": "starter-image",
+            "section_key": "starter",
+            "content_area": "teaching",
+        }
+    ]
 
 
 @pytest.mark.parametrize(
@@ -208,19 +285,14 @@ def test_external_materials_are_normalized_for_safe_rendering(
 def test_presentation_worker_topic_is_registered_and_limits_slide_count(monkeypatch, tmp_path):
     assert CONVERT_PRESENTATION_HANDLER.topic == CONVERT_PRESENTATION_TOPIC
     assert CONVERT_PRESENTATION_TOPIC == "academics.convert_curriculum_presentation"
-    assert (
-        build_job_handler_registry().handler_for(CONVERT_PRESENTATION_TOPIC)
-        is not None
-    )
+    assert build_job_handler_registry().handler_for(CONVERT_PRESENTATION_TOPIC) is not None
 
     monkeypatch.setattr(
-        "backend.modules.domains.academics.subject_curriculum."
-        "presentation_conversion._run",
+        "backend.modules.domains.academics.subject_curriculum.presentation_conversion._run",
         lambda _command: f"Pages: {MAX_PRESENTATION_SLIDES + 1}\n",
     )
     monkeypatch.setattr(
-        "backend.modules.domains.academics.subject_curriculum."
-        "presentation_conversion._binary",
+        "backend.modules.domains.academics.subject_curriculum.presentation_conversion._binary",
         lambda name: name,
     )
     with pytest.raises(RuntimeError, match="at most 200 slides"):
@@ -275,7 +347,7 @@ def test_legacy_fundamentals_blocks_map_into_the_constructor_without_data_loss()
 
     assert item.guidance.overview == "Legacy overview"
     assert item.guidance.sections[0].title == "Starter"
-    assert item.guidance.sections[0].planning_blocks[0].text == "Welcome the class."
+    assert item.guidance.sections[0].blocks[0].text == "Welcome the class."
 
 
 def test_legacy_write_payload_is_upgraded_without_exposing_row_fields():
@@ -295,7 +367,7 @@ def test_legacy_write_payload_is_upgraded_without_exposing_row_fields():
 
     assert lesson.guidance.overview == "Legacy overview"
     assert lesson.guidance.sections[0].title == "Practice"
-    assert lesson.guidance.sections[0].planning_blocks[0].text == "Model the activity."
+    assert lesson.guidance.sections[0].blocks[0].text == "Model the activity."
     assert "bookPages" not in lesson.model_dump(mode="json", by_alias=True)
 
 
@@ -311,9 +383,9 @@ def test_teacher_curriculum_query_requires_active_teacher_and_subject_assignment
 
 
 def test_curriculum_migration_is_additive_and_seeds_only_supplemental_data():
-    source = Path(
-        "database/alembic/versions/0052_teacher_subject_curricula.py"
-    ).read_text(encoding="utf-8")
+    source = Path("database/alembic/versions/0052_teacher_subject_curricula.py").read_text(
+        encoding="utf-8"
+    )
     upgrade = source.split("def downgrade", 1)[0].upper()
 
     assert 'revision = "0052_teacher_curricula"' in source

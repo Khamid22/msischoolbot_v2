@@ -53,7 +53,7 @@ def _content_blocks(raw_value: object) -> list[CurriculumContentBlock]:
 
 def _legacy_guidance_document(row) -> LessonGuidanceDocument:
     blocks = _content_blocks(row["content_json"])
-    before_teaching: list[CurriculumContentBlock] = []
+    ungrouped_blocks: list[CurriculumContentBlock] = []
     sections: list[LessonGuidanceSection] = []
     current_title = ""
     current_blocks: list[CurriculumContentBlock] = []
@@ -64,7 +64,7 @@ def _legacy_guidance_document(row) -> LessonGuidanceDocument:
                     LessonGuidanceSection(
                         section_key=f"legacy-section-{len(sections) + 1}",
                         title=current_title,
-                        planning_blocks=current_blocks,
+                        blocks=current_blocks,
                     )
                 )
             current_title = block.text
@@ -72,27 +72,26 @@ def _legacy_guidance_document(row) -> LessonGuidanceDocument:
         elif current_title:
             current_blocks.append(block)
         else:
-            before_teaching.append(block)
+            ungrouped_blocks.append(block)
     if current_title:
         sections.append(
             LessonGuidanceSection(
                 section_key=f"legacy-section-{len(sections) + 1}",
                 title=current_title,
-                planning_blocks=current_blocks,
+                blocks=current_blocks,
             )
         )
-    elif before_teaching:
-        sections.append(
+    if ungrouped_blocks:
+        sections.insert(
+            0,
             LessonGuidanceSection(
-                section_key="legacy-section-1",
-                title="Lesson guidance",
-                planning_blocks=before_teaching,
-            )
+                section_key="legacy-preparation",
+                title="Preparation",
+                blocks=ungrouped_blocks,
+            ),
         )
-        before_teaching = []
     return LessonGuidanceDocument(
         overview=str(row["specification_points"] or ""),
-        before_teaching=before_teaching,
         sections=sections,
     )
 
@@ -102,13 +101,7 @@ def _guidance_document(row) -> LessonGuidanceDocument:
     if isinstance(raw_value, dict) and raw_value:
         try:
             document = LessonGuidanceDocument.model_validate(raw_value)
-            if (
-                document.overview
-                or document.tags
-                or document.duration_minutes
-                or document.before_teaching
-                or document.sections
-            ):
+            if document.overview or document.tags or document.duration_minutes or document.sections:
                 return document
         except (TypeError, ValueError):
             pass
@@ -159,9 +152,7 @@ def _assets_by_item(
                 title=str(row["title"] or ""),
                 external_url=str(row["external_url"] or ""),
                 preview_url=f"{url_prefix}/{asset_id}/open" if is_file else "",
-                download_url=(
-                    f"{url_prefix}/{asset_id}/open?download=true" if is_file else ""
-                ),
+                download_url=(f"{url_prefix}/{asset_id}/open?download=true" if is_file else ""),
                 original_file_name=str(row["original_file_name"] or ""),
                 mime_type=str(row["mime_type"] or ""),
                 size_bytes=int(row["size_bytes"] or 0),
@@ -188,28 +179,15 @@ def _assets_by_item(
 
 def assets_from_rows(rows, rendition_rows, *, url_prefix: str) -> list[CurriculumAsset]:
     grouped = _assets_by_item(rows, rendition_rows, url_prefix)
-    return [
-        asset
-        for item_assets in grouped.values()
-        for asset in item_assets
-    ]
+    return [asset for item_assets in grouped.values() for asset in item_assets]
 
 
 def _with_legacy_materials(
     guidance: LessonGuidanceDocument,
     item_assets: list[CurriculumAsset],
 ) -> LessonGuidanceDocument:
-    all_blocks = [
-        *guidance.before_teaching,
-        *[
-            block
-            for section in guidance.sections
-            for block in [*section.planning_blocks, *section.teaching_blocks]
-        ],
-    ]
-    referenced_ids = {
-        int(block.asset_id) for block in all_blocks if block.asset_id is not None
-    }
+    all_blocks = [block for section in guidance.sections for block in section.blocks]
+    referenced_ids = {int(block.asset_id) for block in all_blocks if block.asset_id is not None}
     missing = [asset for asset in item_assets if asset.asset_id not in referenced_ids]
     if not missing:
         return guidance
@@ -222,15 +200,12 @@ def _with_legacy_materials(
         )
         for asset in missing
     ]
-    if any(
-        section.section_key == "legacy-materials"
-        for section in guidance.sections
-    ):
+    if any(section.section_key == "legacy-materials" for section in guidance.sections):
         sections = [
             section.model_copy(
                 update={
-                    "planning_blocks": [
-                        *section.planning_blocks,
+                    "blocks": [
+                        *section.blocks,
                         *material_blocks,
                     ]
                 }
@@ -245,8 +220,7 @@ def _with_legacy_materials(
             LessonGuidanceSection(
                 section_key="legacy-materials",
                 title="Materials",
-                planning_blocks=material_blocks,
-                teaching_blocks=[],
+                blocks=material_blocks,
             ),
         ]
     return guidance.model_copy(update={"sections": sections})

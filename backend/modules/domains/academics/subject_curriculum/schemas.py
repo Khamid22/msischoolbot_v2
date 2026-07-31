@@ -39,6 +39,8 @@ class CurriculumContentBlock(ApiModel):
             CurriculumContentBlockType.EMBED,
             CurriculumContentBlockType.LINK,
         }
+        if self.block_type is CurriculumContentBlockType.INSTRUCTION and self.asset_id is not None:
+            raise ValueError("Teacher Instruction blocks cannot reference an asset.")
         if self.block_type in media_types:
             if self.asset_id is None:
                 raise ValueError("Media blocks require an attached asset.")
@@ -54,14 +56,35 @@ class LessonGuidanceSection(ApiModel):
     title: str = Field(min_length=1, max_length=300)
     activity_label: str = Field(default="", max_length=160)
     duration_minutes: int = Field(default=0, ge=0, le=480)
-    planning_blocks: list[CurriculumContentBlock] = Field(
-        default_factory=list,
-        max_length=100,
-    )
-    teaching_blocks: list[CurriculumContentBlock] = Field(
-        default_factory=list,
-        max_length=100,
-    )
+    blocks: list[CurriculumContentBlock] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode="before")
+    @classmethod
+    def combine_legacy_block_columns(cls, value):
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        if "blocks" not in normalized:
+            planning = normalized.get(
+                "planning_blocks",
+                normalized.get("planningBlocks", []),
+            )
+            teaching = normalized.get(
+                "teaching_blocks",
+                normalized.get("teachingBlocks", []),
+            )
+            normalized["blocks"] = [
+                *(planning if isinstance(planning, list) else []),
+                *(teaching if isinstance(teaching, list) else []),
+            ]
+        for legacy_key in (
+            "planning_blocks",
+            "planningBlocks",
+            "teaching_blocks",
+            "teachingBlocks",
+        ):
+            normalized.pop(legacy_key, None)
+        return normalized
 
     @field_validator("section_key")
     @classmethod
@@ -79,15 +102,53 @@ class LessonGuidanceSection(ApiModel):
             raise ValueError("A section title is required.")
         return normalized
 
+
 class LessonGuidanceDocument(ApiModel):
     overview: str = Field(default="", max_length=4_000)
     tags: list[str] = Field(default_factory=list, max_length=8)
     duration_minutes: int = Field(default=0, ge=0, le=480)
-    before_teaching: list[CurriculumContentBlock] = Field(
-        default_factory=list,
-        max_length=100,
-    )
     sections: list[LessonGuidanceSection] = Field(default_factory=list, max_length=40)
+
+    @model_validator(mode="before")
+    @classmethod
+    def move_legacy_preparation_into_lesson_flow(cls, value):
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        sections = normalized.get("sections", [])
+        sections = list(sections) if isinstance(sections, list) else []
+        preparation = normalized.get(
+            "before_teaching",
+            normalized.get("beforeTeaching", []),
+        )
+        if isinstance(preparation, list) and preparation:
+            existing_keys = {
+                str(
+                    section.get(
+                        "section_key",
+                        section.get("sectionKey", ""),
+                    )
+                )
+                for section in sections
+                if isinstance(section, dict)
+            }
+            preparation_key = "legacy-preparation"
+            suffix = 2
+            while preparation_key in existing_keys:
+                preparation_key = f"legacy-preparation-{suffix}"
+                suffix += 1
+            sections.insert(
+                0,
+                {
+                    "section_key": preparation_key,
+                    "title": "Preparation",
+                    "blocks": preparation,
+                },
+            )
+        normalized["sections"] = sections
+        normalized.pop("before_teaching", None)
+        normalized.pop("beforeTeaching", None)
+        return normalized
 
     @field_validator("overview")
     @classmethod
@@ -130,7 +191,7 @@ class CurriculumAsset(ApiModel):
     conversion_status: CurriculumConversionStatus = CurriculumConversionStatus.NOT_REQUIRED
     conversion_error: str = ""
     conversion_attempts: int = 0
-    slides: list["CurriculumAssetRendition"] = Field(default_factory=list)
+    slides: list[CurriculumAssetRendition] = Field(default_factory=list)
     status: CurriculumRecordStatus = CurriculumRecordStatus.ACTIVE
     version: int = 1
 
@@ -225,7 +286,7 @@ class FundamentalsLessonWrite(ApiModel):
                         {
                             "section_key": f"legacy-section-{len(sections) + 1}",
                             "title": current_title,
-                            "planning_blocks": current_blocks,
+                            "blocks": current_blocks,
                         }
                     )
                 current_title = str(raw_block.get("text") or "").strip()
@@ -239,7 +300,7 @@ class FundamentalsLessonWrite(ApiModel):
                 {
                     "section_key": f"legacy-section-{len(sections) + 1}",
                     "title": current_title,
-                    "planning_blocks": current_blocks,
+                    "blocks": current_blocks,
                 }
             )
         elif before_teaching:
@@ -247,7 +308,7 @@ class FundamentalsLessonWrite(ApiModel):
                 {
                     "section_key": "legacy-section-1",
                     "title": "Lesson guidance",
-                    "planning_blocks": before_teaching,
+                    "blocks": before_teaching,
                 }
             )
             before_teaching = []
@@ -257,8 +318,20 @@ class FundamentalsLessonWrite(ApiModel):
                 "specificationPoints",
                 value.get("specification_points", ""),
             ),
-            "before_teaching": before_teaching,
-            "sections": sections,
+            "sections": [
+                *(
+                    [
+                        {
+                            "section_key": "legacy-preparation",
+                            "title": "Preparation",
+                            "blocks": before_teaching,
+                        }
+                    ]
+                    if before_teaching
+                    else []
+                ),
+                *sections,
+            ],
         }
         return normalized
 

@@ -1,6 +1,7 @@
 export type CurriculumVariantKey = "fundamentals" | "primary";
 export type CurriculumItemType = "lesson" | "exam";
 export type CurriculumBlockType =
+  | "instruction"
   | "heading"
   | "paragraph"
   | "bullets"
@@ -42,15 +43,13 @@ export interface LessonGuidanceSection {
   title: string;
   activityLabel: string;
   durationMinutes: number;
-  planningBlocks: CurriculumContentBlock[];
-  teachingBlocks: CurriculumContentBlock[];
+  blocks: CurriculumContentBlock[];
 }
 
 export interface LessonGuidanceDocument {
   overview: string;
   tags: string[];
   durationMinutes: number;
-  beforeTeaching: CurriculumContentBlock[];
   sections: LessonGuidanceSection[];
 }
 
@@ -58,7 +57,6 @@ export const EMPTY_LESSON_GUIDANCE: LessonGuidanceDocument = {
   overview: "",
   tags: [],
   durationMinutes: 0,
-  beforeTeaching: [],
   sections: [],
 };
 

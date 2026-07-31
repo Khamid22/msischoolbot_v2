@@ -26,6 +26,7 @@ class CurriculumAssetKind(StrEnum):
 
 
 class CurriculumContentBlockType(StrEnum):
+    INSTRUCTION = "instruction"
     HEADING = "heading"
     PARAGRAPH = "paragraph"
     BULLETS = "bullets"

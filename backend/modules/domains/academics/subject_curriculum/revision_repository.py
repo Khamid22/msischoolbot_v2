@@ -24,7 +24,7 @@ def insert_draft_item(
         VALUES (
             %s, %s, %s, 'lesson', 'Untitled Fundamentals lesson',
             '', '', '', '', '', '', '[]'::jsonb,
-            '{"overview":"","tags":[],"duration_minutes":0,"before_teaching":[],"sections":[]}'::jsonb,
+            '{"overview":"","tags":[],"duration_minutes":0,"sections":[]}'::jsonb,
             'draft', 1, %s, %s, now(), now()
         )
         RETURNING id, version

@@ -22,9 +22,7 @@ from backend.modules.domains.academics.subject_curriculum.schemas import (
     LessonGuidanceSection,
 )
 
-DIRECTOR_ASSET_PREFIX = (
-    "/api/v1/academic-director/academic/subject-curricula/assets"
-)
+DIRECTOR_ASSET_PREFIX = "/api/v1/academic-director/academic/subject-curricula/assets"
 MEDIA_BLOCK_TYPES = {
     CurriculumContentBlockType.IMAGE,
     CurriculumContentBlockType.VIDEO,
@@ -61,27 +59,15 @@ def normalize_guidance_keys(
     sections = [
         section.model_copy(
             update={
-                "planning_blocks": _keyed_blocks(
-                    section.planning_blocks,
-                    prefix=f"{section.section_key}-planning",
-                ),
-                "teaching_blocks": _keyed_blocks(
-                    section.teaching_blocks,
-                    prefix=f"{section.section_key}-teaching",
+                "blocks": _keyed_blocks(
+                    section.blocks,
+                    prefix=f"{section.section_key}-block",
                 ),
             }
         )
         for section in guidance.sections
     ]
-    return guidance.model_copy(
-        update={
-            "before_teaching": _keyed_blocks(
-                guidance.before_teaching,
-                prefix="before-teaching",
-            ),
-            "sections": sections,
-        }
-    )
+    return guidance.model_copy(update={"sections": sections})
 
 
 def _with_staged_materials(
@@ -89,17 +75,8 @@ def _with_staged_materials(
     assets,
 ) -> LessonGuidanceDocument:
     normalized = normalize_guidance_keys(guidance)
-    blocks = [
-        *normalized.before_teaching,
-        *[
-            block
-            for section in normalized.sections
-            for block in [*section.planning_blocks, *section.teaching_blocks]
-        ],
-    ]
-    referenced = {
-        int(block.asset_id) for block in blocks if block.asset_id is not None
-    }
+    blocks = [block for section in normalized.sections for block in section.blocks]
+    referenced = {int(block.asset_id) for block in blocks if block.asset_id is not None}
     missing = [asset for asset in assets if asset.asset_id not in referenced]
     if not missing:
         return normalized
@@ -113,19 +90,15 @@ def _with_staged_materials(
         for asset in missing
     ]
     material_section = next(
-        (
-            section
-            for section in normalized.sections
-            if section.section_key == "legacy-materials"
-        ),
+        (section for section in normalized.sections if section.section_key == "legacy-materials"),
         None,
     )
     if material_section:
         sections = [
             section.model_copy(
                 update={
-                    "planning_blocks": [
-                        *section.planning_blocks,
+                    "blocks": [
+                        *section.blocks,
                         *material_blocks,
                     ],
                 }
@@ -140,8 +113,7 @@ def _with_staged_materials(
             LessonGuidanceSection(
                 section_key="legacy-materials",
                 title="Materials",
-                planning_blocks=material_blocks,
-                teaching_blocks=[],
+                blocks=material_blocks,
             ),
         ]
     return normalized.model_copy(update={"sections": sections})
@@ -188,9 +160,7 @@ def media_placements(
     ) -> None:
         for block in blocks:
             if not block.block_key:
-                raise CurriculumValidationError(
-                    "Every lesson block requires a stable blockKey."
-                )
+                raise CurriculumValidationError("Every lesson block requires a stable blockKey.")
             if block.block_key in seen_block_keys:
                 raise CurriculumValidationError("Lesson block keys must be unique.")
             seen_block_keys.add(block.block_key)
@@ -211,19 +181,9 @@ def media_placements(
                 }
             )
 
-    visit(
-        guidance.before_teaching,
-        section_key="",
-        content_area="before_teaching",
-    )
     for section in guidance.sections:
         visit(
-            section.planning_blocks,
-            section_key=section.section_key,
-            content_area="planning",
-        )
-        visit(
-            section.teaching_blocks,
+            section.blocks,
             section_key=section.section_key,
             content_area="teaching",
         )

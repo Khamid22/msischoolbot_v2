@@ -34,6 +34,21 @@ function GuidanceBlock({
   item: CurriculumItem;
   onRetryConversion?: (assetId: number) => void;
 }) {
+  if (block.blockType === "instruction") {
+    return (
+      <aside className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+        <div className="flex items-center gap-2 text-primary">
+          <Users className="h-4 w-4" />
+          <p className="text-xs font-black uppercase tracking-[0.12em]">
+            Teacher Instruction
+          </p>
+        </div>
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/85">
+          {block.text}
+        </p>
+      </aside>
+    );
+  }
   if (block.assetId) {
     const asset = item.assets.find((candidate) => candidate.assetId === block.assetId);
     return asset ? (
@@ -119,7 +134,7 @@ export function FundamentalsGuidance({
   item: CurriculumItem;
   onRetryConversion?: (assetId: number) => void;
 }) {
-  const { beforeTeaching, durationMinutes, overview, sections, tags } = item.guidance;
+  const { durationMinutes, overview, sections, tags } = item.guidance;
   const [teachingMode, setTeachingMode] = useState(false);
   const [openSections, setOpenSections] = useState<Set<string>>(
     () => new Set(sections[0] ? [sections[0].sectionKey] : []),
@@ -213,26 +228,6 @@ export function FundamentalsGuidance({
       </header>
 
       <div className={`space-y-5 p-4 sm:p-6 ${teachingMode ? "bg-primary/[0.025]" : ""}`}>
-        {beforeTeaching.length ? (
-          <section className="rounded-xl border border-primary/15 bg-surface p-4 shadow-card sm:p-5">
-            <div className="flex items-center gap-2 text-primary">
-              <Sparkles className="h-4 w-4" />
-              <h3 className="text-xs font-black uppercase tracking-[0.14em]">Before You Teach</h3>
-            </div>
-            <div className="mt-3 space-y-3">
-              {beforeTeaching.map((block, index) => (
-                <GuidanceBlock
-                  key={`${block.blockType}-${index}`}
-                  block={block}
-                  teachingMode={teachingMode}
-                  item={item}
-                  onRetryConversion={onRetryConversion}
-                />
-              ))}
-            </div>
-          </section>
-        ) : null}
-
         {sections.length ? (
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -263,9 +258,11 @@ export function FundamentalsGuidance({
             <div className="space-y-3">
               {sections.map((section, index) => {
                 const isOpen = openSections.has(section.sectionKey);
-                const visibleBlocks = teachingMode && section.teachingBlocks.length
-                  ? section.teachingBlocks
-                  : section.planningBlocks;
+                const visibleBlocks = section.blocks.filter((block) =>
+                  teachingMode
+                    ? block.blockType !== "instruction"
+                    : block.blockType === "instruction"
+                );
                 return (
                   <section
                     key={section.sectionKey}
@@ -314,7 +311,7 @@ export function FundamentalsGuidance({
                           <p className="text-sm font-semibold text-muted-foreground">
                             {teachingMode
                               ? "No teaching-view content has been added to this section."
-                              : "This section is ready for planning guidance."}
+                              : "No Teacher Instruction has been added to this section."}
                           </p>
                         )}
                       </div>
@@ -326,7 +323,7 @@ export function FundamentalsGuidance({
           </>
         ) : (
           <section className="rounded-xl border border-dashed border-border bg-surface px-4 py-10 text-center">
-            <p className="text-sm font-black">No teaching guidance has been added yet.</p>
+            <p className="text-sm font-black">No lesson flow has been added yet.</p>
             <p className="mt-1 text-sm text-muted-foreground">
               The Academic Director can add guidance blocks to this lesson.
             </p>

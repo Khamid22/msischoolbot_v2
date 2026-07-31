@@ -3,6 +3,7 @@ import {
   ArrowDown,
   ArrowUp,
   CheckSquare,
+  ClipboardList,
   FileText,
   Heading3,
   Image,
@@ -31,6 +32,7 @@ const TEXT_BLOCK_TYPES: Array<{
   label: string;
   icon: typeof MessageSquareText;
 }> = [
+  { blockType: "instruction", label: "Teacher Instruction", icon: ClipboardList },
   { blockType: "heading", label: "Heading", icon: Heading3 },
   { blockType: "paragraph", label: "Text", icon: MessageSquareText },
   { blockType: "bullets", label: "Bullet list", icon: List },
@@ -232,11 +234,19 @@ export function GuidanceBlockEditor({
         return (
           <article
             key={block.blockKey || `${block.blockType}-${index}`}
-            className="rounded-xl border border-border bg-background p-2.5"
+            className={`rounded-xl border p-2.5 ${
+              block.blockType === "instruction"
+                ? "border-primary/25 bg-primary/[0.035]"
+                : "border-border bg-background"
+            }`}
           >
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <span className="rounded-md bg-muted px-2 py-1 text-[0.625rem] font-black uppercase tracking-wide text-muted-foreground">
-                {isMedia ? asset?.renderKind || "Media" : block.blockType}
+                {isMedia
+                  ? asset?.renderKind || "Media"
+                  : block.blockType === "instruction"
+                    ? "Teacher Instruction"
+                    : block.blockType}
               </span>
               <span className="text-[0.625rem] font-black uppercase tracking-wide text-muted-foreground">
                 Block {index + 1}
@@ -297,9 +307,17 @@ export function GuidanceBlockEditor({
                 onChange={(event) =>
                   updateBlock(index, { ...block, text: event.target.value })
                 }
-                rows={block.blockType === "heading" ? 2 : block.blockType === "paragraph" ? 4 : 3}
+                rows={
+                  block.blockType === "heading"
+                    ? 2
+                    : block.blockType === "paragraph" || block.blockType === "instruction"
+                      ? 4
+                      : 3
+                }
                 placeholder={
-                  block.blockType === "bullets" || block.blockType === "checklist"
+                  block.blockType === "instruction"
+                    ? "Write the private instruction the teacher needs while planning"
+                    : block.blockType === "bullets" || block.blockType === "checklist"
                     ? "One item per line"
                     : block.blockType === "note"
                       ? "A useful warning, alternative, or teaching tip"

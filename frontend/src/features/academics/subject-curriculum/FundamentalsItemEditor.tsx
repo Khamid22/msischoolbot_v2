@@ -39,8 +39,7 @@ function emptySection(): LessonGuidanceSection {
     title: "",
     activityLabel: "",
     durationMinutes: 0,
-    planningBlocks: [],
-    teachingBlocks: [],
+    blocks: [],
   };
 }
 
@@ -56,17 +55,13 @@ function moveSection(
   return next;
 }
 
-type ContentArea =
-  | { kind: "before" }
-  | { kind: "section"; sectionIndex: number; column: "planning" | "teaching" };
+type ContentArea = { sectionIndex: number };
 
 function blocksAt(
   guidance: LessonGuidanceDocument,
   area: ContentArea,
 ): CurriculumContentBlock[] {
-  if (area.kind === "before") return guidance.beforeTeaching;
-  const section = guidance.sections[area.sectionIndex];
-  return area.column === "planning" ? section.planningBlocks : section.teachingBlocks;
+  return guidance.sections[area.sectionIndex].blocks;
 }
 
 function replaceBlocks(
@@ -74,12 +69,9 @@ function replaceBlocks(
   area: ContentArea,
   blocks: CurriculumContentBlock[],
 ): LessonGuidanceDocument {
-  if (area.kind === "before") return { ...guidance, beforeTeaching: blocks };
   const sections = [...guidance.sections];
   const section = sections[area.sectionIndex];
-  sections[area.sectionIndex] = area.column === "planning"
-    ? { ...section, planningBlocks: blocks }
-    : { ...section, teachingBlocks: blocks };
+  sections[area.sectionIndex] = { ...section, blocks };
   return { ...guidance, sections };
 }
 
@@ -303,7 +295,7 @@ export function FundamentalsItemEditor({
   return (
     <Modal
       title={draft.isNew ? "Build Fundamentals lesson" : "Edit Fundamentals lesson"}
-      subtitle="Construct teacher guidance with preparation, planning, teaching, and media."
+      subtitle="Build one ordered lesson flow for teacher instructions, classroom content, and media."
       onClose={() => !busy && void onClose()}
       size="wide"
       mobileMode="fullscreen"
@@ -350,21 +342,6 @@ export function FundamentalsItemEditor({
                 onDraftChange={onDraftChange}
               />
 
-              <section className="rounded-xl border border-primary/15 bg-surface p-4 shadow-card">
-                <div className="mb-3">
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-primary">
-                    Before You Teach
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    Preparation, setup, reminders, and supporting media shown above the lesson flow.
-                  </p>
-                </div>
-                {contentEditor(
-                  { kind: "before" },
-                  "Add preparation text, a checklist, a note, or supporting media.",
-                )}
-              </section>
-
               <section className="space-y-3">
                 <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 shadow-card sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -372,7 +349,7 @@ export function FundamentalsItemEditor({
                       Lesson flow
                     </p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      Each section becomes one expandable step in Teacher Guidance.
+                      Add all instructions, classroom content, and media in one ordered flow.
                     </p>
                   </div>
                   <button
@@ -487,28 +464,16 @@ export function FundamentalsItemEditor({
                         </LessonEditorField>
                       </div>
 
-                      <div className="grid gap-4 lg:grid-cols-2">
-                        <section className="rounded-xl border border-border bg-muted/25 p-3">
-                          <h4 className="text-sm font-black">Planning content</h4>
-                          <p className="mb-3 mt-0.5 text-xs text-muted-foreground">
-                            Preparation, explanations, files, and references.
-                          </p>
-                          {contentEditor(
-                            { kind: "section", sectionIndex: index, column: "planning" },
-                            "Add preparation, explanations, or lesson media.",
-                          )}
-                        </section>
-                        <section className="rounded-xl border border-primary/15 bg-primary/[0.025] p-3">
-                          <h4 className="text-sm font-black">Teaching content</h4>
-                          <p className="mb-3 mt-0.5 text-xs text-muted-foreground">
-                            Live prompts, examples, slideshows, and classroom media.
-                          </p>
-                          {contentEditor(
-                            { kind: "section", sectionIndex: index, column: "teaching" },
-                            "Add content for the teacher’s live Teaching view.",
-                          )}
-                        </section>
-                      </div>
+                      <section className="rounded-xl border border-primary/15 bg-primary/[0.025] p-3">
+                        <h4 className="text-sm font-black">Section blocks</h4>
+                        <p className="mb-3 mt-0.5 text-xs leading-5 text-muted-foreground">
+                          Teacher Instructions appear in Planning. Every other block appears in Teaching.
+                        </p>
+                        {contentEditor(
+                          { sectionIndex: index },
+                          "Add a Teacher Instruction, classroom content, or lesson media.",
+                        )}
+                      </section>
                     </div>
                   </article>
                 ))}
