@@ -28,10 +28,11 @@ def test_worker_health_server_reports_configured_service(monkeypatch):
         health_server.close()
 
 
-def test_curriculum_worker_image_installs_presentation_tools_only_for_its_service():
+def test_lms_image_includes_curriculum_presentation_tools():
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
-    assert 'ARG RAILWAY_SERVICE_NAME' in dockerfile
-    assert '[ "$RAILWAY_SERVICE_NAME" = "curriculum-worker" ]' in dockerfile
+    assert "ARG RAILWAY_SERVICE_NAME" in dockerfile
+    assert '[ "$RAILWAY_SERVICE_NAME" = "MSI-LMS-Portal" ]' in dockerfile
+    assert '[ "$RAILWAY_SERVICE_NAME" = "curriculum-worker" ]' not in dockerfile
     assert "libreoffice-impress" in dockerfile
     assert "poppler-utils" in dockerfile

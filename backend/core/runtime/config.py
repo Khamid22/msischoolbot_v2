@@ -56,6 +56,7 @@ class WorkerSettings:
     retry_base_seconds: int
     retry_max_seconds: int
     allowed_topics: tuple[str, ...]
+    embedded_curriculum_enabled: bool
 
 
 @dataclass(frozen=True)
@@ -220,6 +221,7 @@ def _worker_settings() -> WorkerSettings:
         retry_base_seconds=max(1, _int_env("WORKER_RETRY_BASE_SECONDS", 15)),
         retry_max_seconds=max(1, _int_env("WORKER_RETRY_MAX_SECONDS", 3600)),
         allowed_topics=_csv_env("WORKER_ALLOWED_TOPICS"),
+        embedded_curriculum_enabled=_bool_env("LMS_CURRICULUM_WORKER_ENABLED"),
     )
 
 

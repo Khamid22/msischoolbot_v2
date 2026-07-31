@@ -21,7 +21,7 @@ WORKDIR /app
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg tzdata \
-    && if [ "$RAILWAY_SERVICE_NAME" = "curriculum-worker" ]; then \
+    && if [ "$RAILWAY_SERVICE_NAME" = "MSI-LMS-Portal" ]; then \
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             libreoffice-core \
             libreoffice-impress \

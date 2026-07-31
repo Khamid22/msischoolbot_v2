@@ -13,6 +13,10 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import Response
 
 from backend.application.container import AppContainer
+from backend.application.curriculum_worker import (
+    CurriculumWorkerHandle,
+    start_curriculum_worker,
+)
 from backend.application.registry import register_application_pages
 from backend.application.security_middleware import AuthAndSecurityMiddleware
 from backend.core.access.pages import install_guard_handler
@@ -125,9 +129,14 @@ _OPENAPI_TAGS = [
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    curriculum_worker: CurriculumWorkerHandle | None = None
+    if _app.state.settings.worker.embedded_curriculum_enabled:
+        curriculum_worker = start_curriculum_worker(_app.state.settings)
     try:
         yield
     finally:
+        if curriculum_worker is not None:
+            curriculum_worker.close()
         _app.state.container.close()
 
 
