@@ -52,6 +52,41 @@ def list_teachers_rows(conn):
     ).fetchall()
 
 
+def get_active_teacher_workspace_row(conn, teacher_id):
+    return conn.execute(
+        """
+        SELECT teacher.id,
+               teacher.full_name,
+               teacher.phone,
+               teacher.telegram_username,
+               teacher.status,
+               coalesce(
+                   jsonb_agg(
+                       jsonb_build_object(
+                           'id', subject.id,
+                           'name', subject.subject_name,
+                           'key', subject.subject_key,
+                           'shortName', subject.subject_short
+                       )
+                       ORDER BY subject.subject_name
+                   ) FILTER (WHERE subject.id IS NOT NULL),
+                   '[]'::jsonb
+               ) AS subjects
+        FROM msi_v2.teachers teacher
+        LEFT JOIN msi_v2.teacher_subjects teacher_subject
+          ON teacher_subject.teacher_id = teacher.id
+         AND teacher_subject.status = 'active'
+        LEFT JOIN msi_v2.subjects subject
+          ON subject.id = teacher_subject.subject_id
+         AND subject.status = 'active'
+        WHERE teacher.id = %s
+          AND teacher.status = 'active'
+        GROUP BY teacher.id
+        """,
+        (int(teacher_id),),
+    ).fetchone()
+
+
 def get_teacher_login_row(conn, login):
     return conn.execute(
         """
@@ -669,6 +704,7 @@ def list_subject_options_for_teacher_rows(conn, teacher_id):
 __all__ = [
     "acquire_teacher_login_advisory_lock",
     "list_teachers_rows",
+    "get_active_teacher_workspace_row",
     "get_teacher_login_row",
     "get_teacher_by_telegram_id",
     "get_teacher_auth_row_by_id",

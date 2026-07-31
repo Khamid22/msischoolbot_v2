@@ -67,8 +67,12 @@ from backend.modules.people.academic_director.contracts import (
     update_lesson_session_from_payload,
     upsert_group_schedule_from_payload,
 )
+from backend.modules.people.academic_director.workspace.curriculum_api import (
+    router as curriculum_router,
+)
 
 router = APIRouter(prefix="/academic")
+router.include_router(curriculum_router)
 
 
 def _payload(model) -> dict[str, Any]:

@@ -20,6 +20,7 @@ API_WORKSPACE_NAMES = {
     "customer_support",
     "student",
     "parent",
+    "teacher",
 }
 FRONTEND_WORKSPACE_NAMES = WORKSPACE_NAMES - {"hr_manager"}
 
@@ -62,11 +63,10 @@ def _imported_module_names(path: Path) -> set[str]:
     return imported_modules
 
 
-def test_application_composes_exactly_six_workspace_routers():
+def test_application_composes_every_api_workspace_router():
     source = Path("backend/application/api.py").read_text()
 
     assert 'APIRouter(prefix="/api/v1")' in source
-    assert "teacher_router" not in source
     for workspace in API_WORKSPACE_NAMES:
         import_path = f"backend.modules.people.{workspace}.workspace.api"
         assert import_path in source

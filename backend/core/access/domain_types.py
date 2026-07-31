@@ -103,6 +103,8 @@ class Capability(StrEnum):
     VIEW_TEACHER_PERFORMANCE = "view_teacher_performance"
     OBSERVE_LESSONS = "observe_lessons"
     MANAGE_CURRICULUM_PROGRESS = "manage_curriculum_progress"
+    VIEW_SUBJECT_CURRICULUM = "view_subject_curriculum"
+    MANAGE_SUPPLEMENTAL_CURRICULUM = "manage_supplemental_curriculum"
     REVIEW_DEMO_LESSONS = "review_demo_lessons"
     EVALUATE_RECRUITMENT_CANDIDATES = "evaluate_recruitment_candidates"
     MANAGE_TEACHER_ACADEMY = "manage_teacher_academy"

@@ -3,6 +3,18 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const teacherHome = readFileSync(new URL("./pages/Home.tsx", import.meta.url), "utf8");
+const teacherCurriculum = readFileSync(
+  new URL("../../features/academics/subject-curriculum/TeacherSubjectCurriculum.tsx", import.meta.url),
+  "utf8",
+);
+const directorCurriculum = readFileSync(
+  new URL("../../features/academics/subject-curriculum/DirectorSubjectCurriculum.tsx", import.meta.url),
+  "utf8",
+);
+const curriculumTable = readFileSync(
+  new URL("../../features/academics/subject-curriculum/CurriculumTable.tsx", import.meta.url),
+  "utf8",
+);
 
 test("Teacher Academy uses its own responsive cabinet instead of an Admin preview", () => {
   assert.doesNotMatch(teacherHome, /AcademyTeacherPreview/);
@@ -31,4 +43,31 @@ test("Teacher Academy navigation and account actions keep accessible touch targe
   assert.match(teacherHome, /aria-current/);
   assert.match(teacherHome, /focus-visible:ring-2/);
   assert.match(teacherHome, /motion-reduce:transition-none/);
+});
+
+test("active teachers receive assigned-subject curriculum without an Academy dependency", () => {
+  assert.match(teacherHome, /teacherProfile/);
+  assert.match(teacherHome, /subjectCurriculumCatalog/);
+  assert.match(teacherHome, /key: "curriculum"/);
+  assert.match(teacherHome, /key !== "updates"/);
+  assert.match(teacherCurriculum, /No subject curriculum assigned/);
+  assert.match(teacherCurriculum, /\/api\/v1\/teacher\/subject-curricula/);
+  assert.doesNotMatch(teacherCurriculum, /create_fundamentals|update_fundamentals/i);
+});
+
+test("ESL curriculum uses Fundamentals first and keeps Primary read-only", () => {
+  assert.match(teacherCurriculum, /defaultVariant/);
+  assert.match(directorCurriculum, /defaultVariant/);
+  assert.match(directorCurriculum, /Add lesson/);
+  assert.match(directorCurriculum, /The canonical Primary Curriculum is read-only/);
+  assert.match(directorCurriculum, /expectedCurriculumVersion/);
+  assert.match(directorCurriculum, /Archive/);
+  assert.match(directorCurriculum, /onRestore/);
+});
+
+test("curriculum lesson content renders typed safe blocks and private materials", () => {
+  assert.match(curriculumTable, /blockType === "heading"/);
+  assert.match(curriculumTable, /blockType === "bullets"/);
+  assert.match(curriculumTable, /downloadUrl/);
+  assert.doesNotMatch(curriculumTable, /dangerouslySetInnerHTML/);
 });

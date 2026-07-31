@@ -16,6 +16,7 @@ Audience: engineers locating the owner of a change.
 | Teacher Academy | `modules/domains/teacher_academy` | `features/teacher-academy` |
 | teacher recruitment | `modules/domains/recruitment` | `features/recruitment` |
 | curriculum/program | `modules/domains/academics/curriculum` | `features/academics` |
+| teacher subject curriculum and ESL Fundamentals | `modules/domains/academics/subject_curriculum` | `features/academics/subject-curriculum` |
 | groups/enrollment | `modules/domains/academics/groups` | `features/academics` |
 | schedules/reflow/office hours | `modules/domains/academics/timetable` | `features/academics/timetable` |
 | lesson overrides | `modules/domains/academics/lessons` | timetable details UI |
@@ -42,6 +43,7 @@ Audience: engineers locating the owner of a change.
 | Parent Relationships | `parents`, `parent_profiles`, parent links/invites |
 | Teacher Records | `teachers`, `teacher_profiles` |
 | Academics / Curriculum | `subject_programs`, `subject_program_items` |
+| Academics / Subject Curriculum | `supplemental_curricula`, `supplemental_curriculum_items`, `supplemental_curriculum_assets`, `teacher_curriculum_views` |
 | Academics / Groups | `groups`, `group_students` |
 | Academics / Timetable | `group_schedule_rules`, `lesson_sessions`, office-hour tables |
 | Academics / Lessons | group-specific lesson-session overrides (within `lesson_sessions`) |

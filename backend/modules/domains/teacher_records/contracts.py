@@ -2,6 +2,7 @@
 
 from backend.modules.domains.teacher_records import repository
 from backend.modules.domains.teacher_records.service import (
+    get_active_teacher_workspace_profile,
     get_teacher_name_by_group,
     list_teachers,
     reset_teacher_password,
@@ -23,6 +24,7 @@ __all__ = [
     "acquire_teacher_login_advisory_lock",
     "get_next_teacher_code",
     "get_teacher_auth_row_by_id",
+    "get_active_teacher_workspace_profile",
     "get_teacher_by_full_name_row",
     "get_teacher_name_by_group",
     "insert_teacher_auth",

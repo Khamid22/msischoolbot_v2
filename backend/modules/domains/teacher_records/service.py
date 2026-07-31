@@ -530,6 +530,7 @@ __all__ = [
     "TEACHER_SEMESTER_STAGES",
     "assign_teacher_to_group",
     "delete_teacher_by_id",
+    "get_active_teacher_workspace_profile",
     "get_teacher_by_id",
     "get_teacher_name_by_group",
     "list_teachers",
@@ -547,3 +548,25 @@ def list_subject_options_for_teacher(teacher_id):
     with connect() as conn:
         rows = repository.list_subject_options_for_teacher_rows(conn, teacher_id)
     return [dict(row) for row in rows]
+
+
+def get_active_teacher_workspace_profile(teacher_id):
+    """Canonical active teacher profile independent from Teacher Academy."""
+    try:
+        parsed_teacher_id = int(teacher_id or 0)
+    except (TypeError, ValueError):
+        return None
+    if parsed_teacher_id <= 0:
+        return None
+    with connect() as conn:
+        row = repository.get_active_teacher_workspace_row(conn, parsed_teacher_id)
+    if not row:
+        return None
+    return {
+        "id": int(row["id"]),
+        "full_name": str(row["full_name"] or ""),
+        "phone": str(row["phone"] or ""),
+        "telegram_username": str(row["telegram_username"] or ""),
+        "status": str(row["status"] or ""),
+        "subjects": list(row["subjects"] or []),
+    }

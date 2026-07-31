@@ -16,6 +16,7 @@ from backend.modules.people.head_of_department.workspace.api import (
 )
 from backend.modules.people.parent.workspace.api import router as parent_router
 from backend.modules.people.student.workspace.api import router as student_router
+from backend.modules.people.teacher.workspace.api import router as teacher_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -23,6 +24,7 @@ API_MODULES = (
     ModuleSpec("academic_director", academic_director_router),
     ModuleSpec("head_of_department", head_of_department_router),
     ModuleSpec("student", student_router),
+    ModuleSpec("teacher", teacher_router),
     ModuleSpec("parent", parent_router),
     ModuleSpec("ceo", ceo_router),
     ModuleSpec("customer_support", customer_support_router),

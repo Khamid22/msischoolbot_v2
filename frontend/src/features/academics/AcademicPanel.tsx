@@ -8,9 +8,9 @@ import { fetchApiQuery, queryClient } from "@/shared/api/queryClient";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString, AcademicPanelKind, normalizeSubjectKey } from "@/shared/lib/workspace";
 import { schoolNamesByCode, schoolStatsByCode } from "@/features/organization/model";
-import { filterProgramItems } from "./curriculum/model";
+import { DirectorSubjectCurriculum } from "./subject-curriculum/DirectorSubjectCurriculum";
 import { filteredGroupRows, groupContextSummary, groupSections, subjectFilterOptions as buildSubjectFilterOptions } from "./groups/model";
-import { FieldLabel, TextInput, Select, Pill, MiniMetric, CompactMetric, subjectSwatches, programInitials } from "./ui";
+import { FieldLabel, TextInput, Select, Pill, CompactMetric, subjectSwatches, programInitials } from "./ui";
 import type { Lesson } from "./gradebook/model";
 import { GroupGradebook } from "./gradebook/GroupGradebook";
 import { SchedulePanel } from "./timetable/SchedulePanel";
@@ -62,16 +62,11 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
   const initialCurriculumPrograms = Array.isArray(props.academicManagementCurriculumPrograms)
     ? props.academicManagementCurriculumPrograms
     : [];
-  const initialCurriculumItems = Array.isArray(props.academicManagementCurriculumItems)
-    ? props.academicManagementCurriculumItems
-    : [];
   const csrf: string = asString(props.csrfToken);
   const academicRoutes = state.academicRoutes || routes;
 
   const [openGroupId, setOpenGroupId] = useState<number | null>(null);
   const [openProgramId, setOpenProgramId] = useState<number | null>(null);
-  const [programSearch, setProgramSearch] = useState("");
-  const [programTypeFilter, setProgramTypeFilter] = useState<"all" | "lesson" | "exam">("all");
   const [addGroupOpen, setAddGroupOpen] = useState(false);
   const [manageSchoolsOpen, setManageSchoolsOpen] = useState(false);
   useDismissibleLayer({
@@ -99,8 +94,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
   const [groupLoading, setGroupLoading] = useState(false);
   const [groupLoadError, setGroupLoadError] = useState("");
   const [curriculumPrograms, setCurriculumPrograms] = useState(initialCurriculumPrograms);
-  const [curriculumItems, setCurriculumItems] = useState(initialCurriculumItems);
-  const [programLoading, setProgramLoading] = useState(false);
+  const [, setProgramLoading] = useState(false);
   const [programLoadError, setProgramLoadError] = useState("");
   const groupRequestRef = useRef(0);
 
@@ -331,25 +325,6 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
     curriculumPrograms[0] ||
     null;
   const activeProgramId = asNumber(activeProgram?.id);
-  useEffect(() => {
-    if (kind !== "subjects" || !activeProgramId || typeof academicRoutes.academicManagementProgramItemsApi !== "function") return;
-    setProgramLoading(true);
-    setProgramLoadError("");
-    void fetchApiQuery<{ items?: Array<Record<string, unknown>> }>(
-      ["academic", "programs", activeProgramId, "items"],
-      academicRoutes.academicManagementProgramItemsApi(activeProgramId, "limit=250"),
-    )
-      .then((page) => {
-        setCurriculumItems(Array.isArray(page.items) ? page.items : []);
-      })
-      .catch((error: unknown) => {
-        setProgramLoadError(error instanceof Error ? error.message : "Unable to load the scheme of work.");
-      })
-      .finally(() => setProgramLoading(false));
-  }, [kind, activeProgramId]);
-  const activeProgramItems = useMemo(() => {
-    return filterProgramItems(curriculumItems, activeProgramId, programSearch, programTypeFilter);
-  }, [activeProgramId, curriculumItems, programSearch, programTypeFilter]);
 
   if (kind === "groups" && openGroupId !== null) {
     return (
@@ -393,7 +368,6 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
                 value={activeProgramId || ""}
                 onChange={(event) => {
                   setOpenProgramId(Number(event.target.value));
-                  setProgramSearch("");
                 }}
                 className="h-9 min-w-0 max-w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm font-bold outline-none focus:border-foreground/30"
                 aria-label="Subject program"
@@ -414,115 +388,12 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Acade
             </label>
           </div>
 
-          <ChartCard
-              title={activeProgram ? asString(activeProgram.subject_name) : "Program"}
-              subtitle={
-                activeProgram
-                  ? asString(activeProgram.source_file)
-                  : "Select a subject program"
-              }
-              headerActions={
-                <div className="relative w-full max-w-sm">
-                  <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                  <input
-                    type="search"
-                    value={programSearch}
-                    onChange={(event) => setProgramSearch(event.target.value)}
-                    placeholder="Search program"
-                    className="h-9 w-full rounded-lg border border-foreground/10 bg-surface pl-8 pr-3 text-xs font-semibold outline-none focus:border-foreground/30"
-                  />
-                </div>
-              }
-            >
-              <div className="mb-3 grid gap-2 sm:grid-cols-3">
-                <MiniMetric icon={<BookMarked className="h-3.5 w-3.5" />} label="Program Rows" value={asNumber(activeProgram?.total_items)} />
-                <MiniMetric icon={<Layers className="h-3.5 w-3.5" />} label="Lessons" value={asNumber(activeProgram?.lesson_count)} />
-                <MiniMetric icon={<BookMarked className="h-3.5 w-3.5" />} label="Exams" value={asNumber(activeProgram?.exam_count)} />
-              </div>
-
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                {[
-                  { key: "all", label: "All" },
-                  { key: "lesson", label: "Lessons" },
-                  { key: "exam", label: "Exams" },
-                ].map((option) => {
-                  const active = programTypeFilter === option.key;
-                  return (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={() => setProgramTypeFilter(option.key as "all" | "lesson" | "exam")}
-                      className={`h-8 rounded-lg px-3 text-xs font-bold transition-colors ${
-                        active
-                          ? "bg-foreground text-background"
-                          : "border border-foreground/10 bg-surface text-muted-foreground hover:bg-muted hover:text-foreground"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-                <span className="ml-auto text-xs font-semibold text-muted-foreground">
-                  {activeProgramItems.length} shown
-                </span>
-              </div>
-
-              <div className="miniapp-table-scroll max-h-[62dvh] rounded-lg border border-foreground/8">
-                {programLoading && activeProgramItems.length === 0 ? (
-                  <p className="px-4 py-12 text-center text-sm font-bold text-muted-foreground">
-                    Loading the selected scheme of work…
-                  </p>
-                ) : activeProgramItems.length ? (
-                  <div className="divide-y divide-foreground/6">
-                    {activeProgramItems.map((item: Record<string, unknown>) => {
-                      const itemType = asString(item.item_type);
-                      const isExam = itemType === "exam";
-                      return (
-                        <div
-                          key={asNumber(item.id)}
-                          className={`grid gap-3 px-3 py-3 md:grid-cols-[5.25rem_1fr_9rem_8rem] ${
-                            isExam ? "bg-amber-50/70" : "bg-surface"
-                          }`}
-                        >
-                          <div>
-                            <p className="text-xs font-bold text-foreground">{asString(item.lesson_number)}</p>
-                            <span
-                              className={`mt-1 inline-flex rounded-md px-2 py-0.5 text-[0.625rem] font-bold ${
-                                isExam
-                                  ? "bg-amber-100 text-amber-800"
-                                  : "bg-muted text-muted-foreground"
-                              }`}
-                            >
-                              {isExam ? "Exam" : "Lesson"}
-                            </span>
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold leading-5">{asString(item.title)}</p>
-                            {asString(item.specification_points) ? (
-                              <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                                {asString(item.specification_points)}
-                              </p>
-                            ) : null}
-                          </div>
-                          <div className="text-xs leading-5 text-muted-foreground">
-                            <span className="font-semibold text-foreground">{asString(item.term_label) || "Term not set"}</span>
-                            <br />
-                            {asString(item.week_label) || "Week not set"}
-                          </div>
-                          <div className="text-xs leading-5 text-muted-foreground">
-                            {asString(item.book_pages) || "No book pages"}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="px-4 py-12 text-center text-sm font-bold text-muted-foreground">
-                    No program items match this search.
-                  </p>
-                )}
-              </div>
-            </ChartCard>
+          <DirectorSubjectCurriculum
+            subjectKey={
+              asString(activeProgram?.subject_key) || asString(activeProgram?.subject_name)
+            }
+            csrfToken={csrf}
+          />
 
         </div>
       ) : null}

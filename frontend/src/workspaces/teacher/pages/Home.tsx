@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
   BookOpen,
+  BookMarked,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
@@ -20,19 +21,25 @@ import {
   UserRoundCheck,
 } from "lucide-react";
 import { routes } from "@/shared/lib/routes";
+import { TeacherSubjectCurriculum } from "@/features/academics/subject-curriculum/TeacherSubjectCurriculum";
+import type { SubjectCurriculumCatalog } from "@/features/academics/subject-curriculum/model";
 
 type TeacherHomeProps = {
   authLogin?: string;
   academyTeacher?: Record<string, unknown> | null;
+  teacherProfile?: Record<string, unknown> | null;
+  subjectCurriculumCatalog?: SubjectCurriculumCatalog;
+  initialTab?: string;
   csrfToken?: string;
 };
 
-type AcademyTab = "overview" | "lessons" | "timetable" | "updates" | "profile";
+type AcademyTab = "overview" | "lessons" | "curriculum" | "timetable" | "updates" | "profile";
 type AcademyRecord = Record<string, unknown>;
 
 const tabItems: Array<{ key: AcademyTab; label: string; icon: typeof Home }> = [
   { key: "overview", label: "Overview", icon: Home },
   { key: "lessons", label: "Lessons", icon: BookOpen },
+  { key: "curriculum", label: "Curriculum", icon: BookMarked },
   { key: "timetable", label: "Schedule", icon: CalendarDays },
   { key: "updates", label: "Updates", icon: MessageSquareText },
   { key: "profile", label: "Profile", icon: CircleUserRound },
@@ -113,6 +120,7 @@ function EmptyState({ children }: { children: ReactNode }) {
 }
 
 function AcademyNav({ activeTab, onChange, mobile = false }: { activeTab: AcademyTab; onChange: (tab: AcademyTab) => void; mobile?: boolean }) {
+  const items = mobile ? tabItems.filter(({ key }) => key !== "updates") : tabItems;
   if (mobile) {
     return (
       <nav
@@ -120,7 +128,7 @@ function AcademyNav({ activeTab, onChange, mobile = false }: { activeTab: Academ
         className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border/80 bg-surface/95 px-1 pt-1.5 shadow-[0_-0.5rem_1.5rem_hsl(var(--foreground)/0.08)] backdrop-blur md:hidden"
         style={{ paddingBottom: "calc(var(--app-bottom-inset) + 0.375rem)" }}
       >
-        {tabItems.map(({ key, label, icon: Icon }) => (
+        {items.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             type="button"
@@ -140,7 +148,7 @@ function AcademyNav({ activeTab, onChange, mobile = false }: { activeTab: Academ
 
   return (
     <nav aria-label="Teacher Academy navigation" className="mt-7 space-y-1 px-3">
-      {tabItems.map(({ key, label, icon: Icon }) => (
+      {items.map(({ key, label, icon: Icon }) => (
         <button
           key={key}
           type="button"
@@ -158,9 +166,19 @@ function AcademyNav({ activeTab, onChange, mobile = false }: { activeTab: Academ
   );
 }
 
-export default function TeacherHome({ authLogin = "", academyTeacher = null, csrfToken = "" }: TeacherHomeProps) {
-  const [activeTab, setActiveTab] = useState<AcademyTab>("overview");
-  const teacher = academyTeacher ?? {};
+export default function TeacherHome({
+  authLogin = "",
+  academyTeacher = null,
+  teacherProfile = null,
+  subjectCurriculumCatalog,
+  initialTab = "overview",
+  csrfToken = "",
+}: TeacherHomeProps) {
+  const validInitialTab = tabItems.some(({ key }) => key === initialTab)
+    ? (initialTab as AcademyTab)
+    : "overview";
+  const [activeTab, setActiveTab] = useState<AcademyTab>(validInitialTab);
+  const teacher = academyTeacher ?? teacherProfile ?? {};
   const progress = teacher.progress && typeof teacher.progress === "object" ? (teacher.progress as AcademyRecord) : {};
   const assignments = useMemo(
     () => asRecords(teacher.assignments).sort((a, b) => asNumber(a.sequence_no) - asNumber(b.sequence_no)),
@@ -184,7 +202,11 @@ export default function TeacherHome({ authLogin = "", academyTeacher = null, csr
   );
 
   const name = asText(teacher.full_name, "Academy teacher");
-  const subject = asText(teacher.subject_program_name, asText(teacher.subject, "Subject not assigned"));
+  const assignedSubjects = asRecords(teacher.subjects);
+  const subject = asText(
+    teacher.subject_program_name,
+    asText(teacher.subject, asText(assignedSubjects[0]?.name, "Subject not assigned")),
+  );
   const academyStatus = asText(teacher.academy_status, "In Academy").replace(/_/g, " ");
   const assignedCount = asNumber(progress.assigned_count || assignments.length);
   const assessedCount = asNumber(progress.assessed_count || assessments.length);
@@ -217,7 +239,7 @@ export default function TeacherHome({ authLogin = "", academyTeacher = null, csr
     return items.sort((a, b) => (dateValue(b.date)?.getTime() ?? 0) - (dateValue(a.date)?.getTime() ?? 0));
   }, [assignments, assessments]);
 
-  if (!academyTeacher) {
+  if (!academyTeacher && !teacherProfile) {
     return (
       <main className="flex min-h-[var(--tg-viewport-height)] items-center justify-center bg-background px-4 text-foreground">
         <section className="w-full max-w-md rounded-2xl border border-border bg-surface p-7 text-center shadow-card">
@@ -243,7 +265,7 @@ export default function TeacherHome({ authLogin = "", academyTeacher = null, csr
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground"><GraduationCap className="h-5 w-5" /></span>
           <div className="min-w-0">
             <p className="truncate text-sm font-black">MSI School</p>
-            <p className="truncate text-xs font-semibold text-sidebar-foreground/55">Teacher Academy</p>
+            <p className="truncate text-xs font-semibold text-sidebar-foreground/55">Teacher Workspace</p>
           </div>
         </div>
         <AcademyNav activeTab={activeTab} onChange={setActiveTab} />
@@ -263,7 +285,7 @@ export default function TeacherHome({ authLogin = "", academyTeacher = null, csr
         <header className="sticky top-0 z-30 border-b border-border/80 bg-surface/95 backdrop-blur md:hidden" style={{ paddingTop: "var(--app-top-inset)" }}>
           <div className="flex min-h-14 items-center gap-3 px-4">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar text-white"><GraduationCap className="h-5 w-5" /></span>
-            <div className="min-w-0"><p className="truncate text-sm font-black">{name}</p><p className="truncate text-xs font-semibold text-muted-foreground">Teacher Academy · {authLogin}</p></div>
+            <div className="min-w-0"><p className="truncate text-sm font-black">{name}</p><p className="truncate text-xs font-semibold text-muted-foreground">Teacher Workspace · {authLogin}</p></div>
           </div>
         </header>
 
@@ -303,6 +325,25 @@ export default function TeacherHome({ authLogin = "", academyTeacher = null, csr
                   {latestAssessment ? <div className="p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-wide text-muted-foreground">Lesson {asText(latestAssessment.lesson_number, "")}</p><p className="mt-1 font-black">{asText(latestAssessment.lesson_topic, "Assessment report")}</p></div><span className="rounded-lg bg-primary/10 px-3 py-1.5 text-lg font-black text-primary">{asNumber(latestAssessment.weighted_overall_score) || "—"}</span></div><p className="mt-3 text-xs font-semibold text-muted-foreground">{asText(latestAssessment.final_recommendation, asText(latestAssessment.areas_for_improvement, "Your assessment report is ready."))}</p></div> : <EmptyState>No assessment report has been recorded.</EmptyState>}
                 </SectionCard>
               </div>
+              {updates.length ? (
+                <SectionCard title="Recent updates" icon={<Sparkles className="h-4 w-4" />}>
+                  <ol className="divide-y divide-border/70">
+                    {updates.slice(0, 3).map((item) => (
+                      <li key={item.id} className="flex gap-3 px-4 py-3">
+                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          {item.type === "Report" ? <CheckCircle2 className="h-4 w-4" /> : <BookOpen className="h-4 w-4" />}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-black">{item.title}</p>
+                          <p className="mt-0.5 text-xs font-semibold text-muted-foreground">
+                            {item.detail} · {formatDate(item.date, true)}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </SectionCard>
+              ) : null}
             </div>
           )}
 
@@ -326,6 +367,13 @@ export default function TeacherHome({ authLogin = "", academyTeacher = null, csr
                 {scheduledAssignments.length ? <div className="divide-y divide-border/70">{scheduledAssignments.map((assignment, index) => <article key={asText(assignment.id, String(index))} className="grid gap-3 px-4 py-4 sm:grid-cols-[9rem_1fr_auto] sm:items-center"><div><p className="text-sm font-black text-primary">{formatDate(assignment.session_datetime, true)}</p><p className="mt-0.5 text-xs font-semibold text-muted-foreground">Asia/Tashkent</p></div><div className="min-w-0"><p className="truncate text-sm font-black">Lesson {asText(assignment.lesson_number, "")} · {asText(assignment.lesson_topic, "Academy lesson")}</p><p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><UserRoundCheck className="h-3.5 w-3.5" />{asText(assignment.evaluator_name, "Evaluator not assigned")}</p></div><span className={`w-fit rounded-full px-2 py-1 text-[0.625rem] font-black uppercase ${assignmentStatus(assignment.status).className}`}>{assignmentStatus(assignment.status).label}</span></article>)}</div> : <EmptyState>No lessons have a scheduled date yet.</EmptyState>}
               </SectionCard>
             </div>
+          )}
+
+          {activeTab === "curriculum" && (
+            <TeacherSubjectCurriculum
+              initialCatalog={subjectCurriculumCatalog}
+              csrfToken={csrfToken}
+            />
           )}
 
           {activeTab === "updates" && (

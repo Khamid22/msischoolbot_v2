@@ -76,6 +76,7 @@ _ALLOWED_CANDIDATE_DOCUMENT_EXTENSIONS = {
     ".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png",
 }
 _CANDIDATE_DOCUMENT_MAX_BYTES = 20 * 1024 * 1024
+_CURRICULUM_ASSET_MAX_BYTES = 50 * 1024 * 1024
 
 
 # ---------------------------------------------------------------------------
@@ -941,6 +942,114 @@ def build_private_candidate_document_url(
         return ""
 
 
+def upload_private_curriculum_asset(uploaded_file, *, item_id):
+    """Upload one teacher-only curriculum asset without exposing a public URL."""
+    original_name = str(getattr(uploaded_file, "filename", "") or "").strip()
+    if not original_name:
+        return {}, "No file was uploaded."
+    extension = _file_extension(original_name)
+    if extension not in _ALLOWED_RESOURCE_EXTENSIONS:
+        return {}, "Unsupported curriculum file type."
+    if not is_r2_configured():
+        return {}, "Private curriculum storage is not configured."
+
+    stream = getattr(uploaded_file, "file", None) or getattr(uploaded_file, "stream", None)
+    if stream is None:
+        return {}, "Unable to read the uploaded file."
+    try:
+        stream.seek(0)
+    except Exception:
+        pass
+
+    fd, temp_path = tempfile.mkstemp(suffix=extension)
+    os.close(fd)
+    size_bytes = 0
+    try:
+        with open(temp_path, "wb") as output:
+            while True:
+                chunk = stream.read(256 * 1024)
+                if not chunk:
+                    break
+                size_bytes += len(chunk)
+                if size_bytes > _CURRICULUM_ASSET_MAX_BYTES:
+                    return {}, "Curriculum files must be 50 MB or smaller."
+                output.write(chunk)
+        if size_bytes <= 0:
+            return {}, "Uploaded file is empty."
+
+        safe_name = _safe_file_name(original_name)
+        item_part = str(max(1, int(item_id)))
+        object_key = (
+            f"private/curricula/items/{item_part}/"
+            f"{int(time.time())}-{_slugify(safe_name.rsplit('.', 1)[0]) or 'asset'}{extension}"
+        )
+        content_type = (
+            infer_resource_mime_type(original_name)
+            or str(getattr(uploaded_file, "content_type", "") or "").strip()
+            or "application/octet-stream"
+        )
+        client = _get_r2_client()
+        if client is None:
+            return {}, "Unable to connect to private curriculum storage."
+        with open(temp_path, "rb") as payload:
+            client.upload_fileobj(
+                payload,
+                _resource_bucket_name(),
+                object_key,
+                ExtraArgs={
+                    "ContentType": content_type,
+                    "ContentDisposition": f'inline; filename="{safe_name}"',
+                    "CacheControl": "private, no-store, max-age=0",
+                },
+            )
+        return {
+            "object_key": object_key,
+            "original_file_name": original_name,
+            "mime_type": content_type,
+            "size_bytes": size_bytes,
+        }, ""
+    except Exception:
+        return {}, "Failed to upload the curriculum file."
+    finally:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+
+
+def build_private_curriculum_asset_url(
+    object_key,
+    *,
+    original_file_name="",
+    download=False,
+    expires_in=300,
+):
+    """Return a short-lived URL for an authorized curriculum asset."""
+    normalized_key = str(object_key or "").strip()
+    if not normalized_key.startswith("private/curricula/") or not is_r2_configured():
+        return ""
+    client = _get_r2_client()
+    if client is None:
+        return ""
+    safe_name = _safe_file_name(
+        original_file_name or normalized_key.rsplit("/", 1)[-1]
+    )
+    disposition = "attachment" if download else "inline"
+    try:
+        return client.generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": _resource_bucket_name(),
+                "Key": normalized_key,
+                "ResponseContentDisposition": f'{disposition}; filename="{safe_name}"',
+                "ResponseCacheControl": "private, no-store, max-age=0",
+            },
+            ExpiresIn=max(60, min(int(expires_in or 300), 900)),
+        )
+    except (BotoCoreError, ClientError):
+        return ""
+
+
 def delete_private_candidate_document(object_key):
     normalized_key = str(object_key or "").strip()
     if not normalized_key.startswith("private/recruitment/") or not is_r2_configured():
@@ -983,4 +1092,6 @@ __all__ = [
     "upload_private_candidate_document",
     "build_private_candidate_document_url",
     "delete_private_candidate_document",
+    "upload_private_curriculum_asset",
+    "build_private_curriculum_asset_url",
 ]

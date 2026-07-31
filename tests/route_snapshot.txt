@@ -44,6 +44,17 @@
 /api/v1/academic-director/academic/programs/{program_id}/items | GET
 /api/v1/academic-director/academic/schedules | POST
 /api/v1/academic-director/academic/schools | POST
+/api/v1/academic-director/academic/subject-curricula | GET
+/api/v1/academic-director/academic/subject-curricula/assets/{asset_id}/open | GET
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/assets/{asset_id}/archive | POST
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/items | POST
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/items/{item_id} | PATCH
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/items/{item_id}/archive | POST
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/items/{item_id}/assets | POST
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/items/{item_id}/files | POST
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/items/{item_id}/restore | POST
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/fundamentals/reorder | POST
+/api/v1/academic-director/academic/subject-curricula/{subject_id}/{curriculum_key} | GET
 /api/v1/academic-director/academic/timetable | GET
 /api/v1/academic-director/head-of-departments | POST
 /api/v1/academic-director/head-of-departments/{account_id}/reset-password | POST
@@ -224,6 +235,10 @@
 /api/v1/student/support/tickets/{ticket_id} | GET
 /api/v1/student/support/tickets/{ticket_id}/messages | POST
 /api/v1/system/status | GET
+/api/v1/teacher/subject-curricula | GET
+/api/v1/teacher/subject-curricula/assets/{asset_id}/open | GET
+/api/v1/teacher/subject-curricula/{subject_id}/{curriculum_key} | GET
+/api/v1/teacher/subject-curricula/{subject_id}/{curriculum_key}/viewed | POST
 /auth/telegram | POST
 /ceo | GET
 /ceo/recruitment | GET
@@ -301,4 +316,5 @@
 /support | GET
 /sw.js | GET
 /teacher | GET
+/teacher/subject-curriculum | GET
 /unauthorized | GET

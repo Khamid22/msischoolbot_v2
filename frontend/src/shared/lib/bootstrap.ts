@@ -74,7 +74,7 @@ export function inferPageFromPath(pathname: string): ReactPageName | null {
   if (/^\/admissions\/[^/]+\/?$/.test(pathname)) {
     return "public-admission";
   }
-  if (/^\/teacher\/?$/.test(pathname)) {
+  if (/^\/teacher(?:\/subject-curriculum)?\/?$/.test(pathname)) {
     return "teacher-home";
   }
   if (/^\/dashboard\/\d+\/chat\/?$/.test(pathname)) {

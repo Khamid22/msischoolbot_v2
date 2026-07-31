@@ -166,6 +166,8 @@ PERSON_ACCESS_DEFAULTS: dict[Role, PersonAccessDefaults] = {
                 Capability.VIEW_TEACHER_PERFORMANCE,
                 Capability.OBSERVE_LESSONS,
                 Capability.MANAGE_CURRICULUM_PROGRESS,
+                Capability.VIEW_SUBJECT_CURRICULUM,
+                Capability.MANAGE_SUPPLEMENTAL_CURRICULUM,
                 Capability.REVIEW_DEMO_LESSONS,
                 Capability.VIEW_RECRUITMENT,
                 Capability.EVALUATE_RECRUITMENT_CANDIDATES,
@@ -235,7 +237,12 @@ PERSON_ACCESS_DEFAULTS: dict[Role, PersonAccessDefaults] = {
         object_scope=ObjectScope.ASSIGNED_RECRUITMENT_RECORDS,
     ),
     Role.TEACHER: PersonAccessDefaults(
-        capabilities=frozenset({Capability.VIEW_DASHBOARD}),
+        capabilities=frozenset(
+            {
+                Capability.VIEW_DASHBOARD,
+                Capability.VIEW_SUBJECT_CURRICULUM,
+            }
+        ),
         allowed_domains=frozenset(
             {
                 Domain.IDENTITY,

@@ -8,6 +8,7 @@ test("Teacher Academy teacher pages remain in the teacher workspace", () => {
   assert.equal(normalizePageName("teacher-home"), "teacher-home");
   assert.equal(inferPageFromPath("/teacher"), "teacher-home");
   assert.equal(inferPageFromPath("/teacher/"), "teacher-home");
+  assert.equal(inferPageFromPath("/teacher/subject-curriculum"), "teacher-home");
 });
 
 test("every lazy page registered by App is accepted by the bootstrap normalizer", () => {
