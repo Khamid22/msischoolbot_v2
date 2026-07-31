@@ -15,6 +15,13 @@ const curriculumTable = readFileSync(
   new URL("../../features/academics/subject-curriculum/CurriculumTable.tsx", import.meta.url),
   "utf8",
 );
+const fundamentalsGuidance = readFileSync(
+  new URL(
+    "../../features/academics/subject-curriculum/FundamentalsGuidance.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
 test("Teacher Academy uses its own responsive cabinet instead of an Admin preview", () => {
   assert.doesNotMatch(teacherHome, /AcademyTeacherPreview/);
@@ -70,4 +77,19 @@ test("curriculum lesson content renders typed safe blocks and private materials"
   assert.match(curriculumTable, /blockType === "bullets"/);
   assert.match(curriculumTable, /downloadUrl/);
   assert.doesNotMatch(curriculumTable, /dangerouslySetInnerHTML/);
+});
+
+test("Fundamentals lesson details use the teacher-guidance interaction design", () => {
+  assert.match(curriculumTable, /useGuidanceLayout/);
+  assert.match(teacherCurriculum, /curriculumKey === "fundamentals"/);
+  assert.match(directorCurriculum, /useGuidanceLayout=\{isEditable\}/);
+  assert.match(fundamentalsGuidance, /Teacher Guidance/);
+  assert.match(fundamentalsGuidance, /Before You Teach/);
+  assert.match(fundamentalsGuidance, /Planning/);
+  assert.match(fundamentalsGuidance, /Teaching/);
+  assert.match(fundamentalsGuidance, /Expand all/);
+  assert.match(fundamentalsGuidance, /Collapse all/);
+  assert.match(fundamentalsGuidance, /role="switch"/);
+  assert.match(fundamentalsGuidance, /aria-expanded/);
+  assert.doesNotMatch(fundamentalsGuidance, /dangerouslySetInnerHTML/);
 });

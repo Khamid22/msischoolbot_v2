@@ -189,7 +189,8 @@ export function FundamentalsItemEditor({
               <div>
                 <h3 className="text-sm font-black">Lesson content</h3>
                 <p className="text-xs text-muted-foreground">
-                  Safe formatted blocks for teachers.
+                  Blocks before the first Heading appear under Before You Teach.
+                  Each Heading starts an expandable guidance section.
                 </p>
               </div>
               <button

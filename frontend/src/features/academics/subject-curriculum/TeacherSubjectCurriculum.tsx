@@ -204,7 +204,12 @@ export function TeacherSubjectCurriculum({
               </p>
             </div>
           </div>
-          <CurriculumTable detail={detail} loading={loading} error={error} />
+          <CurriculumTable
+            detail={detail}
+            loading={loading}
+            error={error}
+            useGuidanceLayout={selectedVariant.curriculumKey === "fundamentals"}
+          />
         </section>
       ) : (
         <CurriculumTable detail={null} loading={loading} error={error} />

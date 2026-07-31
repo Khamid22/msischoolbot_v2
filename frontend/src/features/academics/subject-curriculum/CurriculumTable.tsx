@@ -20,6 +20,7 @@ import type {
   CurriculumItem,
 } from "./model";
 import { formatCurriculumUpdatedAt } from "./model";
+import { FundamentalsGuidance } from "./FundamentalsGuidance";
 
 function ContentBlock({ block }: { block: CurriculumContentBlock }) {
   if (block.blockType === "heading") {
@@ -52,10 +53,29 @@ function AssetIcon({ asset }: { asset: CurriculumAsset }) {
 function LessonDetail({
   item,
   onClose,
+  useGuidanceLayout,
 }: {
   item: CurriculumItem | null;
   onClose: () => void;
+  useGuidanceLayout: boolean;
 }) {
+  if (useGuidanceLayout) {
+    return (
+      <Modal
+        open={Boolean(item)}
+        title="Fundamentals teacher guidance"
+        subtitle={item ? [item.lessonNumber, item.termLabel, item.weekLabel].filter(Boolean).join(" · ") : ""}
+        onClose={onClose}
+        size="wide"
+        mobileMode="fullscreen"
+        panelClassName="bg-background"
+      >
+        <ModalBody className="p-0 sm:p-4">
+          {item ? <FundamentalsGuidance item={item} /> : null}
+        </ModalBody>
+      </Modal>
+    );
+  }
   return (
     <Modal
       open={Boolean(item)}
@@ -123,6 +143,7 @@ export function CurriculumTable({
   onArchive,
   onRestore,
   onMove,
+  useGuidanceLayout = false,
 }: {
   detail: CurriculumDetail | null;
   loading?: boolean;
@@ -133,6 +154,7 @@ export function CurriculumTable({
   onArchive?: (item: CurriculumItem) => void;
   onRestore?: (item: CurriculumItem) => void;
   onMove?: (item: CurriculumItem, direction: -1 | 1) => void;
+  useGuidanceLayout?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [type, setType] = useState<"all" | "lesson" | "exam">("all");
@@ -319,7 +341,11 @@ export function CurriculumTable({
           </div>
         </details>
       ) : null}
-      <LessonDetail item={selected} onClose={() => setSelected(null)} />
+      <LessonDetail
+        item={selected}
+        onClose={() => setSelected(null)}
+        useGuidanceLayout={useGuidanceLayout}
+      />
     </>
   );
 }

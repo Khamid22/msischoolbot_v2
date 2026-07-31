@@ -350,6 +350,7 @@ export function DirectorSubjectCurriculum({
           loading={loading}
           error={error}
           editable={isEditable}
+          useGuidanceLayout={isEditable}
           busyItemId={busyItemId}
           onEdit={openEditor}
           onMove={moveItem}
