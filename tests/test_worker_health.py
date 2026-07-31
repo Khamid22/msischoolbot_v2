@@ -8,7 +8,8 @@ from urllib.request import urlopen
 from backend.application.worker_health import start_worker_health_server
 
 
-def test_worker_health_server_reports_readiness():
+def test_worker_health_server_reports_configured_service(monkeypatch):
+    monkeypatch.setenv("WORKER_ID", "curriculum-worker")
     health_server = start_worker_health_server(host="127.0.0.1", port=0)
     try:
         with urlopen(  # noqa: S310 - local test server only
@@ -18,7 +19,7 @@ def test_worker_health_server_reports_readiness():
             assert response.status == 200
             assert json.load(response) == {
                 "status": "ready",
-                "service": "finance-worker",
+                "service": "curriculum-worker",
             }
     finally:
         health_server.close()

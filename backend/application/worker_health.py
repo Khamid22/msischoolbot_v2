@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
@@ -11,12 +12,18 @@ from threading import Thread
 LOGGER = logging.getLogger("msi.worker.health")
 
 
+def _worker_service_name() -> str:
+    return str(os.getenv("WORKER_ID", "") or "").strip() or "durable-worker"
+
+
 class _WorkerHealthHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 - inherited HTTP handler name
         if self.path != "/health/ready":
             self.send_error(404)
             return
-        body = json.dumps({"status": "ready", "service": "finance-worker"}).encode()
+        body = json.dumps(
+            {"status": "ready", "service": _worker_service_name()}
+        ).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -43,7 +50,7 @@ def start_worker_health_server(*, host: str, port: int) -> WorkerHealthServer:
     server.daemon_threads = True
     thread = Thread(
         target=server.serve_forever,
-        name="finance-worker-health",
+        name=f"{_worker_service_name()}-health",
         daemon=True,
     )
     thread.start()
