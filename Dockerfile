@@ -11,6 +11,8 @@ RUN npm run build
 
 FROM python:3.12-slim AS runtime
 
+ARG RAILWAY_SERVICE_NAME
+
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV TZ=Asia/Tashkent
@@ -19,6 +21,14 @@ WORKDIR /app
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg tzdata \
+    && if [ "$RAILWAY_SERVICE_NAME" = "curriculum-worker" ]; then \
+        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            libreoffice-core \
+            libreoffice-impress \
+            poppler-utils \
+            fonts-dejavu-core \
+            fonts-liberation; \
+    fi \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./

@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from urllib.request import urlopen
 
 from backend.application.worker_health import start_worker_health_server
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_worker_health_server_reports_configured_service(monkeypatch):
@@ -23,3 +26,12 @@ def test_worker_health_server_reports_configured_service(monkeypatch):
             }
     finally:
         health_server.close()
+
+
+def test_curriculum_worker_image_installs_presentation_tools_only_for_its_service():
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    assert 'ARG RAILWAY_SERVICE_NAME' in dockerfile
+    assert '[ "$RAILWAY_SERVICE_NAME" = "curriculum-worker" ]' in dockerfile
+    assert "libreoffice-impress" in dockerfile
+    assert "poppler-utils" in dockerfile
